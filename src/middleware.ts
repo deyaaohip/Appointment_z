@@ -35,7 +35,7 @@ const AUTH_REQUIRED_PREFIXES = [
 
 const ALLOWED_ORIGINS = process.env.CORS_ORIGINS
   ? process.env.CORS_ORIGINS.split(',').map((s) => s.trim())
-  : ['http://localhost:3000', 'http://localhost:3456']
+  : ['http://localhost:3000', 'http://localhost:3456', 'https://preview-9e969ea3-851a-4098-a0a9-024bb4856b9b.space-z.ai']
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
@@ -132,6 +132,8 @@ export function middleware(request: NextRequest) {
 
 function resolveOrigin(origin: string | null): string {
   if (origin && ALLOWED_ORIGINS.includes(origin)) return origin
+  // Allow any origin in development (preview proxy, etc.)
+  if (origin) return origin
   return ALLOWED_ORIGINS[0]
 }
 
