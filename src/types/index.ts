@@ -147,6 +147,7 @@ export type PermissionResource =
   | 'notifications'
   | 'audit_logs'
   | 'whatsapp'
+  | 'subscriptions'
 
 export type PermissionAction =
   | 'view'

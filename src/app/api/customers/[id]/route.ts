@@ -29,7 +29,6 @@ export async function GET(
         bookings: {
           include: {
             branch: { select: { id: true, name: true } },
-            employee: { select: { id: true, name: true, avatar: true } },
             services: { include: { service: true } },
             payments: true,
           },

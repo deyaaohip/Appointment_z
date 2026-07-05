@@ -85,7 +85,6 @@ export async function GET(request: NextRequest) {
         where: { tenantId: tid },
         include: {
           customer: { select: { firstName: true, lastName: true } },
-          employee: { select: { id: true, name: true, avatar: true } },
           branch: { select: { id: true, name: true } },
           services: { include: { service: { select: { name: true } } } },
           payments: { select: { amount: true, status: true } },
@@ -229,10 +228,10 @@ export async function GET(request: NextRequest) {
     }))
 
     // ─── Top Employees (batch enrich) ───────────────────────────────────
-    // Booking.employeeId references TenantUser, not Employee
+    // Booking.employeeId references Employee table
     const employeeIds = topEmployeesRaw.map((e) => e.employeeId).filter(Boolean) as string[]
     const employeeDetails = employeeIds.length > 0
-      ? await db.tenantUser.findMany({ where: { id: { in: employeeIds } }, select: { id: true, name: true } })
+      ? await db.employee.findMany({ where: { id: { in: employeeIds } }, select: { id: true, name: true } })
       : []
     const employeeMap = new Map(employeeDetails.map((e) => [e.id, e.name]))
 
@@ -245,9 +244,17 @@ export async function GET(request: NextRequest) {
     }))
 
     // ─── Recent Bookings (transform to flat shape) ──────────────────────
+    // Enrich recent bookings with employee names
+    const rbEmpIds = [...new Set(recentBookingsRaw.map(b => b.employeeId).filter(Boolean))] as string[]
+    const rbEmployees = rbEmpIds.length > 0
+      ? await db.employee.findMany({ where: { id: { in: rbEmpIds } }, select: { id: true, name: true } })
+      : []
+    const rbEmpMap = new Map(rbEmployees.map(e => [e.id, e.name]))
+
     const recentBookings = recentBookingsRaw.map((b) => ({
       id: b.id,
       customerName: `${b.customer.firstName} ${b.customer.lastName}`.trim(),
+      employeeName: b.employeeId ? (rbEmpMap.get(b.employeeId) ?? '—') : '—',
       serviceName: b.services[0]?.service?.name ?? '—',
       date: b.startDate.toISOString().slice(0, 10),
       time: b.startTime ?? '',

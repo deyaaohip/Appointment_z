@@ -15,6 +15,7 @@ const DEFAULT_PERMISSIONS: PermissionMap = {
   notifications: { view: true, create: false, edit: false, delete: false, export: false, manage: false },
   audit_logs: { view: true, create: false, edit: false, delete: false, export: true, manage: false },
   whatsapp: { view: true, create: true, edit: true, delete: false, export: true, manage: true },
+  subscriptions: { view: true, create: true, edit: true, delete: true, export: true, manage: true },
 }
 
 // Map between DB-stored action names and the canonical RBAC action names
