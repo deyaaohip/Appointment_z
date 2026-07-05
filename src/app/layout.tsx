@@ -28,6 +28,7 @@ export default function RootLayout({
     <html lang="ar" dir="rtl" suppressHydrationWarning>
       <body
         className={`${cairo.variable} font-sans antialiased bg-background text-foreground`}
+        suppressHydrationWarning
       >
         <Providers>{children}</Providers>
         <Toaster />
