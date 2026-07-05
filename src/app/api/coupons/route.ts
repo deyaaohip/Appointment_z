@@ -55,7 +55,7 @@ const createCouponSchema = z.object({
   code: z.string().min(3).max(50),
   type: z.enum(['percentage', 'fixed']),
   value: z.number().min(0).max(1000000),
-  valueType: z.enum(['percentage', 'fixed_amount']),
+  valueType: z.enum(['percentage', 'fixed_amount']).optional(),
   minPurchase: z.number().min(0).optional(),
   maxUses: z.number().int().min(1).optional(),
   startDate: z.string().optional(),

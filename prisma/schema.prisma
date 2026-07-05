@@ -191,7 +191,6 @@ model TenantUser {
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
   auditLogs        AuditLog[]
-  assignedBookings Booking[]  @relation("EmployeeBooking")
   role             Role       @relation(fields: [roleId], references: [id])
   tenant           Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -419,7 +418,7 @@ model Booking {
   updatedAt         DateTime         @updatedAt
   parent            Booking?         @relation("BookingChildren", fields: [parentBookingId], references: [id])
   children          Booking[]        @relation("BookingChildren")
-  employee          TenantUser?      @relation("EmployeeBooking", fields: [employeeId], references: [id])
+  // employeeId references Employee.id (not TenantUser) - kept as plain field to avoid FK conflicts
   customer          Customer         @relation(fields: [customerId], references: [id])
   branch            Branch           @relation(fields: [branchId], references: [id])
   tenant            Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)

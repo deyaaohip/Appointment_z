@@ -80,7 +80,6 @@ export async function PATCH(
         data: { status: newStatus },
         include: {
           customer: true,
-          employee: { select: { id: true, name: true, avatar: true } },
           branch: true,
           services: { include: { service: true } },
           payments: true,
@@ -88,9 +87,16 @@ export async function PATCH(
       })
     })
 
+    // Enrich with employee data
+    let enriched = { ...updated, employee: null as null | { id: string; name: string; avatar: string | null } }
+    if (updated.employeeId) {
+      const emp = await db.employee.findFirst({ where: { id: updated.employeeId }, select: { id: true, name: true, avatar: true } })
+      enriched = { ...enriched, employee: emp }
+    }
+
     return ok(
       {
-        booking: updated,
+        booking: enriched,
         message: `Booking status updated from "${currentStatus}" to "${newStatus}"`,
       },
       request.headers.get('origin')

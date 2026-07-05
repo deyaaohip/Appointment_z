@@ -27,7 +27,6 @@ export async function GET(
       where: { id, tenantId: tenant.id },
       include: {
         customer: true,
-        employee: { select: { id: true, name: true, avatar: true, email: true, phone: true } },
         branch: true,
         services: { include: { service: true } },
         payments: true,
@@ -40,7 +39,14 @@ export async function GET(
       return err('Booking not found', 404, request.headers.get('origin'))
     }
 
-    return ok({ booking }, request.headers.get('origin'))
+    // Enrich with employee data
+    let enriched = { ...booking, employee: null as null | { id: string; name: string; avatar: string | null; email: string | null; phone: string | null } }
+    if (booking.employeeId) {
+      const emp = await db.employee.findFirst({ where: { id: booking.employeeId }, select: { id: true, name: true, avatar: true, email: true, phone: true } })
+      enriched = { ...enriched, employee: emp }
+    }
+
+    return ok({ booking: enriched }, request.headers.get('origin'))
   } catch (error) {
     console.error('Booking detail error:', error)
     return internalError(request.headers.get('origin'))
@@ -114,14 +120,20 @@ export async function PUT(
       data: updateData,
       include: {
         customer: true,
-        employee: { select: { id: true, name: true, avatar: true } },
         branch: true,
         services: { include: { service: true } },
         payments: true,
       },
     })
 
-    return ok({ booking }, request.headers.get('origin'))
+    // Enrich with employee data
+    let enriched = { ...booking, employee: null as null | { id: string; name: string; avatar: string | null } }
+    if (booking.employeeId) {
+      const emp = await db.employee.findFirst({ where: { id: booking.employeeId }, select: { id: true, name: true, avatar: true } })
+      enriched = { ...enriched, employee: emp }
+    }
+
+    return ok({ booking: enriched }, request.headers.get('origin'))
   } catch (error) {
     console.error('Update booking error:', error)
     return internalError(request.headers.get('origin'))
@@ -155,14 +167,20 @@ export async function DELETE(
       data: { status: 'cancelled' },
       include: {
         customer: true,
-        employee: { select: { id: true, name: true, avatar: true } },
         branch: true,
         services: { include: { service: true } },
         payments: true,
       },
     })
 
-    return ok({ booking, message: 'Booking cancelled successfully' }, request.headers.get('origin'))
+    // Enrich with employee data
+    let enriched = { ...booking, employee: null as null | { id: string; name: string; avatar: string | null } }
+    if (booking.employeeId) {
+      const emp = await db.employee.findFirst({ where: { id: booking.employeeId }, select: { id: true, name: true, avatar: true } })
+      enriched = { ...enriched, employee: emp }
+    }
+
+    return ok({ booking: enriched, message: 'Booking cancelled successfully' }, request.headers.get('origin'))
   } catch (error) {
     console.error('Delete booking error:', error)
     return internalError(request.headers.get('origin'))

@@ -19,10 +19,18 @@ import type { PermissionResource, PermissionAction, PermissionMap } from '@/type
 
 const ALLOWED_ORIGINS = process.env.CORS_ORIGINS
   ? process.env.CORS_ORIGINS.split(',').map((s) => s.trim())
-  : ['http://localhost:3000', 'http://localhost:3456']
+  : ['http://localhost:3000', 'http://localhost:3456', 'https://preview-9e969ea3-851a-4098-a0a9-024bb4856b9b.space-z.ai']
 
 export function getCorsHeaders(origin?: string | null): Record<string, string> {
-  const allowed = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0]
+  // Allow any origin in development (preview proxy, etc.)
+  let allowed: string
+  if (origin && ALLOWED_ORIGINS.includes(origin)) {
+    allowed = origin
+  } else if (origin) {
+    allowed = origin
+  } else {
+    allowed = ALLOWED_ORIGINS[0]
+  }
   return {
     'Access-Control-Allow-Origin': allowed,
     'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',

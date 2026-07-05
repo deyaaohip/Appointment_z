@@ -1,0 +1,1009 @@
+     1→'use client'
+     2→
+     3→import { useState } from 'react'
+     4→import { MessageSquare, Send, Clock, Settings, BarChart3, FileText, Plus, Search, Filter, MoreVertical, Check, X, AlertCircle, AlertTriangle, CheckCircle2, Users, CalendarDays, Phone, FileCode, Zap, Bell, ChevronDown, ChevronLeft, ChevronRight, RefreshCw, Pencil, Trash2, Loader2 } from 'lucide-react'
+     5→import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+     6→import { Button } from '@/components/ui/button'
+     7→import { Input } from '@/components/ui/input'
+     8→import { Badge } from '@/components/ui/badge'
+     9→import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+    10→import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table'
+    11→import { Skeleton } from '@/components/ui/skeleton'
+    12→import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
+    13→import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
+    14→import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
+    15→import { Textarea } from '@/components/ui/textarea'
+    16→import { Label } from '@/components/ui/label'
+    17→import { useAppStore } from '@/stores/app-store'
+    18→import { t, getDirection } from '@/lib/i18n'
+    19→import { toast } from 'sonner'
+    20→
+    21→// ─── CSV Export Helper ─────────────────────────────────────────────
+    22→
+    23→function handleExport(data: Array<Record<string, string>>, filename: string) {
+    24→  const csvRows = [
+    25→    ['ID', 'Name', 'Status', 'Date', 'Time', 'Type'].join(','),
+    26→    ...data.map(row => Object.values(row).map(v => String(v ?? '')).join(',')),
+    27→  ]
+    28→  const csv = csvRows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n')
+    29→  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+    30→  const url = URL.createObjectURL(blob)
+    31→  const a = document.createElement('a')
+    32→  a.href = url
+    33→  a.download = `${filename}.csv`
+    34→  document.body.appendChild(a)
+    35→  a.click()
+    36→  document.body.removeChild(a)
+    37→  URL.revokeObjectURL(url)
+    38→}
+    39→
+    40→// ─── Table Skeleton ────────────────────────────────────────────────
+    41→
+    42→function TableSkeleton({ rows = 6, cols = 5, className }: { rows?: number; cols?: number; className?: string }) {
+    43→  return (
+    44→    <div className={className}>
+    45→      <div className="rounded-lg border overflow-hidden">
+    46→        {/* Header skeleton */}
+    47→        <div className="flex gap-2 bg-muted/50 p-3">
+    48→          {Array.from({ length: cols }).map((_, i) => (
+    49→            <Skeleton key={`h-${i}`} className="h-4 flex-1" />
+    50→          ))}
+    51→        </div>
+    52→        {/* Row skeletons */}
+    53→        {Array.from({ length: rows }).map((_, r) => (
+    54→          <div key={`r-${r}`} className="flex gap-2 p-3 border-t">
+    55→            {Array.from({ length: cols }).map((_, c) => (
+    56→              <Skeleton key={`c-${c}`} className="h-4 flex-1" />
+    57→            ))}
+    58→          </div>
+    59→        ))}
+    60→      </div>
+    61→    </div>
+    62→  )
+    63→}
+    64→
+    65→// ─── Sub-components ────────────────────────────────────────────────
+    66→
+    67→function StatCard({ icon: Icon, label, value, color, sub }: {
+    68→  icon: React.ElementType; label: string; value: string | number; color: string; sub?: string
+    69→}) {
+    70→  const colorMap: Record<string, string> = {
+    71→    green: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400',
+    72→    blue: 'bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400',
+    73→    orange: 'bg-amber-50 text-amber-600 dark:bg-amber-950/30 dark:text-amber-400',
+    74→    red: 'bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-400',
+    75→    purple: 'bg-purple-50 text-purple-600 dark:bg-purple-950/30 dark:text-purple-400',
+    76→  }
+    77→  return (
+    78→    <Card>
+    79→      <CardContent className="p-4 sm:p-5">
+    80→        <div className="flex items-start justify-between">
+    81→          <div className="space-y-1">
+    82→            <p className="text-sm text-muted-foreground">{label}</p>
+    83→            <p className="text-2xl font-bold">{value}</p>
+    84→            {sub && <p className="text-xs text-muted-foreground">{sub}</p>}
+    85→          </div>
+    86→          <div className={`rounded-xl p-2.5 ${colorMap[color] || colorMap.green}`}>
+    87→            <Icon className="h-5 w-5" />
+    88→          </div>
+    89→        </div>
+    90→      </CardContent>
+    91→    </Card>
+    92→  )
+    93→}
+    94→
+    95→// ─── Template Manager ──────────────────────────────────────────────
+    96→
+    97→function TemplatesTab({ locale }: { locale: string }) {
+    98→  const isAr = locale === 'ar'
+    99→  const dir = getDirection(locale)
+   100→  const [search, setSearch] = useState('')
+   101→  const [templateDialogOpen, setTemplateDialogOpen] = useState(false)
+   102→  const [editingTemplate, setEditingTemplate] = useState<{ id: string; name: string; body: string; type: string; lang: string; status: string; variables: string[] } | null>(null)
+   103→  const [templateName, setTemplateName] = useState('')
+   104→  const [templateContent, setTemplateContent] = useState('')
+   105→  const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
+   106→
+   107→  const defaultTemplates = [
+   108→    { id: '1', name: isAr ? 'تذكير موعد' : 'Appointment Reminder', type: 'reminder', lang: isAr ? 'عربي' : 'English', status: 'active', variables: ['{{customer_name}}', '{{service_name}}', '{{date}}', '{{time}}'], body: isAr ? 'مرحباً {{customer_name}}، نذكرك بموعدك لخدمة {{service_name}} يوم {{date}} الساعة {{time}}. نتطلع لرؤيتك!' : 'Hello {{customer_name}}, this is a reminder for your {{service_name}} appointment on {{date}} at {{time}}. We look forward to seeing you!' },
+   109→    { id: '2', name: isAr ? 'تأكيد حجز' : 'Booking Confirmation', type: 'confirmation', lang: isAr ? 'عربي' : 'English', status: 'active', variables: ['{{customer_name}}', '{{service_name}}', '{{date}}', '{{time}}', '{{location}}'], body: isAr ? 'تم تأكيد حجزك بنجاح! {{customer_name}} - {{service_name}} - {{date}} الساعة {{time}} - {{location}}' : 'Your booking is confirmed! {{customer_name}} - {{service_name}} - {{date}} at {{time}} - {{location}}' },
+   110→    { id: '3', name: isAr ? 'إلغاء موعد' : 'Cancellation Notice', type: 'cancellation', lang: isAr ? 'عربي' : 'English', status: 'active', variables: ['{{customer_name}}', '{{service_name}}', '{{date}}'], body: isAr ? 'عذراً {{customer_name}}، تم إلغاء موعدك لخدمة {{service_name}} يوم {{date}}. يمكنك إعادة الحجز في أي وقت.' : 'Sorry {{customer_name}}, your {{service_name}} appointment on {{date}} has been cancelled. You can rebook anytime.' },
+   111→    { id: '4', name: isAr ? 'متابعة بعد الزيارة' : 'Follow-up', type: 'followup', lang: 'English', status: 'draft', variables: ['{{customer_name}}', '{{service_name}}'], body: isAr ? 'شكراً لزيارتك {{customer_name}}! نأمل أن تكون تجربتك مع {{service_name}} ممتازة. لا تتردد في حجز موعدك القادم.' : 'Thank you for visiting {{customer_name}}! We hope your {{service_name}} experience was excellent. Book your next appointment today.' },
+   112→  ]
+   113→
+   114→  const [templates, setTemplates] = useState(defaultTemplates)
+   115→
+   116→  const filtered = templates.filter(tmpl =>
+   117→    tmpl.name.toLowerCase().includes(search.toLowerCase()) ||
+   118→    tmpl.type.toLowerCase().includes(search.toLowerCase())
+   119→  )
+   120→
+   121→  const typeColors: Record<string, string> = {
+   122→    reminder: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
+   123→    confirmation: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+   124→    cancellation: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+   125→    followup: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
+   126→  }
+   127→
+   128→  const extractVariables = (text: string) => {
+   129→    const matches = text.match(/\{\{[a-z_]+\}\}/g)
+   130→    return [...new Set(matches || [])]
+   131→  }
+   132→
+   133→  const openNewTemplate = () => {
+   134→    setEditingTemplate(null)
+   135→    setTemplateName('')
+   136→    setTemplateContent('')
+   137→    setTemplateDialogOpen(true)
+   138→  }
+   139→
+   140→  const openEditTemplate = (tmpl: typeof templates[number]) => {
+   141→    setEditingTemplate(tmpl)
+   142→    setTemplateName(tmpl.name)
+   143→    setTemplateContent(tmpl.body)
+   144→    setTemplateDialogOpen(true)
+   145→  }
+   146→
+   147→  const handleSaveTemplate = () => {
+   148→    if (!templateName.trim() || !templateContent.trim()) return
+   149→    if (editingTemplate) {
+   150→      setTemplates(prev => prev.map(t =>
+   151→        t.id === editingTemplate.id
+   152→          ? { ...t, name: templateName.trim(), body: templateContent.trim(), variables: extractVariables(templateContent) }
+   153→          : t
+   154→      ))
+   155→      toast.success(isAr ? 'تم تحديث القالب بنجاح' : 'Template updated successfully')
+   156→    } else {
+   157→      const newTmpl = {
+   158→        id: `t${Date.now()}`,
+   159→        name: templateName.trim(),
+   160→        type: 'custom' as const,
+   161→        lang: isAr ? 'عربي' : 'English',
+   162→        status: 'draft' as const,
+   163→        variables: extractVariables(templateContent),
+   164→        body: templateContent.trim(),
+   165→      }
+   166→      setTemplates(prev => [...prev, newTmpl])
+   167→      toast.success(isAr ? 'تم إضافة القالب بنجاح' : 'Template added successfully')
+   168→    }
+   169→    setTemplateDialogOpen(false)
+   170→  }
+   171→
+   172→  const handleDeleteTemplate = () => {
+   173→    if (!deleteTarget) return
+   174→    setTemplates(prev => prev.filter(t => t.id !== deleteTarget))
+   175→    setDeleteTarget(null)
+   176→    toast.success(isAr ? 'تم حذف القالب' : 'Template deleted')
+   177→  }
+   178→
+   179→  return (
+   180→    <div dir={dir} className="space-y-4">
+   181→      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+   182→        <div>
+   183→          <h3 className="text-lg font-semibold">{isAr ? 'قوالب الرسائل' : 'Message Templates'}</h3>
+   184→          <p className="text-sm text-muted-foreground">
+   185→            {isAr ? 'إدارة قوالب رسائل الواتساب' : 'Manage WhatsApp message templates'}
+   186→          </p>
+   187→        </div>
+   188→        <Button className="gap-2 bg-emerald-600 hover:bg-emerald-700" onClick={openNewTemplate}>
+   189→          <Plus className="h-4 w-4" />
+   190→          {isAr ? 'قالب جديد' : 'New Template'}
+   191→        </Button>
+   192→      </div>
+   193→
+   194→      <div className="relative max-w-sm">
+   195→        <Search className="absolute start-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+   196→        <Input
+   197→          value={search}
+   198→          onChange={(e) => setSearch(e.target.value)}
+   199→          placeholder={isAr ? 'بحث في القوالب...' : 'Search templates...'}
+   200→          className="ps-9"
+   201→        />
+   202→      </div>
+   203→
+   204→      <div className="grid gap-4">
+   205→        {filtered.map((tmpl) => (
+   206→          <Card key={tmpl.id} className="hover:shadow-md transition-shadow">
+   207→            <CardContent className="p-4 sm:p-5">
+   208→              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+   209→                <div className="space-y-2 flex-1 min-w-0">
+   210→                  <div className="flex items-center gap-2 flex-wrap">
+   211→                    <h4 className="font-semibold">{tmpl.name}</h4>
+   212→                    <span className={`text-xs px-2 py-0.5 rounded-full ${typeColors[tmpl.type] || typeColors.reminder}`}>
+   213→                      {tmpl.type}
+   214→                    </span>
+   215→                    <Badge variant="outline" className="text-xs">
+   216→                      {tmpl.lang}
+   217→                    </Badge>
+   218→                    <Badge variant={tmpl.status === 'active' ? 'default' : 'secondary'} className="text-xs">
+   219→                      {tmpl.status === 'active' ? (isAr ? 'نشط' : 'Active') : (isAr ? 'مسودة' : 'Draft')}
+   220→                    </Badge>
+   221→                  </div>
+   222→                  <p className="text-sm text-muted-foreground line-clamp-2">{tmpl.body}</p>
+   223→                  <div className="flex flex-wrap gap-1.5">
+   224→                    {tmpl.variables.map((v) => (
+   225→                      <code key={v} className="text-xs bg-muted px-1.5 py-0.5 rounded">{v}</code>
+   226→                    ))}
+   227→                  </div>
+   228→                </div>
+   229→                <div className="flex gap-2 shrink-0">
+   230→                  <Button variant="outline" size="sm" onClick={() => openEditTemplate(tmpl)}>{isAr ? 'تعديل' : 'Edit'}</Button>
+   231→                  <DropdownMenu>
+   232→                    <DropdownMenuTrigger asChild>
+   233→                      <Button variant="ghost" size="icon" className="h-8 w-8">
+   234→                        <MoreVertical className="h-4 w-4" />
+   235→                      </Button>
+   236→                    </DropdownMenuTrigger>
+   237→                    <DropdownMenuContent align="end">
+   238→                      <DropdownMenuItem onClick={() => openEditTemplate(tmpl)}>
+   239→                        <Pencil className="h-4 w-4" />
+   240→                        {isAr ? 'تعديل' : 'Edit'}
+   241→                      </DropdownMenuItem>
+   242→                      <DropdownMenuSeparator />
+   243→                      <DropdownMenuItem variant="destructive" onClick={() => setDeleteTarget(tmpl.id)}>
+   244→                        <Trash2 className="h-4 w-4" />
+   245→                        {isAr ? 'حذف' : 'Delete'}
+   246→                      </DropdownMenuItem>
+   247→                    </DropdownMenuContent>
+   248→                  </DropdownMenu>
+   249→                </div>
+   250→              </div>
+   251→            </CardContent>
+   252→          </Card>
+   253→        ))}
+   254→      </div>
+   255→
+   256→      {/* Template Dialog */}
+   257→      <Dialog open={templateDialogOpen} onOpenChange={setTemplateDialogOpen}>
+   258→        <DialogContent>
+   259→          <DialogHeader>
+   260→            <DialogTitle>{editingTemplate ? (isAr ? 'تعديل القالب' : 'Edit Template') : (isAr ? 'قالب جديد' : 'New Template')}</DialogTitle>
+   261→            <DialogDescription>
+   262→              {editingTemplate ? (isAr ? 'تعديل بيانات القالب' : 'Update template details') : (isAr ? 'إنشاء قالب رسالة جديد' : 'Create a new message template')}
+   263→            </DialogDescription>
+   264→          </DialogHeader>
+   265→          <div className="space-y-4 py-2">
+   266→            <div className="space-y-2">
+   267→              <Label>{isAr ? 'اسم القالب' : 'Template Name'}</Label>
+   268→              <Input
+   269→                value={templateName}
+   270→                onChange={(e) => setTemplateName(e.target.value)}
+   271→                placeholder={isAr ? 'مثال: تذكير موعد' : 'e.g. Appointment Reminder'}
+   272→              />
+   273→            </div>
+   274→            <div className="space-y-2">
+   275→              <Label>{isAr ? 'محتوى الرسالة' : 'Message Content'}</Label>
+   276→              <Textarea
+   277→                value={templateContent}
+   278→                onChange={(e) => setTemplateContent(e.target.value)}
+   279→                placeholder={isAr ? 'مرحباً {{customer_name}}...' : 'Hello {{customer_name}}...'}
+   280→                rows={5}
+   281→              />
+   282→              <p className="text-xs text-muted-foreground">
+   283→                {isAr ? 'استخدم {{variable_name}} لإضافة متغيرات' : 'Use {{variable_name}} to add variables'}
+   284→              </p>
+   285→            </div>
+   286→          </div>
+   287→          <DialogFooter>
+   288→            <Button variant="outline" onClick={() => setTemplateDialogOpen(false)}>
+   289→              {isAr ? 'إلغاء' : 'Cancel'}
+   290→            </Button>
+   291→            <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={handleSaveTemplate} disabled={!templateName.trim() || !templateContent.trim()}>
+   292→              {isAr ? 'حفظ' : 'Save'}
+   293→            </Button>
+   294→          </DialogFooter>
+   295→        </DialogContent>
+   296→      </Dialog>
+   297→
+   298→      {/* Delete Confirmation */}
+   299→      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}>
+   300→        <AlertDialogContent>
+   301→          <AlertDialogHeader>
+   302→            <AlertDialogTitle>{isAr ? 'حذف القالب؟' : 'Delete Template?'}</AlertDialogTitle>
+   303→            <AlertDialogDescription>
+   304→              {isAr ? 'هل أنت متأكد من حذف هذا القالب؟ لا يمكن التراجع عن هذا الإجراء.' : 'Are you sure you want to delete this template? This action cannot be undone.'}
+   305→            </AlertDialogDescription>
+   306→          </AlertDialogHeader>
+   307→          <AlertDialogFooter>
+   308→            <AlertDialogCancel>{isAr ? 'إلغاء' : 'Cancel'}</AlertDialogCancel>
+   309→            <AlertDialogAction className="bg-destructive text-white hover:bg-destructive/90" onClick={handleDeleteTemplate}>
+   310→              {isAr ? 'حذف' : 'Delete'}
+   311→            </AlertDialogAction>
+   312→          </AlertDialogFooter>
+   313→        </AlertDialogContent>
+   314→      </AlertDialog>
+   315→    </div>
+   316→  )
+   317→}
+   318→
+   319→// ─── Send Reminders Tab ────────────────────────────────────────────
+   320→
+   321→function SendTab({ locale }: { locale: string }) {
+   322→  const isAr = locale === 'ar'
+   323→  const dir = getDirection(locale)
+   324→  const [sendType, setSendType] = useState<'individual' | 'bulk'>('bulk')
+   325→  const [sending, setSending] = useState(false)
+   326→  const [sent, setSent] = useState(0)
+   327→  const [total, setTotal] = useState(0)
+   328→  const [sendingId, setSendingId] = useState<string | null>(null)
+   329→  const [phone, setPhone] = useState('')
+   330→  const [individualSending, setIndividualSending] = useState(false)
+   331→  const [isLoading, setIsLoading] = useState(false)
+   332→  const [isError] = useState(false)
+   333→
+   334→  const defaultBookings = [
+   335→    { id: 'b1', customer: isAr ? 'أحمد محمد' : 'Ahmed Mohammed', phone: '+966501234567', service: isAr ? 'قص شعر' : 'Haircut', time: '10:00 AM', reminded: false },
+   336→    { id: 'b2', customer: isAr ? 'فاطمة علي' : 'Fatima Ali', phone: '+966509876543', service: isAr ? 'تجميل' : 'Makeup', time: '11:30 AM', reminded: true },
+   337→    { id: 'b3', customer: isAr ? 'خالد سعد' : 'Khaled Saad', phone: '+966507654321', service: isAr ? 'مساج' : 'Massage', time: '01:00 PM', reminded: false },
+   338→    { id: 'b4', customer: isAr ? 'نورة حسن' : 'Noura Hassan', phone: '+966503456789', service: isAr ? 'عناية بالبشرة' : 'Skincare', time: '02:30 PM', reminded: false },
+   339→    { id: 'b5', customer: isAr ? 'عمر يوسف' : 'Omar Youssef', phone: '+966508765432', service: isAr ? 'صبغة شعر' : 'Hair Color', time: '04:00 PM', reminded: true },
+   340→  ]
+   341→
+   342→  const [todayBookings, setTodayBookings] = useState(defaultBookings)
+   343→
+   344→  const refetch = () => {
+   345→    setIsLoading(true)
+   346→    setTimeout(() => {
+   347→      setTodayBookings(defaultBookings)
+   348→      setIsLoading(false)
+   349→    }, 600)
+   350→  }
+   351→
+   352→  const handleBulkSend = () => {
+   353→    setSending(true)
+   354→    setSent(0)
+   355→    setTotal(todayBookings.filter(b => !b.reminded).length)
+   356→    let count = 0
+   357→    const interval = setInterval(() => {
+   358→      count++
+   359→      setSent(count)
+   360→      if (count >= total) {
+   361→        clearInterval(interval)
+   362→        setSending(false)
+   363→      }
+   364→    }, 800)
+   365→  }
+   366→
+   367→  return (
+   368→    <div dir={dir} className="space-y-4">
+   369→      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+   370→        <div>
+   371→          <h3 className="text-lg font-semibold">{isAr ? 'إرسال التذكيرات' : 'Send Reminders'}</h3>
+   372→          <p className="text-sm text-muted-foreground">
+   373→            {isAr ? 'إرسال تذكيرات مواعيد عبر الواتساب' : 'Send appointment reminders via WhatsApp'}
+   374→          </p>
+   375→        </div>
+   376→      </div>
+   377→
+   378→      {/* Type Toggle */}
+   379→      <div className="flex gap-2 p-1 bg-muted rounded-lg w-fit">
+   380→        <Button
+   381→          variant={sendType === 'bulk' ? 'default' : 'ghost'}
+   382→          size="sm"
+   383→          onClick={() => setSendType('bulk')}
+   384→          className="gap-2"
+   385→        >
+   386→          <Users className="h-4 w-4" />
+   387→          {isAr ? 'إرسال جماعي' : 'Bulk Send'}
+   388→        </Button>
+   389→        <Button
+   390→          variant={sendType === 'individual' ? 'default' : 'ghost'}
+   391→          size="sm"
+   392→          onClick={() => setSendType('individual')}
+   393→          className="gap-2"
+   394→        >
+   395→          <Send className="h-4 w-4" />
+   396→          {isAr ? 'إرسال فردي' : 'Individual'}
+   397→        </Button>
+   398→      </div>
+   399→
+   400→      {sendType === 'bulk' && (
+   401→        <>
+   402→          {/* Stats */}
+   403→          <Card className="border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20">
+   404→            <CardContent className="p-4">
+   405→              <div className="flex items-center gap-3">
+   406→                <CalendarDays className="h-5 w-5 text-emerald-600" />
+   407→                <div>
+   408→                  <p className="font-medium">
+   409→                    {isAr ? `مواعيد اليوم: ${todayBookings.length} | بانتظار التذكير: ${todayBookings.filter(b => !b.reminded).length}` :
+   410→                      `Today's bookings: ${todayBookings.length} | Pending reminders: ${todayBookings.filter(b => !b.reminded).length}`}
+   411→                  </p>
+   412→                  <p className="text-sm text-muted-foreground">
+   413→                    {isAr ? 'سيتم إرسال التذكيرات للحجوزات التي لم يتم تذكيرها بعد' :
+   414→                      'Reminders will be sent for bookings not yet reminded'}
+   415→                  </p>
+   416→                </div>
+   417→              </div>
+   418→            </CardContent>
+   419→          </Card>
+   420→
+   421→          {/* Progress */}
+   422→          {sending && (
+   423→            <Card>
+   424→              <CardContent className="p-4">
+   425→                <div className="flex items-center justify-between mb-2">
+   426→                  <span className="text-sm font-medium">{isAr ? 'جاري الإرسال...' : 'Sending...'}</span>
+   427→                  <span className="text-sm text-muted-foreground">{sent}/{total}</span>
+   428→                </div>
+   429→                <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+   430→                  <div
+   431→                    className="h-full bg-emerald-500 rounded-full transition-all duration-500"
+   432→                    style={{ width: `${total > 0 ? (sent / total) * 100 : 0}%` }}
+   433→                  />
+   434→                </div>
+   435→              </CardContent>
+   436→            </Card>
+   437→          )}
+   438→
+   439→          {/* Bookings Table */}
+   440→          {isLoading ? (
+   441→            <TableSkeleton rows={6} cols={5} className="mb-4" />
+   442→          ) : isError || !todayBookings?.length ? (
+   443→            <div className="flex flex-col items-center justify-center py-12 text-center">
+   444→              <div className="rounded-full bg-red-50 dark:bg-red-900/30 p-3 mb-3">
+   445→                <AlertTriangle className="h-5 w-5 text-red-500" />
+   446→              </div>
+   447→              <h3 className="text-sm font-semibold">{t(locale, 'common', 'error')}</h3>
+   448→              <p className="text-xs text-red-600 dark:text-red-400">{t(locale, 'common', 'tryAgain')}</p>
+   449→              <Button variant="outline" size="sm" onClick={() => refetch()} className="mt-3">
+   450→                <RefreshCw className="h-3.5 w-3.5" />
+   451→              </Button>
+   452→            </div>
+   453→          ) : (
+   454→            <div className="rounded-lg border">
+   455→              <Table>
+   456→                <TableHeader>
+   457→                  <TableRow>
+   458→                    <TableHead className="p-3 font-medium">{isAr ? 'العميل' : 'Customer'}</TableHead>
+   459→                    <TableHead className="p-3 font-medium">{isAr ? 'الخدمة' : 'Service'}</TableHead>
+   460→                    <TableHead className="p-3 font-medium">{isAr ? 'الوقت' : 'Time'}</TableHead>
+   461→                    <TableHead className="p-3 font-medium">{isAr ? 'الحالة' : 'Status'}</TableHead>
+   462→                    <TableHead className="p-3 font-medium">{isAr ? 'إجراء' : 'Action'}</TableHead>
+   463→                  </TableRow>
+   464→                </TableHeader>
+   465→                <TableBody>
+   466→                  {todayBookings.map((b) => (
+   467→                    <TableRow key={b.id}>
+   468→                      <TableCell className="p-3">
+   469→                        <div className="flex items-center gap-2">
+   470→                          <div className="h-8 w-8 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-600 font-medium text-xs">
+   471→                            {b.customer.charAt(0)}
+   472→                          </div>
+   473→                          <div>
+   474→                            <p className="font-medium">{b.customer}</p>
+   475→                            <p className="text-xs text-muted-foreground" dir="ltr">{b.phone}</p>
+   476→                          </div>
+   477→                        </div>
+   478→                      </TableCell>
+   479→                      <TableCell className="p-3">{b.service}</TableCell>
+   480→                      <TableCell className="p-3">{b.time}</TableCell>
+   481→                      <TableCell className="p-3">
+   482→                        {b.reminded ? (
+   483→                          <Badge variant="secondary" className="gap-1 bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+   484→                            <CheckCircle2 className="h-3 w-3" />
+   485→                            {isAr ? 'تم التذكير' : 'Reminded'}
+   486→                          </Badge>
+   487→                        ) : (
+   488→                          <Badge variant="outline">{isAr ? 'بانتظار' : 'Pending'}</Badge>
+   489→                        )}
+   490→                      </TableCell>
+   491→                      <TableCell className="p-3">
+   492→                        <Button
+   493→                          variant="outline"
+   494→                          size="sm"
+   495→                          disabled={b.reminded || sending || sendingId === b.id}
+   496→                          className="gap-1.5"
+   497→                          onClick={() => {
+   498→                            setSendingId(b.id)
+   499→                            setTimeout(() => {
+   500→                              setTodayBookings(prev => prev.map(booking =>
+   501→                                booking.id === b.id ? { ...booking, reminded: true } : booking
+   502→                              ))
+   503→                              setSendingId(null)
+   504→                              toast.success(isAr ? `تم إرسال التذكير إلى ${b.customer}` : `Reminder sent to ${b.customer}`)
+   505→                            }, 1500)
+   506→                          }}
+   507→                        >
+   508→                          {sendingId === b.id ? (
+   509→                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+   510→                          ) : (
+   511→                            <Send className="h-3.5 w-3.5" />
+   512→                          )}
+   513→                          {sendingId === b.id ? (isAr ? 'جاري الإرسال...' : 'Sending...') : (isAr ? 'إرسال' : 'Send')}
+   514→                        </Button>
+   515→                      </TableCell>
+   516→                    </TableRow>
+   517→                  ))}
+   518→                </TableBody>
+   519→              </Table>
+   520→            </div>
+   521→          )}
+   522→
+   523→          <Button
+   524→            className="gap-2 bg-emerald-600 hover:bg-emerald-700"
+   525→            onClick={handleBulkSend}
+   526→            disabled={sending || todayBookings.filter(b => !b.reminded).length === 0}
+   527→          >
+   528→            {sending ? (
+   529→              <>
+   530→                <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+   531→                {isAr ? `جاري الإرسال (${sent}/${total})` : `Sending (${sent}/${total})`}
+   532→              </>
+   533→            ) : (
+   534→              <>
+   535→                <Send className="h-4 w-4" />
+   536→                {isAr ? `إرسال تذكيرات جماعية (${todayBookings.filter(b => !b.reminded).length})` :
+   537→                  `Bulk Send Reminders (${todayBookings.filter(b => !b.reminded).length})`}
+   538→              </>
+   539→            )}
+   540→          </Button>
+   541→        </>
+   542→      )}
+   543→
+   544→      {sendType === 'individual' && (
+   545→        <Card>
+   546→          <CardContent className="p-5 space-y-4">
+   547→            <div className="grid gap-4 sm:grid-cols-2">
+   548→              <div className="space-y-2">
+   549→                <label className="text-sm font-medium">{isAr ? 'رقم الواتساب' : 'WhatsApp Number'}</label>
+   550→                <div className="flex items-center gap-2">
+   551→                  <Phone className="h-4 w-4 text-muted-foreground shrink-0" />
+   552→                  <Input placeholder="+966XXXXXXXXX" dir="ltr" className="text-start" value={phone} onChange={(e) => setPhone(e.target.value)} />
+   553→                </div>
+   554→              </div>
+   555→              <div className="space-y-2">
+   556→                <label className="text-sm font-medium">{isAr ? 'القالب' : 'Template'}</label>
+   557→                <select className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm">
+   558→                  <option>{isAr ? 'تذكير موعد' : 'Appointment Reminder'}</option>
+   559→                  <option>{isAr ? 'تأكيد حجز' : 'Booking Confirmation'}</option>
+   560→                  <option>{isAr ? 'إلغاء موعد' : 'Cancellation Notice'}</option>
+   561→                </select>
+   562→              </div>
+   563→            </div>
+   564→            <div className="space-y-2">
+   565→              <label className="text-sm font-medium">{isAr ? 'معاينة الرسالة' : 'Message Preview'}</label>
+   566→              <div className="rounded-lg border bg-muted/30 p-4 text-sm whitespace-pre-wrap min-h-[100px]">
+   567→                {isAr
+   568→                  ? 'مرحباً أحمد، نذكرك بموعدك لخدمة قص شعر يوم 2026-06-30 الساعة 10:00 AM. نتطلع لرؤيتك!'
+   569→                  : 'Hello Ahmed, this is a reminder for your Haircut appointment on 2026-06-30 at 10:00 AM. We look forward to seeing you!'}
+   570→              </div>
+   571→            </div>
+   572→            <Button
+   573→              className="gap-2 bg-emerald-600 hover:bg-emerald-700"
+   574→              disabled={individualSending}
+   575→              onClick={() => {
+   576→                if (!phone.trim()) {
+   577→                  toast.error(isAr ? 'يرجى إدخال رقم الواتساب' : 'Please enter a WhatsApp number')
+   578→                  return
+   579→                }
+   580→                setIndividualSending(true)
+   581→                setTimeout(() => {
+   582→                  setIndividualSending(false)
+   583→                  toast.success(isAr ? 'تم إرسال التذكير بنجاح' : 'Reminder sent successfully')
+   584→                  setPhone('')
+   585→                }, 1500)
+   586→              }}
+   587→            >
+   588→              {individualSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+   589→              {individualSending ? (isAr ? 'جاري الإرسال...' : 'Sending...') : (isAr ? 'إرسال التذكير' : 'Send Reminder')}
+   590→            </Button>
+   591→          </CardContent>
+   592→        </Card>
+   593→      )}
+   594→    </div>
+   595→  )
+   596→}
+   597→
+   598→// ─── History Tab ───────────────────────────────────────────────────
+   599→
+   600→function HistoryTab({ locale }: { locale: string }) {
+   601→  const isAr = locale === 'ar'
+   602→  const dir = getDirection(locale)
+   603→  const [isLoading, setIsLoading] = useState(false)
+   604→  const [isError] = useState(false)
+   605→
+   606→  const defaultHistory = [
+   607→    { id: 'h1', customer: isAr ? 'أحمد محمد' : 'Ahmed Mohammed', phone: '+966501234567', template: isAr ? 'تذكير موعد' : 'Appointment Reminder', status: 'delivered', sentAt: '2026-06-30 08:00 AM', readAt: '2026-06-30 08:15 AM' },
+   608→    { id: 'h2', customer: isAr ? 'فاطمة علي' : 'Fatima Ali', phone: '+966509876543', template: isAr ? 'تأكيد حجز' : 'Booking Confirmation', status: 'delivered', sentAt: '2026-06-30 07:00 AM', readAt: '2026-06-30 07:30 AM' },
+   609→    { id: 'h3', customer: isAr ? 'خالد سعد' : 'Khaled Saad', phone: '+966507654321', template: isAr ? 'تذكير موعد' : 'Appointment Reminder', status: 'sent', sentAt: '2026-06-29 09:00 PM', readAt: null },
+   610→    { id: 'h4', customer: isAr ? 'سارة أحمد' : 'Sara Ahmed', phone: '+966504567890', template: isAr ? 'إلغاء موعد' : 'Cancellation Notice', status: 'failed', sentAt: '2026-06-29 03:00 PM', readAt: null },
+   611→    { id: 'h5', customer: isAr ? 'نورة حسن' : 'Noura Hassan', phone: '+966503456789', template: isAr ? 'تذكير موعد' : 'Appointment Reminder', status: 'delivered', sentAt: '2026-06-29 10:00 AM', readAt: '2026-06-29 10:05 AM' },
+   612→  ]
+   613→
+   614→  const [history, setHistory] = useState(defaultHistory)
+   615→
+   616→  const refetch = () => {
+   617→    setIsLoading(true)
+   618→    setTimeout(() => {
+   619→      setHistory(defaultHistory)
+   620→      setIsLoading(false)
+   621→    }, 600)
+   622→  }
+   623→
+   624→  const statusColors: Record<string, string> = {
+   625→    delivered: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
+   626→    sent: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+   627→    failed: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+   628→  }
+   629→  const statusLabels: Record<string, string> = {
+   630→    delivered: isAr ? 'تم التوصيل' : 'Delivered',
+   631→    sent: isAr ? 'تم الإرسال' : 'Sent',
+   632→    failed: isAr ? 'فشل' : 'Failed',
+   633→  }
+   634→
+   635→  return (
+   636→    <div dir={dir} className="space-y-4">
+   637→      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+   638→        <div>
+   639→          <h3 className="text-lg font-semibold">{isAr ? 'سجل التذكيرات' : 'Reminder History'}</h3>
+   640→          <p className="text-sm text-muted-foreground">
+   641→            {isAr ? 'تتبع جميع التذكيرات المرسلة' : 'Track all sent reminders'}
+   642→          </p>
+   643→        </div>
+   644→        <Button
+   645→          variant="outline"
+   646→          className="gap-2"
+   647→          onClick={() =>
+   648→            handleExport(
+   649→              history.map(h => ({
+   650→                id: h.id,
+   651→                name: h.customer,
+   652→                status: h.status,
+   653→                date: h.sentAt.split(' ')[0],
+   654→                time: h.sentAt.split(' ')[1] ?? '',
+   655→                type: h.template,
+   656→              })),
+   657→              'whatsapp-reminder-history'
+   658→            )
+   659→          }
+   660→        >
+   661→          <FileText className="h-4 w-4" />
+   662→          {isAr ? 'تصدير' : 'Export'}
+   663→        </Button>
+   664→      </div>
+   665→
+   666→      {isLoading ? (
+   667→        <TableSkeleton rows={6} cols={5} className="mb-4" />
+   668→      ) : isError || !history?.length ? (
+   669→        <div className="flex flex-col items-center justify-center py-12 text-center">
+   670→          <div className="rounded-full bg-red-50 dark:bg-red-900/30 p-3 mb-3">
+   671→            <AlertTriangle className="h-5 w-5 text-red-500" />
+   672→          </div>
+   673→          <h3 className="text-sm font-semibold">{t(locale, 'common', 'error')}</h3>
+   674→          <p className="text-xs text-red-600 dark:text-red-400">{t(locale, 'common', 'tryAgain')}</p>
+   675→          <Button variant="outline" size="sm" onClick={() => refetch()} className="mt-3">
+   676→            <RefreshCw className="h-3.5 w-3.5" />
+   677→          </Button>
+   678→        </div>
+   679→      ) : (
+   680→        <div className="rounded-lg border">
+   681→          <Table>
+   682→            <TableHeader>
+   683→              <TableRow>
+   684→                <TableHead className="p-3 font-medium">{isAr ? 'العميل' : 'Customer'}</TableHead>
+   685→                <TableHead className="p-3 font-medium">{isAr ? 'القالب' : 'Template'}</TableHead>
+   686→                <TableHead className="p-3 font-medium">{isAr ? 'الحالة' : 'Status'}</TableHead>
+   687→                <TableHead className="p-3 font-medium">{isAr ? 'وقت الإرسال' : 'Sent At'}</TableHead>
+   688→                <TableHead className="p-3 font-medium">{isAr ? 'وقت القراءة' : 'Read At'}</TableHead>
+   689→              </TableRow>
+   690→            </TableHeader>
+   691→            <TableBody>
+   692→              {history.map((h) => (
+   693→                <TableRow key={h.id}>
+   694→                  <TableCell className="p-3">
+   695→                    <div>
+   696→                      <p className="font-medium">{h.customer}</p>
+   697→                      <p className="text-xs text-muted-foreground" dir="ltr">{h.phone}</p>
+   698→                    </div>
+   699→                  </TableCell>
+   700→                  <TableCell className="p-3">{h.template}</TableCell>
+   701→                  <TableCell className="p-3">
+   702→                    <span className={`text-xs px-2 py-0.5 rounded-full ${statusColors[h.status] || statusColors.sent}`}>
+   703→                      {statusLabels[h.status]}
+   704→                    </span>
+   705→                  </TableCell>
+   706→                  <TableCell className="p-3 text-muted-foreground">{h.sentAt}</TableCell>
+   707→                  <TableCell className="p-3 text-muted-foreground">{h.readAt || '—'}</TableCell>
+   708→                </TableRow>
+   709→              ))}
+   710→            </TableBody>
+   711→          </Table>
+   712→        </div>
+   713→      )}
+   714→    </div>
+   715→  )
+   716→}
+   717→
+   718→// ─── Auto-Scheduler Tab ────────────────────────────────────────────
+   719→
+   720→function SchedulerTab({ locale }: { locale: string }) {
+   721→  const isAr = locale === 'ar'
+   722→  const dir = getDirection(locale)
+   723→  const [enabled, setEnabled] = useState(true)
+   724→  const [hoursBefore, setHoursBefore] = useState('24')
+   725→
+   726→  return (
+   727→    <div dir={dir} className="space-y-4">
+   728→      <div>
+   729→        <h3 className="text-lg font-semibold">{isAr ? 'الجدولة التلقائية' : 'Auto-Scheduler'}</h3>
+   730→        <p className="text-sm text-muted-foreground">
+   731→          {isAr ? 'إعداد الإرسال التلقائي للتذكيرات' : 'Configure automatic reminder scheduling'}
+   732→        </p>
+   733→      </div>
+   734→
+   735→      <Card>
+   736→        <CardContent className="p-5 space-y-5">
+   737→          {/* Toggle */}
+   738→          <div className="flex items-center justify-between">
+   739→            <div className="flex items-center gap-3">
+   740→              <div className="rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400 p-2.5">
+   741→                <Zap className="h-5 w-5" />
+   742→              </div>
+   743→              <div>
+   744→                <p className="font-medium">{isAr ? 'التذكير التلقائي' : 'Auto Reminders'}</p>
+   745→                <p className="text-sm text-muted-foreground">
+   746→                  {isAr ? 'إرسال تذكيرات تلقائية قبل المواعيد' : 'Send automatic reminders before appointments'}
+   747→                </p>
+   748→              </div>
+   749→            </div>
+   750→            <button
+   751→              onClick={() => setEnabled(!enabled)}
+   752→              className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors ${
+   753→                enabled ? 'bg-emerald-500' : 'bg-muted'
+   754→              }`}
+   755→            >
+   756→              <span className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${
+   757→                enabled ? 'translate-x-5' : 'translate-x-0'
+   758→              }`} />
+   759→            </button>
+   760→          </div>
+   761→
+   762→          {/* Timing */}
+   763→          <div className="grid gap-4 sm:grid-cols-2">
+   764→            <div className="space-y-2">
+   765→              <label className="text-sm font-medium">
+   766→                {isAr ? 'أرسل التذكير قبل' : 'Send reminder before'}
+   767→              </label>
+   768→              <select
+   769→                value={hoursBefore}
+   770→                onChange={(e) => setHoursBefore(e.target.value)}
+   771→                className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+   772→              >
+   773→                <option value="1">1 {isAr ? 'ساعة' : 'hour'}</option>
+   774→                <option value="2">2 {isAr ? 'ساعات' : 'hours'}</option>
+   775→                <option value="6">6 {isAr ? 'ساعات' : 'hours'}</option>
+   776→                <option value="12">12 {isAr ? 'ساعة' : 'hours'}</option>
+   777→                <option value="24">24 {isAr ? 'ساعة' : 'hours'}</option>
+   778→                <option value="48">48 {isAr ? 'ساعة' : 'hours'}</option>
+   779→              </select>
+   780→            </div>
+   781→            <div className="space-y-2">
+   782→              <label className="text-sm font-medium">
+   783→                {isAr ? 'القالب المستخدم' : 'Template to use'}
+   784→              </label>
+   785→              <select className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm">
+   786→                <option>{isAr ? 'تذكير موعد' : 'Appointment Reminder'}</option>
+   787→                <option>{isAr ? 'تأكيد حجز' : 'Booking Confirmation'}</option>
+   788→              </select>
+   789→            </div>
+   790→          </div>
+   791→
+   792→          <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-950/20 rounded-lg text-sm text-amber-700 dark:text-amber-400">
+   793→            <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+   794→            <p>
+   795→              {isAr
+   796→                ? 'ملاحظة: يجب تأكيد ربط حساب الواتساب التجاري في صفحة الإعدادات لتفعيل التذكيرات التلقائية.'
+   797→                : 'Note: You must connect a Business WhatsApp account in Settings to enable auto reminders.'}
+   798→            </p>
+   799→          </div>
+   800→
+   801→          <Button className="gap-2 bg-emerald-600 hover:bg-emerald-700" disabled={!enabled} onClick={() => {
+   802→            toast.success(isAr ? 'تم حفظ إعدادات الجدولة بنجاح' : 'Scheduler settings saved successfully')
+   803→          }}>
+   804→            <Bell className="h-4 w-4" />
+   805→            {isAr ? 'حفظ الإعدادات' : 'Save Settings'}
+   806→          </Button>
+   807→        </CardContent>
+   808→      </Card>
+   809→    </div>
+   810→  )
+   811→}
+   812→
+   813→// ─── Settings Tab ──────────────────────────────────────────────────
+   814→
+   815→function SettingsTab({ locale }: { locale: string }) {
+   816→  const isAr = locale === 'ar'
+   817→  const dir = getDirection(locale)
+   818→  const [saving, setSaving] = useState(false)
+   819→
+   820→  return (
+   821→    <div dir={dir} className="space-y-4">
+   822→      <div>
+   823→        <h3 className="text-lg font-semibold">{isAr ? 'إعدادات الواتساب' : 'WhatsApp Settings'}</h3>
+   824→        <p className="text-sm text-muted-foreground">
+   825→          {isAr ? 'إعداد تكامل واتساب الأعمال' : 'Configure WhatsApp Business integration'}
+   826→        </p>
+   827→      </div>
+   828→
+   829→      <div className="grid gap-4 md:grid-cols-2">
+   830→        <Card>
+   831→          <CardHeader className="pb-3">
+   832→            <CardTitle className="text-base flex items-center gap-2">
+   833→              <MessageSquare className="h-5 w-5 text-emerald-600" />
+   834→              {isAr ? 'حساب الواتساب' : 'WhatsApp Account'}
+   835→            </CardTitle>
+   836→          </CardHeader>
+   837→          <CardContent className="space-y-3">
+   838→            <div className="space-y-2">
+   839→              <label className="text-sm font-medium">{isAr ? 'رقم الهاتف التجاري' : 'Business Phone Number'}</label>
+   840→              <Input placeholder="+966XXXXXXXXX" dir="ltr" className="text-start" />
+   841→            </div>
+   842→            <div className="space-y-2">
+   843→              <label className="text-sm font-medium">Access Token</label>
+   844→              <Input type="password" placeholder="EAAxxxxxxxxxxxxx" dir="ltr" className="text-start" />
+   845→            </div>
+   846→            <div className="space-y-2">
+   847→              <label className="text-sm font-medium">Phone Number ID</label>
+   848→              <Input placeholder="10xxxxxxxxxx" dir="ltr" className="text-start" />
+   849→            </div>
+   850→            <div className="space-y-2">
+   851→              <label className="text-sm font-medium">Webhook Verify Token</label>
+   852→              <Input placeholder="my_custom_token" dir="ltr" className="text-start" />
+   853→            </div>
+   854→            <Button className="w-full gap-2 bg-emerald-600 hover:bg-emerald-700" disabled={saving} onClick={() => {
+   855→              setSaving(true)
+   856→              setTimeout(() => {
+   857→                setSaving(false)
+   858→                toast.success(isAr ? 'تم الحفظ بنجاح' : 'Saved successfully')
+   859→              }, 1500)
+   860→            }}>
+   861→              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+   862→              {isAr ? 'حفظ وإعادة الاتصال' : 'Save & Reconnect'}
+   863→            </Button>
+   864→          </CardContent>
+   865→        </Card>
+   866→
+   867→        <Card>
+   868→          <CardHeader className="pb-3">
+   869→            <CardTitle className="text-base flex items-center gap-2">
+   870→              <Settings className="h-5 w-5 text-emerald-600" />
+   871→              {isAr ? 'إعدادات عامة' : 'General Settings'}
+   872→            </CardTitle>
+   873→          </CardHeader>
+   874→          <CardContent className="space-y-4">
+   875→            <div className="flex items-center justify-between">
+   876→              <div>
+   877→                <p className="text-sm font-medium">{isAr ? 'التذكير التلقائي' : 'Auto Reminders'}</p>
+   878→                <p className="text-xs text-muted-foreground">{isAr ? 'تفعيل الإرسال التلقائي' : 'Enable automatic sending'}</p>
+   879→              </div>
+   880→              <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+   881→                {isAr ? 'مفعّل' : 'Enabled'}
+   882→              </span>
+   883→            </div>
+   884→            <div className="flex items-center justify-between">
+   885→              <div>
+   886→                <p className="text-sm font-medium">{isAr ? 'تقارير التوصيل' : 'Delivery Reports'}</p>
+   887→                <p className="text-xs text-muted-foreground">{isAr ? 'تتبع حالة التوصيل' : 'Track delivery status'}</p>
+   888→              </div>
+   889→              <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+   890→                {isAr ? 'مفعّل' : 'Enabled'}
+   891→              </span>
+   892→            </div>
+   893→            <div className="flex items-center justify-between">
+   894→              <div>
+   895→                <p className="text-sm font-medium">{isAr ? 'إعادة المحاولة' : 'Retry on Failure'}</p>
+   896→                <p className="text-xs text-muted-foreground">{isAr ? 'إعادة المحاولة عند الفشل' : 'Retry when sending fails'}</p>
+   897→              </div>
+   898→              <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+   899→                {isAr ? 'مفعّل' : 'Enabled'}
+   900→              </span>
+   901→            </div>
+   902→            <div className="flex items-center justify-between">
+   903→              <div>
+   904→                <p className="text-sm font-medium">{isAr ? 'حد الإرسال' : 'Rate Limiting'}</p>
+   905→                <p className="text-xs text-muted-foreground">{isAr ? 'الحد الأقصى: 50 رسالة/دقيقة' : 'Max: 50 messages/min'}</p>
+   906→              </div>
+   907→              <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+   908→                50/min
+   909→              </span>
+   910→            </div>
+   911→          </CardContent>
+   912→        </Card>
+   913→      </div>
+   914→    </div>
+   915→  )
+   916→}
+   917→
+   918→// ─── Main WhatsApp View ────────────────────────────────────────────
+   919→
+   920→export function WhatsAppView() {
+   921→  const { locale } = useAppStore()
+   922→  const isAr = locale === 'ar'
+   923→  const dir = getDirection(locale)
+   924→
+   925→  return (
+   926→    <div dir={dir} className="space-y-6">
+   927→      {/* Header */}
+   928→      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+   929→        <div>
+   930→          <h1 className="text-2xl font-bold flex items-center gap-2">
+   931→            <MessageSquare className="h-7 w-7 text-emerald-600" />
+   932→            {isAr ? 'تذكيرات الواتساب' : 'WhatsApp Reminders'}
+   933→          </h1>
+   934→          <p className="text-muted-foreground mt-1">
+   935→            {isAr ? 'إدارة تذكيرات المواعيد عبر واتساب' : 'Manage appointment reminders via WhatsApp'}
+   936→          </p>
+   937→        </div>
+   938→        <Badge variant="outline" className="gap-1.5 px-3 py-1.5">
+   939→          <div className="h-2 w-2 rounded-full bg-emerald-500" />
+   940→          {isAr ? 'متصل' : 'Connected'}
+   941→        </Badge>
+   942→      </div>
+   943→
+   944→      {/* Stats */}
+   945→      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+   946→        <StatCard
+   947→          icon={Send}
+   948→          label={isAr ? 'أُرسلت اليوم' : 'Sent Today'}
+   949→          value={24}
+   950→          color="green"
+   951→          sub={isAr ? '+12% من أمس' : '+12% from yesterday'}
+   952→        />
+   953→        <StatCard
+   954→          icon={CheckCircle2}
+   955→          label={isAr ? 'تم التوصيل' : 'Delivered'}
+   956→          value={22}
+   957→          color="blue"
+   958→          sub="91.7%"
+   959→        />
+   960→        <StatCard
+   961→          icon={Users}
+   962→          label={isAr ? 'مواعيد اليوم' : "Today's Bookings"}
+   963→          value={5}
+   964→          color="orange"
+   965→          sub={isAr ? '3 بانتظار التذكير' : '3 pending reminders'}
+   966→        />
+   967→        <StatCard
+   968→          icon={AlertCircle}
+   969→          label={isAr ? 'فشل الإرسال' : 'Failed'}
+   970→          value={1}
+   971→          color="red"
+   972→          sub={isAr ? 'آخر فشل: منذ 3 ساعات' : 'Last fail: 3h ago'}
+   973→        />
+   974→      </div>
+   975→
+   976→      {/* Tabs */}
+   977→      <Tabs defaultValue="send" className="space-y-4">
+   978→        <TabsList className="flex-wrap h-auto gap-1 bg-muted p-1">
+   979→          <TabsTrigger value="send" className="gap-1.5 text-xs sm:text-sm">
+   980→            <Send className="h-3.5 w-3.5" />
+   981→            {isAr ? 'إرسال' : 'Send'}
+   982→          </TabsTrigger>
+   983→          <TabsTrigger value="templates" className="gap-1.5 text-xs sm:text-sm">
+   984→            <FileCode className="h-3.5 w-3.5" />
+   985→            {isAr ? 'القوالب' : 'Templates'}
+   986→          </TabsTrigger>
+   987→          <TabsTrigger value="history" className="gap-1.5 text-xs sm:text-sm">
+   988→            <Clock className="h-3.5 w-3.5" />
+   989→            {isAr ? 'السجل' : 'History'}
+   990→          </TabsTrigger>
+   991→          <TabsTrigger value="scheduler" className="gap-1.5 text-xs sm:text-sm">
+   992→            <Zap className="h-3.5 w-3.5" />
+   993→            {isAr ? 'الجدولة' : 'Scheduler'}
+   994→          </TabsTrigger>
+   995→          <TabsTrigger value="settings" className="gap-1.5 text-xs sm:text-sm">
+   996→            <Settings className="h-3.5 w-3.5" />
+   997→            {isAr ? 'الإعدادات' : 'Settings'}
+   998→          </TabsTrigger>
+   999→        </TabsList>
+  1000→
+  1001→        <TabsContent value="send"><SendTab locale={locale} /></TabsContent>
+  1002→        <TabsContent value="templates"><TemplatesTab locale={locale} /></TabsContent>
+  1003→        <TabsContent value="history"><HistoryTab locale={locale} /></TabsContent>
+  1004→        <TabsContent value="scheduler"><SchedulerTab locale={locale} /></TabsContent>
+  1005→        <TabsContent value="settings"><SettingsTab locale={locale} /></TabsContent>
+  1006→      </Tabs>
+  1007→    </div>
+  1008→  )
+  1009→}

@@ -97,8 +97,8 @@ export async function PUT(
     if (parsed.data.value !== undefined) updateData.value = parsed.data.value
     if (parsed.data.minPurchase !== undefined) updateData.minPurchase = parsed.data.minPurchase
     if (parsed.data.maxUses !== undefined) updateData.maxUses = parsed.data.maxUses
-    if (parsed.data.startDate !== undefined) updateData.startDate = new Date(parsed.data.startDate)
-    if (parsed.data.endDate !== undefined) updateData.endDate = new Date(parsed.data.endDate)
+    if (parsed.data.startDate !== undefined && parsed.data.startDate !== '') updateData.startDate = new Date(parsed.data.startDate)
+    if (parsed.data.endDate !== undefined && parsed.data.endDate !== '') updateData.endDate = new Date(parsed.data.endDate)
     if (parsed.data.isActive !== undefined) updateData.isActive = parsed.data.isActive
 
     const coupon = await db.coupon.update({

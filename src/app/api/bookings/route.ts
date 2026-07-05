@@ -54,7 +54,6 @@ export async function GET(request: NextRequest) {
         where,
         include: {
           customer: true,
-          employee: { select: { id: true, name: true, avatar: true } },
           branch: { select: { id: true, name: true } },
           services: { include: { service: true } },
           payments: true,
@@ -66,7 +65,19 @@ export async function GET(request: NextRequest) {
       db.booking.count({ where }),
     ])
 
-    return ok({ bookings, total, page, limit, totalPages: totalPages(total) }, request.headers.get('origin'))
+    // Enrich bookings with employee data from Employee table
+    const employeeIds = [...new Set(bookings.map(b => b.employeeId).filter(Boolean))] as string[]
+    const employees = employeeIds.length > 0
+      ? await db.employee.findMany({ where: { id: { in: employeeIds } }, select: { id: true, name: true, avatar: true } })
+      : []
+    const employeeMap = Object.fromEntries(employees.map(e => [e.id, e]))
+
+    const enrichedBookings = bookings.map(b => ({
+      ...b,
+      employee: b.employeeId ? (employeeMap[b.employeeId] || null) : null,
+    }))
+
+    return ok({ bookings: enrichedBookings, total, page, limit, totalPages: totalPages(total) }, request.headers.get('origin'))
   } catch (error) {
     console.error('Bookings list error:', error)
     return internalError(request.headers.get('origin'))
@@ -233,14 +244,20 @@ export async function POST(request: NextRequest) {
       },
       include: {
         customer: true,
-        employee: { select: { id: true, name: true, avatar: true } },
         branch: true,
         services: { include: { service: true } },
         payments: true,
       },
     })
 
-    return created({ booking }, request.headers.get('origin'))
+      // Enrich with employee data
+      let bookingWithEmployee = { ...booking }
+      if (booking.employeeId) {
+        const emp = await db.employee.findFirst({ where: { id: booking.employeeId }, select: { id: true, name: true, avatar: true } })
+        bookingWithEmployee = { ...bookingWithEmployee, employee: emp }
+      }
+
+    return created({ booking: bookingWithEmployee }, request.headers.get('origin'))
   } catch (error) {
     console.error('Create booking error:', error)
     return internalError(request.headers.get('origin'))

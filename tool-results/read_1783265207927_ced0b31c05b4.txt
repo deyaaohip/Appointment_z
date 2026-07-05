@@ -1,0 +1,1416 @@
+     1→'use client'
+     2→
+     3→import { authFetch } from '@/lib/auth-fetch'
+     4→
+     5→
+     6→import { useState, useMemo, useCallback } from 'react'
+     7→import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+     8→import { motion, AnimatePresence } from 'framer-motion'
+     9→import {
+    10→  ChevronLeft,
+    11→  ChevronRight,
+    12→  Clock,
+    13→  CalendarX,
+    14→  Plus,
+    15→  RefreshCw,
+    16→  Loader2,
+    17→  Pencil,
+    18→  Trash2,
+    19→  Phone,
+    20→  MapPin,
+    21→  User,
+    22→  Briefcase,
+    23→  StickyNote,
+    24→  MoreVertical,
+    25→} from 'lucide-react'
+    26→import { toast } from 'sonner'
+    27→import { useAppStore } from '@/stores/app-store'
+    28→import { t, formatDate, getDirection, formatCurrency } from '@/lib/i18n'
+    29→import type { Locale } from '@/lib/i18n'
+    30→import { Card, CardContent } from '@/components/ui/card'
+    31→import { Button } from '@/components/ui/button'
+    32→import { Badge } from '@/components/ui/badge'
+    33→import { Input } from '@/components/ui/input'
+    34→import { Textarea } from '@/components/ui/textarea'
+    35→import { Label } from '@/components/ui/label'
+    36→import { Skeleton } from '@/components/ui/skeleton'
+    37→import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+    38→import {
+    39→  Select,
+    40→  SelectTrigger,
+    41→  SelectValue,
+    42→  SelectContent,
+    43→  SelectItem,
+    44→} from '@/components/ui/select'
+    45→import {
+    46→  Dialog,
+    47→  DialogContent,
+    48→  DialogHeader,
+    49→  DialogTitle,
+    50→  DialogFooter,
+    51→  DialogDescription,
+    52→} from '@/components/ui/dialog'
+    53→import {
+    54→  AlertDialog,
+    55→  AlertDialogContent,
+    56→  AlertDialogHeader,
+    57→  AlertDialogTitle,
+    58→  AlertDialogDescription,
+    59→  AlertDialogFooter,
+    60→  AlertDialogAction,
+    61→  AlertDialogCancel,
+    62→} from '@/components/ui/alert-dialog'
+    63→import {
+    64→  DropdownMenu,
+    65→  DropdownMenuTrigger,
+    66→  DropdownMenuContent,
+    67→  DropdownMenuItem,
+    68→  DropdownMenuSeparator,
+    69→} from '@/components/ui/dropdown-menu'
+    70→import { cn } from '@/lib/utils'
+    71→
+    72→// ─── Types ──────────────────────────────────────────────────────────────────
+    73→
+    74→type ViewMode = 'day' | 'week' | 'month'
+    75→type BookingStatus = 'pending' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled' | 'no_show'
+    76→
+    77→interface BookingService {
+    78→  service: { name: string; duration: number; price: number }
+    79→}
+    80→
+    81→interface BookingRow {
+    82→  id: string
+    83→  status: BookingStatus
+    84→  startDate: string
+    85→  startTime: string
+    86→  endTime: string
+    87→  totalPrice: number
+    88→  notes: string | null
+    89→  customer: { id: string; firstName: string; lastName: string; phone?: string | null }
+    90→  employee: { id: string; name: string } | null
+    91→  branch: { id: string; name: string }
+    92→  services: BookingService[]
+    93→}
+    94→
+    95→interface CustomerOption {
+    96→  id: string
+    97→  firstName: string
+    98→  lastName: string
+    99→  phone?: string | null
+   100→}
+   101→
+   102→interface ServiceOption {
+   103→  id: string
+   104→  name: string
+   105→  duration: number
+   106→  price: number
+   107→}
+   108→
+   109→interface EmployeeOption {
+   110→  id: string
+   111→  name: string
+   112→  specialization?: string | null
+   113→}
+   114→
+   115→interface BranchOption {
+   116→  id: string
+   117→  name: string
+   118→}
+   119→
+   120→// ─── Constants ──────────────────────────────────────────────────────────────
+   121→
+   122→const DAY_NAMES_AR = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت']
+   123→const DAY_NAMES_EN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+   124→const MONTH_NAMES_AR = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر']
+   125→const MONTH_NAMES_EN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+   126→
+   127→const HOURS_FULL = Array.from({ length: 14 }, (_, i) => i + 7) // 7AM – 8PM
+   128→const HOUR_HEIGHT = 64 // px per hour
+   129→
+   130→const today = new Date()
+   131→
+   132→const STATUS_STYLES: Record<BookingStatus, { dot: string; border: string; badge: string }> = {
+   133→  pending: { dot: 'bg-amber-500', border: 'border-s-amber-500 bg-amber-50 dark:bg-amber-900/20', badge: 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-400' },
+   134→  confirmed: { dot: 'bg-emerald-500', border: 'border-s-emerald-500 bg-emerald-50 dark:bg-emerald-900/20', badge: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400' },
+   135→  in_progress: { dot: 'bg-blue-500', border: 'border-s-blue-500 bg-blue-50 dark:bg-blue-900/20', badge: 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-400' },
+   136→  completed: { dot: 'bg-violet-500', border: 'border-s-violet-500 bg-violet-50 dark:bg-violet-900/20', badge: 'border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-800 dark:bg-violet-900/30 dark:text-violet-400' },
+   137→  cancelled: { dot: 'bg-red-400', border: 'border-s-red-500 bg-red-50 dark:bg-red-900/20 opacity-60', badge: 'border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-400' },
+   138→  no_show: { dot: 'bg-orange-500', border: 'border-s-orange-500 bg-orange-50 dark:bg-orange-900/20', badge: 'border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-800 dark:bg-orange-900/30 dark:text-orange-400' },
+   139→}
+   140→
+   141→const ALL_STATUSES: BookingStatus[] = ['pending', 'confirmed', 'in_progress', 'completed', 'cancelled', 'no_show']
+   142→
+   143→function statusLabel(status: BookingStatus, locale: Locale): string {
+   144→  const map: Record<BookingStatus, { ar: string; en: string }> = {
+   145→    pending: { ar: 'معلّق', en: 'Pending' },
+   146→    confirmed: { ar: 'مؤكد', en: 'Confirmed' },
+   147→    in_progress: { ar: 'جاري', en: 'In Progress' },
+   148→    completed: { ar: 'مكتمل', en: 'Completed' },
+   149→    cancelled: { ar: 'ملغي', en: 'Cancelled' },
+   150→    no_show: { ar: 'لم يحضر', en: 'No Show' },
+   151→  }
+   152→  return map[status]?.[locale] ?? status
+   153→}
+   154→
+   155→// ─── Helpers ────────────────────────────────────────────────────────────────
+   156→
+   157→function isSameDay(a: Date, b: Date) {
+   158→  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
+   159→}
+   160→
+   161→function formatDateStr(d: Date): string {
+   162→  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+   163→}
+   164→
+   165→function getDaysInMonth(date: Date): Date[] {
+   166→  const year = date.getFullYear()
+   167→  const month = date.getMonth()
+   168→  const firstDay = new Date(year, month, 1)
+   169→  const lastDay = new Date(year, month + 1, 0)
+   170→  const startPad = firstDay.getDay()
+   171→  const days: Date[] = []
+   172→  for (let i = -startPad; i < lastDay.getDate(); i++) {
+   173→    days.push(new Date(year, month, i + 1))
+   174→  }
+   175→  while (days.length % 7 !== 0) {
+   176→    const last = days[days.length - 1]
+   177→    days.push(new Date(last.getFullYear(), last.getMonth(), last.getDate() + 1))
+   178→  }
+   179→  return days
+   180→}
+   181→
+   182→function getWeekDays(date: Date): Date[] {
+   183→  const day = date.getDay()
+   184→  const start = new Date(date)
+   185→  start.setDate(start.getDate() - day)
+   186→  return Array.from({ length: 7 }, (_, i) => {
+   187→    const d = new Date(start)
+   188→    d.setDate(d.getDate() + i)
+   189→    return d
+   190→  })
+   191→}
+   192→
+   193→function getDateRange(viewMode: ViewMode, currentDate: Date): { startDate: string; endDate: string } {
+   194→  if (viewMode === 'day') {
+   195→    const s = formatDateStr(currentDate)
+   196→    return { startDate: s, endDate: s }
+   197→  }
+   198→  if (viewMode === 'week') {
+   199→    const days = getWeekDays(currentDate)
+   200→    const start = new Date(days[0])
+   201→    start.setDate(start.getDate() - 1)
+   202→    const end = new Date(days[6])
+   203→    end.setDate(end.getDate() + 1)
+   204→    return { startDate: formatDateStr(start), endDate: formatDateStr(end) }
+   205→  }
+   206→  // month view: include prev/next month padding
+   207→  const allDays = getDaysInMonth(currentDate)
+   208→  const start = allDays[0]
+   209→  const end = allDays[allDays.length - 1]
+   210→  return { startDate: formatDateStr(start), endDate: formatDateStr(end) }
+   211→}
+   212→
+   213→function getBookingDateStr(booking: BookingRow): string {
+   214→  if (!booking.startDate) return ''
+   215→  return booking.startDate.substring(0, 10)
+   216→}
+   217→
+   218→function timeToMinutes(time: string): number {
+   219→  const parts = time.split(':')
+   220→  return parseInt(parts[0]) * 60 + parseInt(parts[1])
+   221→}
+   222→
+   223→// ─── Animation Variants ─────────────────────────────────────────────────────
+   224→
+   225→const itemVariants = {
+   226→  hidden: { opacity: 0, y: 8 },
+   227→  visible: { opacity: 1, y: 0, transition: { duration: 0.25, ease: 'easeOut' } },
+   228→}
+   229→
+   230→const containerVariants = {
+   231→  hidden: { opacity: 0 },
+   232→  visible: { opacity: 1, transition: { staggerChildren: 0.01 } },
+   233→}
+   234→
+   235→// ─── Appointment Block (day/week view) ──────────────────────────────────────
+   236→
+   237→function AppointmentBlock({
+   238→  booking,
+   239→  locale,
+   240→  onClick,
+   241→}: {
+   242→  booking: BookingRow
+   243→  locale: Locale
+   244→  onClick: () => void
+   245→}) {
+   246→  const startMinutes = timeToMinutes(booking.startTime)
+   247→  const endMinutes = timeToMinutes(booking.endTime)
+   248→  const duration = Math.max(endMinutes - startMinutes, 15)
+   249→  const top = ((startMinutes - 7 * 60) / 60) * HOUR_HEIGHT
+   250→  const height = Math.max(32, (duration / 60) * HOUR_HEIGHT)
+   251→  const style = STATUS_STYLES[booking.status] ?? STATUS_STYLES.pending
+   252→  const serviceName = booking.services?.[0]?.service?.name ?? ''
+   253→  const customerName = `${booking.customer?.firstName ?? ''} ${booking.customer?.lastName ?? ''}`.trim()
+   254→
+   255→  return (
+   256→    <motion.div
+   257→      variants={itemVariants}
+   258→      initial="hidden"
+   259→      animate="visible"
+   260→      className={cn(
+   261→        'absolute start-1 end-1 z-10 rounded-md border-s-4 ps-2 pe-1 py-1 text-xs cursor-pointer transition-shadow hover:shadow-md',
+   262→        style.border,
+   263→      )}
+   264→      style={{ top: `${top}px`, height: `${height}px` }}
+   265→      onClick={onClick}
+   266→    >
+   267→      <p className="font-semibold truncate">{serviceName}</p>
+   268→      <p className="truncate text-muted-foreground">{customerName}</p>
+   269→      {height > 48 && (
+   270→        <p className="text-muted-foreground">{booking.startTime} – {booking.endTime}</p>
+   271→      )}
+   272→    </motion.div>
+   273→  )
+   274→}
+   275→
+   276→// ─── Loading Skeleton ───────────────────────────────────────────────────────
+   277→
+   278→function CalendarSkeleton() {
+   279→  return (
+   280→    <Card>
+   281→      <CardContent className="p-4 space-y-4">
+   282→        <div className="flex items-center gap-2">
+   283→          <Skeleton className="h-8 w-20" />
+   284→          <Skeleton className="h-8 w-32" />
+   285→        </div>
+   286→        <div className="grid grid-cols-7 gap-px">
+   287→          {Array.from({ length: 7 }).map((_, i) => (
+   288→            <Skeleton key={i} className="h-8 w-full" />
+   289→          ))}
+   290→        </div>
+   291→        <div className="grid grid-cols-7 gap-px">
+   292→          {Array.from({ length: 35 }).map((_, i) => (
+   293→            <Skeleton key={i} className="h-24 w-full" />
+   294→          ))}
+   295→        </div>
+   296→      </CardContent>
+   297→    </Card>
+   298→  )
+   299→}
+   300→
+   301→// ─── Create Booking Dialog ──────────────────────────────────────────────────
+   302→
+   303→function CreateBookingDialog({
+   304→  open,
+   305→  onOpenChange,
+   306→  locale,
+   307→  defaultDate,
+   308→  defaultTime,
+   309→}: {
+   310→  open: boolean
+   311→  onOpenChange: (open: boolean) => void
+   312→  locale: Locale
+   313→  defaultDate?: string
+   314→  defaultTime?: string
+   315→}) {
+   316→  const queryClient = useQueryClient()
+   317→
+   318→  const [branchId, setBranchId] = useState('')
+   319→  const [customerId, setCustomerId] = useState('')
+   320→  const [employeeId, setEmployeeId] = useState('')
+   321→  const [serviceId, setServiceId] = useState('')
+   322→  const [date, setDate] = useState(defaultDate ?? '')
+   323→  const [startTime, setStartTime] = useState(defaultTime ?? '')
+   324→  const initialEndTime = useMemo(() => {
+   325→    if (!defaultTime) return ''
+   326→    const parts = defaultTime.split(':')
+   327→    const h = parseInt(parts[0]) + 1
+   328→    return `${String(h).padStart(2, '0')}:${parts[1]}`
+   329→  }, [defaultTime])
+   330→  const [endTime, setEndTime] = useState(initialEndTime)
+   331→  const [notes, setNotes] = useState('')
+   332→
+   333→  const { data: customersData } = useQuery({
+   334→    queryKey: ['customers-list'],
+   335→    queryFn: () => authFetch('/api/customers?limit=100').then((r) => r.json()),
+   336→  })
+   337→  const customers: CustomerOption[] = Array.isArray(customersData?.customers) ? customersData.customers : []
+   338→
+   339→  const { data: servicesData } = useQuery({
+   340→    queryKey: ['services-list'],
+   341→    queryFn: () => authFetch('/api/services?limit=100').then((r) => r.json()),
+   342→  })
+   343→  const services: ServiceOption[] = Array.isArray(servicesData?.services) ? servicesData.services : []
+   344→
+   345→  const { data: employeesData } = useQuery({
+   346→    queryKey: ['employees-list'],
+   347→    queryFn: () => authFetch('/api/employees?limit=100').then((r) => r.json()),
+   348→  })
+   349→  const employees: EmployeeOption[] = Array.isArray(employeesData?.employees) ? employeesData.employees : []
+   350→
+   351→  const { data: branchesData } = useQuery({
+   352→    queryKey: ['branches-list'],
+   353→    queryFn: () => authFetch('/api/branches').then((r) => r.json()),
+   354→  })
+   355→  const branches: BranchOption[] = Array.isArray(branchesData?.branches) ? branchesData.branches : []
+   356→
+   357→  const effectiveBranchId = branchId || (branches.length > 0 ? branches[0].id : '')
+   358→
+   359→  const createMutation = useMutation({
+   360→    mutationFn: (body: Record<string, unknown>) =>
+   361→      authFetch('/api/bookings', {
+   362→        method: 'POST',
+   363→        headers: { 'Content-Type': 'application/json' },
+   364→        body: JSON.stringify(body),
+   365→      }).then((r) => {
+   366→        if (!r.ok) throw new Error('Failed to create booking')
+   367→        return r.json()
+   368→      }),
+   369→    onSuccess: () => {
+   370→      queryClient.invalidateQueries({ queryKey: ['bookings-calendar'] })
+   371→      toast.success(t(locale, 'bookings', 'bookingCreated'))
+   372→      resetAndClose()
+   373→    },
+   374→    onError: () => {
+   375→      toast.error(t(locale, 'common', 'error'))
+   376→    },
+   377→  })
+   378→
+   379→  const resetAndClose = () => {
+   380→    setCustomerId('')
+   381→    setEmployeeId('')
+   382→    setServiceId('')
+   383→    setDate('')
+   384→    setStartTime('')
+   385→    setEndTime('')
+   386→    setNotes('')
+   387→    onOpenChange(false)
+   388→  }
+   389→
+   390→  const handleSubmit = () => {
+   391→    const finalBranchId = effectiveBranchId
+   392→    if (!finalBranchId || !customerId || !serviceId || !date || !startTime || !endTime) {
+   393→      toast.error(t(locale, 'common', 'required'))
+   394→      return
+   395→    }
+   396→    createMutation.mutate({
+   397→      branchId: finalBranchId,
+   398→      customerId,
+   399→      employeeId: employeeId || undefined,
+   400→      startDate: date,
+   401→      startTime,
+   402→      endTime,
+   403→      notes: notes || undefined,
+   404→      services: [{ serviceId, quantity: 1 }],
+   405→    })
+   406→  }
+   407→
+   408→  return (
+   409→    <Dialog open={open} onOpenChange={(v) => { if (!v) { resetAndClose() } else { onOpenChange(true) } }}>
+   410→      <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
+   411→        <DialogHeader>
+   412→          <DialogTitle>{t(locale, 'bookings', 'newBooking')}</DialogTitle>
+   413→          <DialogDescription>{t(locale, 'bookings', 'selectService')}</DialogDescription>
+   414→        </DialogHeader>
+   415→        <div className="grid gap-4 py-2">
+   416→          <div className="grid gap-2">
+   417→            <Label>{t(locale, 'calendar', 'customer')}</Label>
+   418→            <Select value={customerId} onValueChange={setCustomerId}>
+   419→              <SelectTrigger className="w-full">
+   420→                <SelectValue placeholder={t(locale, 'bookings', 'selectCustomer')} />
+   421→              </SelectTrigger>
+   422→              <SelectContent>
+   423→                {customers.map((c) => (
+   424→                  <SelectItem key={c.id} value={c.id}>
+   425→                    {c.firstName} {c.lastName}{c.phone ? ` — ${c.phone}` : ''}
+   426→                  </SelectItem>
+   427→                ))}
+   428→              </SelectContent>
+   429→            </Select>
+   430→          </div>
+   431→
+   432→          <div className="grid gap-2">
+   433→            <Label>{t(locale, 'calendar', 'service')}</Label>
+   434→            <Select value={serviceId} onValueChange={setServiceId}>
+   435→              <SelectTrigger className="w-full">
+   436→                <SelectValue placeholder={t(locale, 'bookings', 'selectService')} />
+   437→              </SelectTrigger>
+   438→              <SelectContent>
+   439→                {services.map((s) => (
+   440→                  <SelectItem key={s.id} value={s.id}>
+   441→                    {s.name} — {formatCurrency(s.price, 'SAR', locale)} ({s.duration} {locale === 'ar' ? 'دقيقة' : 'min'})
+   442→                  </SelectItem>
+   443→                ))}
+   444→              </SelectContent>
+   445→            </Select>
+   446→          </div>
+   447→
+   448→          <div className="grid gap-2">
+   449→            <Label>{t(locale, 'calendar', 'employee')} ({t(locale, 'common', 'optional')})</Label>
+   450→            <Select value={employeeId} onValueChange={setEmployeeId}>
+   451→              <SelectTrigger className="w-full">
+   452→                <SelectValue placeholder={t(locale, 'bookings', 'selectEmployee')} />
+   453→              </SelectTrigger>
+   454→              <SelectContent>
+   455→                {employees.map((e) => (
+   456→                  <SelectItem key={e.id} value={e.id}>
+   457→                    {e.name}
+   458→                  </SelectItem>
+   459→                ))}
+   460→              </SelectContent>
+   461→            </Select>
+   462→          </div>
+   463→
+   464→          <div className="grid gap-2">
+   465→            <Label>{t(locale, 'bookings', 'selectBranch')}</Label>
+   466→            <Select value={branchId} onValueChange={setBranchId}>
+   467→              <SelectTrigger className="w-full">
+   468→                <SelectValue placeholder={t(locale, 'bookings', 'selectBranch')} />
+   469→              </SelectTrigger>
+   470→              <SelectContent>
+   471→                {branches.map((b) => (
+   472→                  <SelectItem key={b.id} value={b.id}>
+   473→                    {b.name}
+   474→                  </SelectItem>
+   475→                ))}
+   476→              </SelectContent>
+   477→            </Select>
+   478→          </div>
+   479→
+   480→          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+   481→            <div className="grid gap-2">
+   482→              <Label>{t(locale, 'common', 'date')}</Label>
+   483→              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+   484→            </div>
+   485→            <div className="grid gap-2" />
+   486→          </div>
+   487→
+   488→          <div className="grid grid-cols-2 gap-4">
+   489→            <div className="grid gap-2">
+   490→              <Label>{t(locale, 'bookings', 'startTime')}</Label>
+   491→              <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
+   492→            </div>
+   493→            <div className="grid gap-2">
+   494→              <Label>{t(locale, 'bookings', 'endTime')}</Label>
+   495→              <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
+   496→            </div>
+   497→          </div>
+   498→
+   499→          <div className="grid gap-2">
+   500→            <Label>{t(locale, 'calendar', 'notes')} ({t(locale, 'common', 'optional')})</Label>
+   501→            <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
+   502→          </div>
+   503→        </div>
+   504→        <DialogFooter>
+   505→          <Button variant="outline" onClick={resetAndClose}>{t(locale, 'common', 'cancel')}</Button>
+   506→          <Button
+   507→            className="bg-emerald-600 hover:bg-emerald-700 text-white"
+   508→            onClick={handleSubmit}
+   509→            disabled={createMutation.isPending}
+   510→          >
+   511→            {createMutation.isPending && <Loader2 className="h-4 w-4 animate-spin me-2" />}
+   512→            {t(locale, 'common', 'save')}
+   513→          </Button>
+   514→        </DialogFooter>
+   515→      </DialogContent>
+   516→    </Dialog>
+   517→  )
+   518→}
+   519→
+   520→// ─── View / Edit / Delete Dialog ────────────────────────────────────────────
+   521→
+   522→function ViewEditDialog({
+   523→  booking,
+   524→  open,
+   525→  onOpenChange,
+   526→  locale,
+   527→}: {
+   528→  booking: BookingRow | null
+   529→  open: boolean
+   530→  onOpenChange: (open: boolean) => void
+   531→  locale: Locale
+   532→}) {
+   533→  const queryClient = useQueryClient()
+   534→  const [isEditing, setIsEditing] = useState(false)
+   535→  const [editDate, setEditDate] = useState(booking?.startDate?.substring(0, 10) ?? '')
+   536→  const [editStartTime, setEditStartTime] = useState(booking?.startTime ?? '')
+   537→  const [editEndTime, setEditEndTime] = useState(booking?.endTime ?? '')
+   538→  const [editStatus, setEditStatus] = useState<BookingStatus>(booking?.status ?? 'pending')
+   539→  const [editNotes, setEditNotes] = useState(booking?.notes ?? '')
+   540→  const [deleteOpen, setDeleteOpen] = useState(false)
+   541→
+   542→  const updateMutation = useMutation({
+   543→    mutationFn: ({ id, body }: { id: string; body: Record<string, unknown> }) =>
+   544→      authFetch(`/api/bookings/${id}`, {
+   545→        method: 'PUT',
+   546→        headers: { 'Content-Type': 'application/json' },
+   547→        body: JSON.stringify(body),
+   548→      }).then((r) => {
+   549→        if (!r.ok) throw new Error('Failed to update')
+   550→        return r.json()
+   551→      }),
+   552→    onSuccess: () => {
+   553→      queryClient.invalidateQueries({ queryKey: ['bookings-calendar'] })
+   554→      toast.success(t(locale, 'bookings', 'bookingUpdated'))
+   555→      setIsEditing(false)
+   556→      onOpenChange(false)
+   557→    },
+   558→    onError: () => {
+   559→      toast.error(t(locale, 'common', 'error'))
+   560→    },
+   561→  })
+   562→
+   563→  const deleteMutation = useMutation({
+   564→    mutationFn: (id: string) =>
+   565→      authFetch(`/api/bookings/${id}`, { method: 'DELETE' }).then((r) => {
+   566→        if (!r.ok) throw new Error('Failed to delete')
+   567→        return r.json()
+   568→      }),
+   569→    onSuccess: () => {
+   570→      queryClient.invalidateQueries({ queryKey: ['bookings-calendar'] })
+   571→      toast.success(t(locale, 'bookings', 'bookingDeleted'))
+   572→      setDeleteOpen(false)
+   573→      onOpenChange(false)
+   574→    },
+   575→    onError: () => {
+   576→      toast.error(t(locale, 'common', 'error'))
+   577→    },
+   578→  })
+   579→
+   580→  const statusChangeMutation = useMutation({
+   581→    mutationFn: ({ id, status }: { id: string; status: BookingStatus }) =>
+   582→      authFetch(`/api/bookings/${id}/status`, {
+   583→        method: 'PATCH',
+   584→        headers: { 'Content-Type': 'application/json' },
+   585→        body: JSON.stringify({ status }),
+   586→      }).then((r) => {
+   587→        if (!r.ok) throw new Error('Failed to update status')
+   588→        return r.json()
+   589→      }),
+   590→    onSuccess: () => {
+   591→      queryClient.invalidateQueries({ queryKey: ['bookings-calendar'] })
+   592→      toast.success(t(locale, 'bookings', 'bookingUpdated'))
+   593→      onOpenChange(false)
+   594→    },
+   595→    onError: () => {
+   596→      toast.error(t(locale, 'common', 'error'))
+   597→    },
+   598→  })
+   599→
+   600→  if (!booking) return null
+   601→
+   602→  const style = STATUS_STYLES[booking.status] ?? STATUS_STYLES.pending
+   603→  const customerName = `${booking.customer?.firstName ?? ''} ${booking.customer?.lastName ?? ''}`.trim()
+   604→  const serviceNames = booking.services?.map((s) => s.service.name).join(', ') ?? ''
+   605→  const totalPrice = booking.totalPrice ?? booking.services?.reduce((sum, s) => sum + s.service.price, 0) ?? 0
+   606→
+   607→  const handleSave = () => {
+   608→    updateMutation.mutate({
+   609→      id: booking.id,
+   610→      body: {
+   611→        startDate: editDate,
+   612→        startTime: editStartTime,
+   613→        endTime: editEndTime,
+   614→        status: editStatus,
+   615→        notes: editNotes,
+   616→      },
+   617→    })
+   618→  }
+   619→
+   620→  const handleStatusChange = (status: BookingStatus) => {
+   621→    statusChangeMutation.mutate({ id: booking.id, status })
+   622→  }
+   623→
+   624→  return (
+   625→    <>
+   626→      <Dialog open={open} onOpenChange={onOpenChange}>
+   627→        <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
+   628→          <DialogHeader>
+   629→            <div className="flex items-center justify-between">
+   630→              <DialogTitle>{t(locale, 'common', 'details')}</DialogTitle>
+   631→              <div className="flex items-center gap-2">
+   632→                <Badge className={style.badge}>{statusLabel(booking.status, locale)}</Badge>
+   633→                <DropdownMenu>
+   634→                  <DropdownMenuTrigger asChild>
+   635→                    <Button variant="ghost" size="icon" className="h-8 w-8">
+   636→                      <MoreVertical className="h-4 w-4" />
+   637→                    </Button>
+   638→                  </DropdownMenuTrigger>
+   639→                  <DropdownMenuContent align={locale === 'ar' ? 'start' : 'end'}>
+   640→                    {ALL_STATUSES.filter((s) => s !== booking.status).map((s) => (
+   641→                      <DropdownMenuItem key={s} onClick={() => handleStatusChange(s)}>
+   642→                        <span className={cn('h-2 w-2 rounded-full me-2', STATUS_STYLES[s].dot)} />
+   643→                        {statusLabel(s, locale)}
+   644→                      </DropdownMenuItem>
+   645→                    ))}
+   646→                  </DropdownMenuContent>
+   647→                </DropdownMenu>
+   648→              </div>
+   649→            </div>
+   650→          </DialogHeader>
+   651→
+   652→          {isEditing ? (
+   653→            <div className="grid gap-4 py-2">
+   654→              <div className="grid gap-2">
+   655→                <Label>{t(locale, 'common', 'status')}</Label>
+   656→                <Select value={editStatus} onValueChange={(v) => setEditStatus(v as BookingStatus)}>
+   657→                  <SelectTrigger className="w-full">
+   658→                    <SelectValue />
+   659→                  </SelectTrigger>
+   660→                  <SelectContent>
+   661→                    {ALL_STATUSES.map((s) => (
+   662→                      <SelectItem key={s} value={s}>
+   663→                        <span className="flex items-center gap-2">
+   664→                          <span className={cn('h-2 w-2 rounded-full', STATUS_STYLES[s].dot)} />
+   665→                          {statusLabel(s, locale)}
+   666→                        </span>
+   667→                      </SelectItem>
+   668→                    ))}
+   669→                  </SelectContent>
+   670→                </Select>
+   671→              </div>
+   672→
+   673→              <div className="grid gap-2">
+   674→                <Label>{t(locale, 'common', 'date')}</Label>
+   675→                <Input type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} />
+   676→              </div>
+   677→
+   678→              <div className="grid grid-cols-2 gap-4">
+   679→                <div className="grid gap-2">
+   680→                  <Label>{t(locale, 'bookings', 'startTime')}</Label>
+   681→                  <Input type="time" value={editStartTime} onChange={(e) => setEditStartTime(e.target.value)} />
+   682→                </div>
+   683→                <div className="grid gap-2">
+   684→                  <Label>{t(locale, 'bookings', 'endTime')}</Label>
+   685→                  <Input type="time" value={editEndTime} onChange={(e) => setEditEndTime(e.target.value)} />
+   686→                </div>
+   687→              </div>
+   688→
+   689→              <div className="grid gap-2">
+   690→                <Label>{t(locale, 'calendar', 'notes')}</Label>
+   691→                <Textarea value={editNotes} onChange={(e) => setEditNotes(e.target.value)} rows={2} />
+   692→              </div>
+   693→            </div>
+   694→          ) : (
+   695→            <div className="grid gap-3 py-2 text-sm">
+   696→              <div className="flex items-start gap-3">
+   697→                <User className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
+   698→                <div>
+   699→                  <p className="font-medium">{customerName}</p>
+   700→                  {booking.customer?.phone && (
+   701→                    <p className="text-muted-foreground">{booking.customer.phone}</p>
+   702→                  )}
+   703→                </div>
+   704→              </div>
+   705→              <div className="flex items-start gap-3">
+   706→                <Briefcase className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
+   707→                <div>
+   708→                  <p className="font-medium">{serviceNames}</p>
+   709→                  <p className="text-muted-foreground">{formatCurrency(totalPrice, 'SAR', locale)}</p>
+   710→                </div>
+   711→              </div>
+   712→              {booking.employee && (
+   713→                <div className="flex items-start gap-3">
+   714→                  <User className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
+   715→                  <p>{booking.employee.name}</p>
+   716→                </div>
+   717→              )}
+   718→              {booking.branch && (
+   719→                <div className="flex items-start gap-3">
+   720→                  <MapPin className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
+   721→                  <p>{booking.branch.name}</p>
+   722→                </div>
+   723→              )}
+   724→              <div className="flex items-start gap-3">
+   725→                <Clock className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
+   726→                <p>
+   727→                  {formatDate(booking.startDate, locale)}
+   728→                  {' · '}
+   729→                  {booking.startTime} – {booking.endTime}
+   730→                </p>
+   731→              </div>
+   732→              {booking.notes && (
+   733→                <div className="flex items-start gap-3">
+   734→                  <StickyNote className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
+   735→                  <p className="text-muted-foreground">{booking.notes}</p>
+   736→                </div>
+   737→              )}
+   738→            </div>
+   739→          )}
+   740→
+   741→          <DialogFooter>
+   742→            {isEditing ? (
+   743→              <>
+   744→                <Button variant="outline" onClick={() => setIsEditing(false)}>{t(locale, 'common', 'cancel')}</Button>
+   745→                <Button onClick={handleSave} disabled={updateMutation.isPending}>
+   746→                  {updateMutation.isPending && <Loader2 className="h-4 w-4 animate-spin me-2" />}
+   747→                  {t(locale, 'common', 'save')}
+   748→                </Button>
+   749→              </>
+   750→            ) : (
+   751→              <>
+   752→                <Button variant="destructive" onClick={() => setDeleteOpen(true)}>
+   753→                  <Trash2 className="h-4 w-4 me-2" />
+   754→                  {t(locale, 'common', 'delete')}
+   755→                </Button>
+   756→                <Button variant="outline" onClick={() => setIsEditing(true)}>
+   757→                  <Pencil className="h-4 w-4 me-2" />
+   758→                  {t(locale, 'common', 'edit')}
+   759→                </Button>
+   760→              </>
+   761→            )}
+   762→          </DialogFooter>
+   763→        </DialogContent>
+   764→      </Dialog>
+   765→
+   766→      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+   767→        <AlertDialogContent>
+   768→          <AlertDialogHeader>
+   769→            <AlertDialogTitle>{t(locale, 'common', 'delete')}?</AlertDialogTitle>
+   770→            <AlertDialogDescription>
+   771→              {locale === 'ar'
+   772→                ? 'هل أنت متأكد من حذف هذا الحجز؟ لا يمكن التراجع عن هذا الإجراء.'
+   773→                : 'Are you sure you want to delete this booking? This action cannot be undone.'}
+   774→            </AlertDialogDescription>
+   775→          </AlertDialogHeader>
+   776→          <AlertDialogFooter>
+   777→            <AlertDialogCancel>{t(locale, 'common', 'cancel')}</AlertDialogCancel>
+   778→            <AlertDialogAction
+   779→              className="bg-red-600 hover:bg-red-700 text-white"
+   780→              onClick={() => deleteMutation.mutate(booking.id)}
+   781→            >
+   782→              {deleteMutation.isPending && <Loader2 className="h-4 w-4 animate-spin me-2" />}
+   783→              {t(locale, 'common', 'delete')}
+   784→            </AlertDialogAction>
+   785→          </AlertDialogFooter>
+   786→        </AlertDialogContent>
+   787→      </AlertDialog>
+   788→    </>
+   789→  )
+   790→}
+   791→
+   792→// ─── Filter Bar ─────────────────────────────────────────────────────────────
+   793→
+   794→function FilterBar({
+   795→  locale,
+   796→  employees,
+   797→  branches,
+   798→  selectedEmployee,
+   799→  onEmployeeChange,
+   800→  selectedStatus,
+   801→  onStatusChange,
+   802→  selectedBranch,
+   803→  onBranchChange,
+   804→}: {
+   805→  locale: Locale
+   806→  employees: EmployeeOption[]
+   807→  branches: BranchOption[]
+   808→  selectedEmployee: string
+   809→  onEmployeeChange: (v: string) => void
+   810→  selectedStatus: string
+   811→  onStatusChange: (v: string) => void
+   812→  selectedBranch: string
+   813→  onBranchChange: (v: string) => void
+   814→}) {
+   815→  return (
+   816→    <div className="flex flex-wrap items-center gap-3">
+   817→      <Select value={selectedEmployee} onValueChange={onEmployeeChange}>
+   818→        <SelectTrigger className="w-[180px]">
+   819→          <SelectValue placeholder={locale === 'ar' ? 'جميع الموظفين' : 'All Employees'} />
+   820→        </SelectTrigger>
+   821→        <SelectContent>
+   822→          <SelectItem value="__all__">{locale === 'ar' ? 'جميع الموظفين' : 'All Employees'}</SelectItem>
+   823→          {employees.map((e) => (
+   824→            <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
+   825→          ))}
+   826→        </SelectContent>
+   827→      </Select>
+   828→
+   829→      <Select value={selectedStatus} onValueChange={onStatusChange}>
+   830→        <SelectTrigger className="w-[180px]">
+   831→          <SelectValue placeholder={t(locale, 'bookings', 'allStatuses')} />
+   832→        </SelectTrigger>
+   833→        <SelectContent>
+   834→          <SelectItem value="__all__">{t(locale, 'bookings', 'allStatuses')}</SelectItem>
+   835→          {ALL_STATUSES.map((s) => (
+   836→            <SelectItem key={s} value={s}>
+   837→              <span className="flex items-center gap-2">
+   838→                <span className={cn('h-2 w-2 rounded-full', STATUS_STYLES[s].dot)} />
+   839→                {statusLabel(s, locale)}
+   840→              </span>
+   841→            </SelectItem>
+   842→          ))}
+   843→        </SelectContent>
+   844→      </Select>
+   845→
+   846→      <Select value={selectedBranch} onValueChange={onBranchChange}>
+   847→        <SelectTrigger className="w-[180px]">
+   848→          <SelectValue placeholder={locale === 'ar' ? 'جميع الفروع' : 'All Branches'} />
+   849→        </SelectTrigger>
+   850→        <SelectContent>
+   851→          <SelectItem value="__all__">{locale === 'ar' ? 'جميع الفروع' : 'All Branches'}</SelectItem>
+   852→          {branches.map((b) => (
+   853→            <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+   854→          ))}
+   855→        </SelectContent>
+   856→      </Select>
+   857→    </div>
+   858→  )
+   859→}
+   860→
+   861→// ─── Main Component ─────────────────────────────────────────────────────────
+   862→
+   863→export function CalendarView() {
+   864→  const { locale } = useAppStore()
+   865→  const dir = getDirection(locale)
+   866→  const queryClient = useQueryClient()
+   867→
+   868→  const [viewMode, setViewMode] = useState<ViewMode>('month')
+   869→  const [currentDate, setCurrentDate] = useState(new Date())
+   870→
+   871→  // Filters
+   872→  const [filterEmployee, setFilterEmployee] = useState('__all__')
+   873→  const [filterStatus, setFilterStatus] = useState('__all__')
+   874→  const [filterBranch, setFilterBranch] = useState('__all__')
+   875→
+   876→  // Dialogs
+   877→  const [createOpen, setCreateOpen] = useState(false)
+   878→  const [createDefaultDate, setCreateDefaultDate] = useState('')
+   879→  const [createDefaultTime, setCreateDefaultTime] = useState('')
+   880→  const [viewBooking, setViewBooking] = useState<BookingRow | null>(null)
+   881→  const [viewOpen, setViewOpen] = useState(false)
+   882→
+   883→  // ─── Date range for fetching ─────────────────────────────────────────
+   884→  const { startDate: fetchStart, endDate: fetchEnd } = useMemo(
+   885→    () => getDateRange(viewMode, currentDate),
+   886→    [viewMode, currentDate],
+   887→  )
+   888→
+   889→  // ─── Fetch bookings ──────────────────────────────────────────────────
+   890→  const { data: bookingsData, isLoading, isError, refetch } = useQuery({
+   891→    queryKey: ['bookings-calendar', fetchStart, fetchEnd],
+   892→    queryFn: () =>
+   893→      authFetch(`/api/bookings?startDate=${fetchStart}&endDate=${fetchEnd}&limit=200`).then((r) => r.json()),
+   894→  })
+   895→
+   896→  const rawBookings: BookingRow[] = Array.isArray(bookingsData?.bookings) ? bookingsData.bookings : []
+   897→
+   898→  // ─── Fetch filter data ───────────────────────────────────────────────
+   899→  const { data: employeesData } = useQuery({
+   900→    queryKey: ['employees-list'],
+   901→    queryFn: () => authFetch('/api/employees?limit=100').then((r) => r.json()),
+   902→  })
+   903→  const employees: EmployeeOption[] = Array.isArray(employeesData?.employees) ? employeesData.employees : []
+   904→
+   905→  const { data: branchesData } = useQuery({
+   906→    queryKey: ['branches-list'],
+   907→    queryFn: () => authFetch('/api/branches').then((r) => r.json()),
+   908→  })
+   909→  const branches: BranchOption[] = Array.isArray(branchesData?.branches) ? branchesData.branches : []
+   910→
+   911→  // ─── Apply client-side filters ───────────────────────────────────────
+   912→  const filteredBookings = useMemo(() => {
+   913→    let result = rawBookings
+   914→    if (filterEmployee !== '__all__') {
+   915→      result = result.filter((b) => b.employee?.id === filterEmployee)
+   916→    }
+   917→    if (filterStatus !== '__all__') {
+   918→      result = result.filter((b) => b.status === filterStatus)
+   919→    }
+   920→    if (filterBranch !== '__all__') {
+   921→      result = result.filter((b) => b.branch?.id === filterBranch)
+   922→    }
+   923→    return result
+   924→  }, [rawBookings, filterEmployee, filterStatus, filterBranch])
+   925→
+   926→  // ─── Navigation ─────────────────────────────────────────────────────
+   927→  const navigate = useCallback((direction: -1 | 1) => {
+   928→    const d = new Date(currentDate)
+   929→    if (viewMode === 'day') d.setDate(d.getDate() + direction)
+   930→    else if (viewMode === 'week') d.setDate(d.getDate() + 7 * direction)
+   931→    else d.setMonth(d.getMonth() + direction)
+   932→    setCurrentDate(d)
+   933→  }, [currentDate, viewMode])
+   934→
+   935→  const goToday = useCallback(() => setCurrentDate(new Date()), [])
+   936→
+   937→  // ─── Handlers ────────────────────────────────────────────────────────
+   938→  const handleCreateFromSlot = useCallback((date: string, time: string) => {
+   939→    setCreateDefaultDate(date)
+   940→    setCreateDefaultTime(time)
+   941→    setCreateOpen(true)
+   942→  }, [])
+   943→
+   944→  const handleBookingClick = useCallback((booking: BookingRow) => {
+   945→    setViewBooking(booking)
+   946→    setViewOpen(true)
+   947→  }, [])
+   948→
+   949→  // ─── Computed ────────────────────────────────────────────────────────
+   950→  const dayNames = locale === 'ar' ? DAY_NAMES_AR : DAY_NAMES_EN
+   951→  const monthNames = locale === 'ar' ? MONTH_NAMES_AR : MONTH_NAMES_EN
+   952→  const currentHour = today.getHours()
+   953→
+   954→  const headerLabel = useMemo(() => {
+   955→    if (viewMode === 'day') return formatDate(currentDate, locale)
+   956→    if (viewMode === 'week') {
+   957→      const week = getWeekDays(currentDate)
+   958→      return `${formatDate(week[0], locale)} — ${formatDate(week[6], locale)}`
+   959→    }
+   960→    return `${monthNames[currentDate.getMonth()]} ${currentDate.getFullYear()}`
+   961→  }, [viewMode, currentDate, locale, monthNames])
+   962→
+   963→  // ─── Shared Header ───────────────────────────────────────────────────
+   964→  function renderHeader() {
+   965→    return (
+   966→      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+   967→        <h1 className="text-2xl font-bold">{t(locale, 'calendar', 'title')}</h1>
+   968→        <div className="flex items-center gap-2">
+   969→          <Button
+   970→            className="bg-emerald-600 hover:bg-emerald-700 text-white"
+   971→            size="sm"
+   972→            onClick={() => { setCreateDefaultDate(''); setCreateDefaultTime(''); setCreateOpen(true) }}
+   973→          >
+   974→            <Plus className="h-4 w-4 me-2" />
+   975→            {t(locale, 'bookings', 'newBooking')}
+   976→          </Button>
+   977→          <Button variant="outline" size="sm" onClick={goToday}>
+   978→            {t(locale, 'calendar', 'goToToday')}
+   979→          </Button>
+   980→          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => navigate(-1)}>
+   981→            {locale === 'ar' ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+   982→          </Button>
+   983→          <span className="text-sm font-medium min-w-44 text-center">{headerLabel}</span>
+   984→          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => navigate(1)}>
+   985→            {locale === 'ar' ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+   986→          </Button>
+   987→        </div>
+   988→      </div>
+   989→    )
+   990→  }
+   991→
+   992→  function renderViewToggle() {
+   993→    return (
+   994→      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+   995→        <ToggleGroup type="single" value={viewMode} onValueChange={(v) => { if (v) setViewMode(v as ViewMode) }}>
+   996→          <ToggleGroupItem value="day">{t(locale, 'calendar', 'dayView')}</ToggleGroupItem>
+   997→          <ToggleGroupItem value="week">{t(locale, 'calendar', 'weekView')}</ToggleGroupItem>
+   998→          <ToggleGroupItem value="month">{t(locale, 'calendar', 'monthView')}</ToggleGroupItem>
+   999→        </ToggleGroup>
+  1000→        <FilterBar
+  1001→          locale={locale}
+  1002→          employees={employees}
+  1003→          branches={branches}
+  1004→          selectedEmployee={filterEmployee}
+  1005→          onEmployeeChange={setFilterEmployee}
+  1006→          selectedStatus={filterStatus}
+  1007→          onStatusChange={setFilterStatus}
+  1008→          selectedBranch={filterBranch}
+  1009→          onBranchChange={setFilterBranch}
+  1010→        />
+  1011→      </div>
+  1012→    )
+  1013→  }
+  1014→
+  1015→  // ─── Error State ─────────────────────────────────────────────────────
+  1016→  if (isError) {
+  1017→    return (
+  1018→      <div dir={dir} className="space-y-4 animate-in fade-in-0 slide-in-from-bottom-1 duration-300">
+  1019→        {renderHeader()}
+  1020→        <Card>
+  1021→          <CardContent className="flex flex-col items-center justify-center py-20 gap-3">
+  1022→            <CalendarX className="h-12 w-12 text-muted-foreground/50" />
+  1023→            <p className="text-muted-foreground text-sm">{t(locale, 'common', 'error')}</p>
+  1024→            <Button variant="outline" size="sm" onClick={() => refetch()}>
+  1025→              <RefreshCw className="h-4 w-4 me-2" />
+  1026→              {t(locale, 'common', 'refresh')}
+  1027→            </Button>
+  1028→          </CardContent>
+  1029→        </Card>
+  1030→      </div>
+  1031→    )
+  1032→  }
+  1033→
+  1034→  // ─── Loading State ───────────────────────────────────────────────────
+  1035→  if (isLoading) {
+  1036→    return (
+  1037→      <div dir={dir} className="space-y-4 animate-in fade-in-0 slide-in-from-bottom-1 duration-300">
+  1038→        {renderHeader()}
+  1039→        {renderViewToggle()}
+  1040→        <CalendarSkeleton />
+  1041→      </div>
+  1042→    )
+  1043→  }
+  1044→
+  1045→  // ─── Empty State ─────────────────────────────────────────────────────
+  1046→  if (rawBookings.length === 0) {
+  1047→    return (
+  1048→      <div dir={dir} className="space-y-4 animate-in fade-in-0 slide-in-from-bottom-1 duration-300">
+  1049→        {renderHeader()}
+  1050→        {renderViewToggle()}
+  1051→        <Card>
+  1052→          <CardContent className="flex flex-col items-center justify-center py-20 gap-3">
+  1053→            <CalendarX className="h-12 w-12 text-muted-foreground/50" />
+  1054→            <p className="text-muted-foreground text-sm">{t(locale, 'calendar', 'noAppointments')}</p>
+  1055→            <Button
+  1056→              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+  1057→              size="sm"
+  1058→              onClick={() => { setCreateDefaultDate(''); setCreateDefaultTime(''); setCreateOpen(true) }}
+  1059→            >
+  1060→              <Plus className="h-4 w-4 me-2" />
+  1061→              {t(locale, 'bookings', 'newBooking')}
+  1062→            </Button>
+  1063→          </CardContent>
+  1064→        </Card>
+  1065→      </div>
+  1066→    )
+  1067→  }
+  1068→
+  1069→  // ─── Day View ────────────────────────────────────────────────────────
+  1070→  if (viewMode === 'day') {
+  1071→    const dayStr = formatDateStr(currentDate)
+  1072→    const dayAppts = filteredBookings.filter((b) => getBookingDateStr(b) === dayStr)
+  1073→    const isTodayCell = isSameDay(currentDate, today)
+  1074→
+  1075→    return (
+  1076→      <div dir={dir} className="space-y-4 animate-in fade-in-0 slide-in-from-bottom-1 duration-300">
+  1077→        {renderHeader()}
+  1078→        {renderViewToggle()}
+  1079→
+  1080→        <AnimatePresence mode="wait">
+  1081→          <motion.div
+  1082→            key="day"
+  1083→            initial={{ opacity: 0, x: locale === 'ar' ? -10 : 10 }}
+  1084→            animate={{ opacity: 1, x: 0 }}
+  1085→            exit={{ opacity: 0, x: locale === 'ar' ? 10 : -10 }}
+  1086→            transition={{ duration: 0.25 }}
+  1087→            className="grid grid-cols-1 gap-4 lg:grid-cols-[200px_1fr]"
+  1088→          >
+  1089→            {/* Time Slot Sidebar */}
+  1090→            <Card>
+  1091→              <CardContent className="p-3">
+  1092→                <h3 className="mb-3 text-sm font-semibold">{t(locale, 'calendar', 'timeSlot')}</h3>
+  1093→                <div className="space-y-1 max-h-[500px] overflow-y-auto">
+  1094→                  {HOURS_FULL.map((hour) => {
+  1095→                    const slotTime = `${String(hour).padStart(2, '0')}:00`
+  1096→                    const hasAppt = dayAppts.some((a) => a.startTime.startsWith(`${hour}`))
+  1097→                    return (
+  1098→                      <button
+  1099→                        key={hour}
+  1100→                        className={cn(
+  1101→                          'flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm transition-colors hover:bg-muted',
+  1102→                          hasAppt && 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400',
+  1103→                        )}
+  1104→                        onClick={() => handleCreateFromSlot(dayStr, slotTime)}
+  1105→                      >
+  1106→                        <span className="flex items-center gap-2">
+  1107→                          <Clock className="h-3.5 w-3.5" />
+  1108→                          {slotTime}
+  1109→                        </span>
+  1110→                        {hasAppt && <span className="h-2 w-2 rounded-full bg-emerald-500" />}
+  1111→                      </button>
+  1112→                    )
+  1113→                  })}
+  1114→                </div>
+  1115→              </CardContent>
+  1116→            </Card>
+  1117→
+  1118→            {/* Main Day Grid */}
+  1119→            <Card className="overflow-hidden">
+  1120→              <div className={cn(
+  1121→                'border-b bg-muted/50 p-3 text-center',
+  1122→                isTodayCell && 'bg-emerald-50 dark:bg-emerald-900/20',
+  1123→              )}>
+  1124→                <p className="text-xs text-muted-foreground">{dayNames[currentDate.getDay()]}</p>
+  1125→                <p className={cn('text-lg font-bold', isTodayCell && 'text-emerald-600')}>{currentDate.getDate()}</p>
+  1126→                <p className="text-xs text-muted-foreground">
+  1127→                  {dayAppts.length} {t(locale, 'calendar', 'appointments')}
+  1128→                </p>
+  1129→              </div>
+  1130→
+  1131→              <div className="overflow-y-auto max-h-[500px]">
+  1132→                <div className="relative">
+  1133→                  {HOURS_FULL.map((hour) => (
+  1134→                    <div key={hour} className="flex border-b" style={{ height: `${HOUR_HEIGHT}px` }}>
+  1135→                      <div className="w-16 shrink-0 flex items-start justify-end pe-2 text-xs text-muted-foreground pt-1">
+  1136→                        {String(hour).padStart(2, '0')}:00
+  1137→                      </div>
+  1138→                      <div
+  1139→                        className="flex-1 relative border-s cursor-pointer hover:bg-muted/20 transition-colors"
+  1140→                        onClick={() => handleCreateFromSlot(dayStr, `${String(hour).padStart(2, '0')}:00`)}
+  1141→                      />
+  1142→                    </div>
+  1143→                  ))}
+  1144→
+  1145→                  {isTodayCell && currentHour >= 7 && currentHour <= 20 && (
+  1146→                    <div
+  1147→                      className="absolute start-16 end-0 z-20 flex items-center before:absolute before:start-0 before:end-0 before:border-t-2 before:border-red-500 pointer-events-none"
+  1148→                      style={{ top: `${(currentHour - 7 + (today.getMinutes() / 60)) * HOUR_HEIGHT}px` }}
+  1149→                    >
+  1150→                      <div className="h-3 w-3 rounded-full bg-red-500 -ms-1.5" />
+  1151→                    </div>
+  1152→                  )}
+  1153→
+  1154→                  {dayAppts.map((appt) => (
+  1155→                    <AppointmentBlock
+  1156→                      key={appt.id}
+  1157→                      booking={appt}
+  1158→                      locale={locale}
+  1159→                      onClick={() => handleBookingClick(appt)}
+  1160→                    />
+  1161→                  ))}
+  1162→                </div>
+  1163→              </div>
+  1164→            </Card>
+  1165→          </motion.div>
+  1166→        </AnimatePresence>
+  1167→
+  1168→        <CreateBookingDialog
+  1169→          key={createDefaultDate + createDefaultTime}
+  1170→          open={createOpen}
+  1171→          onOpenChange={setCreateOpen}
+  1172→          locale={locale}
+  1173→          defaultDate={createDefaultDate}
+  1174→          defaultTime={createDefaultTime}
+  1175→        />
+  1176→        <ViewEditDialog
+  1177→          key={viewBooking?.id ?? ''}
+  1178→          booking={viewBooking}
+  1179→          open={viewOpen}
+  1180→          onOpenChange={setViewOpen}
+  1181→          locale={locale}
+  1182→        />
+  1183→      </div>
+  1184→    )
+  1185→  }
+  1186→
+  1187→  // ─── Week View ───────────────────────────────────────────────────────
+  1188→  if (viewMode === 'week') {
+  1189→    const days = getWeekDays(currentDate)
+  1190→
+  1191→    return (
+  1192→      <div dir={dir} className="space-y-4 animate-in fade-in-0 slide-in-from-bottom-1 duration-300">
+  1193→        {renderHeader()}
+  1194→        {renderViewToggle()}
+  1195→
+  1196→        <AnimatePresence mode="wait">
+  1197→          <motion.div
+  1198→            key="week"
+  1199→            initial={{ opacity: 0, x: locale === 'ar' ? -10 : 10 }}
+  1200→            animate={{ opacity: 1, x: 0 }}
+  1201→            exit={{ opacity: 0, x: locale === 'ar' ? 10 : -10 }}
+  1202→            transition={{ duration: 0.25 }}
+  1203→          >
+  1204→            <Card className="overflow-hidden">
+  1205→              <div className="grid border-b bg-muted/50" style={{ gridTemplateColumns: `56px repeat(${days.length}, 1fr)` }}>
+  1206→                <div className="p-2" />
+  1207→                {days.map((day, i) => {
+  1208→                  const isTodayCell = isSameDay(day, today)
+  1209→                  return (
+  1210→                    <div key={i} className={cn('p-2 text-center border-s', isTodayCell && 'bg-emerald-50 dark:bg-emerald-900/20')}>
+  1211→                      <p className="text-xs text-muted-foreground">{dayNames[day.getDay()]}</p>
+  1212→                      <p className={cn('text-lg font-bold', isTodayCell && 'text-emerald-600')}>{day.getDate()}</p>
+  1213→                    </div>
+  1214→                  )
+  1215→                })}
+  1216→              </div>
+  1217→
+  1218→              <div className="overflow-x-auto">
+  1219→                <div className="overflow-y-auto max-h-[500px]">
+  1220→                  <div className="grid" style={{ gridTemplateColumns: `56px repeat(${days.length}, 1fr)` }}>
+  1221→                    <div className="relative">
+  1222→                      {HOURS_FULL.map((hour) => (
+  1223→                        <div key={hour} className="flex items-start justify-end pe-2 text-xs text-muted-foreground" style={{ height: `${HOUR_HEIGHT}px` }}>
+  1224→                          {String(hour).padStart(2, '0')}:00
+  1225→                        </div>
+  1226→                      ))}
+  1227→                    </div>
+  1228→
+  1229→                    {days.map((day, dayIdx) => {
+  1230→                      const dayStr = formatDateStr(day)
+  1231→                      const dayAppts = filteredBookings.filter((b) => getBookingDateStr(b) === dayStr)
+  1232→                      const isTodayCell = isSameDay(day, today)
+  1233→
+  1234→                      return (
+  1235→                        <div key={dayIdx} className={cn('relative border-s', isTodayCell && 'bg-emerald-50/30 dark:bg-emerald-900/10')}>
+  1236→                          {HOURS_FULL.map((hour) => (
+  1237→                            <div
+  1238→                              key={hour}
+  1239→                              className="border-b cursor-pointer hover:bg-muted/20 transition-colors"
+  1240→                              style={{ height: `${HOUR_HEIGHT}px` }}
+  1241→                              onClick={() => handleCreateFromSlot(dayStr, `${String(hour).padStart(2, '0')}:00`)}
+  1242→                            />
+  1243→                          ))}
+  1244→                          {isTodayCell && currentHour >= 7 && currentHour <= 20 && (
+  1245→                            <div
+  1246→                              className="absolute start-0 end-0 z-20 flex items-center before:absolute before:start-0 before:end-0 before:border-t-2 before:border-red-500 pointer-events-none"
+  1247→                              style={{ top: `${(currentHour - 7 + (today.getMinutes() / 60)) * HOUR_HEIGHT}px` }}
+  1248→                            >
+  1249→                              <div className="h-3 w-3 rounded-full bg-red-500 -ms-1.5" />
+  1250→                            </div>
+  1251→                          )}
+  1252→                          {dayAppts.map((appt) => (
+  1253→                            <AppointmentBlock
+  1254→                              key={appt.id}
+  1255→                              booking={appt}
+  1256→                              locale={locale}
+  1257→                              onClick={() => handleBookingClick(appt)}
+  1258→                            />
+  1259→                          ))}
+  1260→                        </div>
+  1261→                      )
+  1262→                    })}
+  1263→                  </div>
+  1264→                </div>
+  1265→              </div>
+  1266→            </Card>
+  1267→          </motion.div>
+  1268→        </AnimatePresence>
+  1269→
+  1270→        <CreateBookingDialog
+  1271→          key={createDefaultDate + createDefaultTime}
+  1272→          open={createOpen}
+  1273→          onOpenChange={setCreateOpen}
+  1274→          locale={locale}
+  1275→          defaultDate={createDefaultDate}
+  1276→          defaultTime={createDefaultTime}
+  1277→        />
+  1278→        <ViewEditDialog
+  1279→          key={viewBooking?.id ?? ''}
+  1280→          booking={viewBooking}
+  1281→          open={viewOpen}
+  1282→          onOpenChange={setViewOpen}
+  1283→          locale={locale}
+  1284→        />
+  1285→      </div>
+  1286→    )
+  1287→  }
+  1288→
+  1289→  // ─── Month View ──────────────────────────────────────────────────────
+  1290→  const monthDays = getDaysInMonth(currentDate)
+  1291→  const MAX_VISIBLE_BARS = 3
+  1292→
+  1293→  return (
+  1294→    <div dir={dir} className="space-y-4 animate-in fade-in-0 slide-in-from-bottom-1 duration-300">
+  1295→      {renderHeader()}
+  1296→      {renderViewToggle()}
+  1297→
+  1298→      <AnimatePresence mode="wait">
+  1299→        <motion.div
+  1300→          key="month"
+  1301→          initial={{ opacity: 0, x: locale === 'ar' ? -10 : 10 }}
+  1302→          animate={{ opacity: 1, x: 0 }}
+  1303→          exit={{ opacity: 0, x: locale === 'ar' ? 10 : -10 }}
+  1304→          transition={{ duration: 0.25 }}
+  1305→        >
+  1306→          <Card>
+  1307→            <CardContent className="p-2">
+  1308→              <div className="overflow-x-auto">
+  1309→                {/* Day Headers */}
+  1310→                <div className="grid grid-cols-7 gap-px mb-1 min-w-[600px]">
+  1311→                  {dayNames.map((name, i) => (
+  1312→                    <div key={i} className="py-2 text-center text-xs font-semibold text-muted-foreground">
+  1313→                      {name}
+  1314→                    </div>
+  1315→                  ))}
+  1316→                </div>
+  1317→
+  1318→                {/* Day Cells */}
+  1319→                <motion.div
+  1320→                  variants={containerVariants}
+  1321→                  initial="hidden"
+  1322→                  animate="visible"
+  1323→                  className="grid grid-cols-7 gap-px rounded-lg overflow-hidden border min-w-[600px]"
+  1324→                >
+  1325→                  {monthDays.map((day, i) => {
+  1326→                    const isCurrentMonth = day.getMonth() === currentDate.getMonth()
+  1327→                    const isTodayCell = isSameDay(day, today)
+  1328→                    const dayStr = formatDateStr(day)
+  1329→                    const dayAppts = filteredBookings.filter((b) => getBookingDateStr(b) === dayStr)
+  1330→                    const visibleAppts = dayAppts.slice(0, MAX_VISIBLE_BARS)
+  1331→                    const overflowCount = dayAppts.length - MAX_VISIBLE_BARS
+  1332→
+  1333→                    return (
+  1334→                      <motion.div
+  1335→                        key={i}
+  1336→                        variants={itemVariants}
+  1337→                        transition={{ delay: i * 0.006 }}
+  1338→                        className={cn(
+  1339→                          'min-h-28 p-1.5 border-s bg-background transition-colors hover:bg-muted/30 cursor-pointer',
+  1340→                          !isCurrentMonth && 'bg-muted/30 text-muted-foreground',
+  1341→                          isTodayCell && 'bg-emerald-50 dark:bg-emerald-900/20 ring-2 ring-inset ring-emerald-500',
+  1342→                        )}
+  1343→                        onClick={(e) => {
+  1344→                          // Only create if clicking on empty area (not on an appointment bar)
+  1345→                          const target = e.target as HTMLElement
+  1346→                          if (!target.closest('[data-appt-bar]')) {
+  1347→                            handleCreateFromSlot(dayStr, '09:00')
+  1348→                          }
+  1349→                        }}
+  1350→                      >
+  1351→                        <div className="flex items-center justify-between mb-1">
+  1352→                          <span className={cn(
+  1353→                            'inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold',
+  1354→                            isTodayCell && 'bg-emerald-600 text-white',
+  1355→                          )}>
+  1356→                            {day.getDate()}
+  1357→                          </span>
+  1358→                          {dayAppts.length > 0 && (
+  1359→                            <span className="text-[10px] text-muted-foreground">{dayAppts.length}</span>
+  1360→                          )}
+  1361→                        </div>
+  1362→                        <div className="flex flex-col gap-0.5">
+  1363→                          {visibleAppts.map((appt) => {
+  1364→                            const style = STATUS_STYLES[appt.status] ?? STATUS_STYLES.pending
+  1365→                            const svcName = appt.services?.[0]?.service?.name ?? ''
+  1366→                            return (
+  1367→                              <div
+  1368→                                key={appt.id}
+  1369→                                data-appt-bar
+  1370→                                className={cn(
+  1371→                                  'rounded-md border-s-2 ps-1.5 pe-1 py-0.5 text-[11px] leading-tight truncate cursor-pointer transition-shadow hover:shadow-sm',
+  1372→                                  style.border,
+  1373→                                )}
+  1374→                                onClick={(e) => { e.stopPropagation(); handleBookingClick(appt) }}
+  1375→                              >
+  1376→                                <span className="font-semibold">{svcName}</span>
+  1377→                              </div>
+  1378→                            )
+  1379→                          })}
+  1380→                          {overflowCount > 0 && (
+  1381→                            <button
+  1382→                              className="text-[11px] text-muted-foreground hover:text-foreground ps-1.5 text-start"
+  1383→                              onClick={(e) => { e.stopPropagation() }}
+  1384→                            >
+  1385→                              +{overflowCount} {t(locale, 'common', 'more')}
+  1386→                            </button>
+  1387→                          )}
+  1388→                        </div>
+  1389→                      </motion.div>
+  1390→                    )
+  1391→                  })}
+  1392→                </motion.div>
+  1393→              </div>
+  1394→            </CardContent>
+  1395→          </Card>
+  1396→        </motion.div>
+  1397→      </AnimatePresence>
+  1398→
+  1399→      <CreateBookingDialog
+  1400→        key={createDefaultDate + createDefaultTime}
+  1401→        open={createOpen}
+  1402→        onOpenChange={setCreateOpen}
+  1403→        locale={locale}
+  1404→        defaultDate={createDefaultDate}
+  1405→        defaultTime={createDefaultTime}
+  1406→      />
+  1407→      <ViewEditDialog
+  1408→        key={viewBooking?.id ?? ''}
+  1409→        booking={viewBooking}
+  1410→        open={viewOpen}
+  1411→        onOpenChange={setViewOpen}
+  1412→        locale={locale}
+  1413→      />
+  1414→    </div>
+  1415→  )
+  1416→}
