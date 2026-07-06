@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { z } from 'zod'
 import { withAuth, optionsHandler, ok, created, err, internalError, getCorsHeaders } from '@/lib/api-auth'
+import { isDatabaseAvailable } from '@/lib/demo-mode'
+import { demoBranchesList } from '@/lib/demo-responses'
+
 
 export async function OPTIONS(request: NextRequest) {
   return optionsHandler(request)
@@ -10,6 +13,12 @@ export async function OPTIONS(request: NextRequest) {
 // ===================== GET: List Branches =====================
 export async function GET(request: NextRequest) {
   try {
+    // ── Demo mode fallback ───────────────────────────────────
+    const dbOk = await isDatabaseAvailable()
+    if (!dbOk) {
+      return ok(demoBranchesList(), request.headers.get('origin'))
+    }
+
     const auth = await withAuth(request, { resource: 'branches', action: 'view' })
     if (auth.error) return auth.error
     const { tenantId: tid } = auth.context

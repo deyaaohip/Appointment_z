@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { z } from 'zod'
 import { withAuth, optionsHandler, ok, internalError, getCorsHeaders } from '@/lib/api-auth'
+import { isDatabaseAvailable } from '@/lib/demo-mode'
+import { demoAvailability } from '@/lib/demo-responses'
+
 
 export async function OPTIONS(request: NextRequest) {
   return optionsHandler(request)
@@ -27,6 +30,12 @@ function minutesToTime(minutes: number): string {
 
 export async function GET(request: NextRequest) {
   try {
+    // ── Demo mode fallback ───────────────────────────────────
+    const dbOk = await isDatabaseAvailable()
+    if (!dbOk) {
+      return ok(demoAvailability(), request.headers.get('origin'))
+    }
+
     const auth = await withAuth(request, { resource: 'bookings', action: 'view' })
     if (auth.error) return auth.error
     const { tenantId: tid } = auth.context

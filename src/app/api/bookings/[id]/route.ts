@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { z } from 'zod'
 import { withAuth, optionsHandler, ok, err, internalError, getCorsHeaders } from '@/lib/api-auth'
+import { isDatabaseAvailable } from '@/lib/demo-mode'
+import { findDemo, enrichDemoBooking, DEMO_BOOKINGS } from '@/lib/demo-data'
 
 export async function OPTIONS(request: NextRequest) {
   return optionsHandler(request)
@@ -18,6 +20,14 @@ export async function GET(
     const { tenantId: tid } = auth.context
 
     const { id } = await params
+
+    const dbOk = await isDatabaseAvailable()
+    if (!dbOk) {
+      const booking = findDemo(DEMO_BOOKINGS, id)
+      if (!booking) return err('Booking not found', 404, request.headers.get('origin'))
+      return ok({ booking: enrichDemoBooking(booking) }, request.headers.get('origin'))
+    }
+
     const tenant = await db.tenant.findFirst({ where: { id: tid, isActive: true } })
     if (!tenant) {
       return err('No tenant found', 404, request.headers.get('origin'))
@@ -83,6 +93,14 @@ export async function PUT(
         { error: 'Validation failed', details: parsed.error.flatten() },
         { status: 400, headers: getCorsHeaders(request.headers.get('origin')) }
       )
+    }
+
+    const dbOk = await isDatabaseAvailable()
+    if (!dbOk) {
+      const booking = findDemo(DEMO_BOOKINGS, id)
+      if (!booking) return err('Booking not found', 404, request.headers.get('origin'))
+      const updated = { ...booking, ...parsed.data }
+      return ok({ booking: enrichDemoBooking(updated as typeof DEMO_BOOKINGS[0]) }, request.headers.get('origin'))
     }
 
     const tenant = await db.tenant.findFirst({ where: { id: tid, isActive: true } })
@@ -151,6 +169,14 @@ export async function DELETE(
     const { tenantId: tid } = auth.context
 
     const { id } = await params
+
+    const dbOk = await isDatabaseAvailable()
+    if (!dbOk) {
+      const booking = findDemo(DEMO_BOOKINGS, id)
+      if (!booking) return err('Booking not found', 404, request.headers.get('origin'))
+      return ok({ booking: enrichDemoBooking({ ...booking, status: 'cancelled' }), message: 'Booking cancelled successfully' }, request.headers.get('origin'))
+    }
+
     const tenant = await db.tenant.findFirst({ where: { id: tid, isActive: true } })
     if (!tenant) {
       return err('No tenant found', 404, request.headers.get('origin'))

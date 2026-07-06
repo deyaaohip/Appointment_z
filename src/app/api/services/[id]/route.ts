@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { z } from 'zod'
 import { withAuth, optionsHandler, ok, err, internalError, getCorsHeaders } from '@/lib/api-auth'
+import { isDatabaseAvailable } from '@/lib/demo-mode'
+import { findDemo, DEMO_SERVICES, DEMO_SERVICE_CATEGORIES, DEMO_BOOKINGS } from '@/lib/demo-data'
 
 export async function OPTIONS(request: NextRequest) {
   return optionsHandler(request)
@@ -18,6 +20,15 @@ export async function GET(
     const { tenantId: tid } = auth.context
 
     const { id } = await params
+
+    const dbOk = await isDatabaseAvailable()
+    if (!dbOk) {
+      const service = findDemo(DEMO_SERVICES, id)
+      if (!service) return err('Service not found', 404, request.headers.get('origin'))
+      const cat = findDemo(DEMO_SERVICE_CATEGORIES, service.categoryId)
+      return ok({ service: { ...service, category: cat ? { id: cat.id, name: cat.name, description: cat.description, color: cat.color, icon: cat.icon } : null, employees: [], _count: { bookings: DEMO_BOOKINGS.filter(b => b.serviceId === id).length } } }, request.headers.get('origin'))
+    }
+
     const tenant = await db.tenant.findFirst({ where: { id: tid, isActive: true } })
     if (!tenant) {
       return err('No tenant found', 404, request.headers.get('origin'))
@@ -96,6 +107,14 @@ export async function PUT(
       )
     }
 
+    const dbOk = await isDatabaseAvailable()
+    if (!dbOk) {
+      const service = findDemo(DEMO_SERVICES, id)
+      if (!service) return err('Service not found', 404, request.headers.get('origin'))
+      const updated = { ...service, ...parsed.data }
+      return ok({ service: updated }, request.headers.get('origin'))
+    }
+
     const tenant = await db.tenant.findFirst({ where: { id: tid, isActive: true } })
     if (!tenant) {
       return err('No tenant found', 404, request.headers.get('origin'))
@@ -151,6 +170,14 @@ export async function DELETE(
     const { tenantId: tid } = auth.context
 
     const { id } = await params
+
+    const dbOk = await isDatabaseAvailable()
+    if (!dbOk) {
+      const service = findDemo(DEMO_SERVICES, id)
+      if (!service) return err('Service not found', 404, request.headers.get('origin'))
+      return ok({ service: { ...service, isActive: false }, message: 'Service deactivated successfully' }, request.headers.get('origin'))
+    }
+
     const tenant = await db.tenant.findFirst({ where: { id: tid, isActive: true } })
     if (!tenant) {
       return err('No tenant found', 404, request.headers.get('origin'))

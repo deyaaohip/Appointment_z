@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { z } from 'zod'
 import { withAuth, optionsHandler, ok, err, internalError, getCorsHeaders } from '@/lib/api-auth'
+import { isDatabaseAvailable } from '@/lib/demo-mode'
+import { demoSubscriptions } from '@/lib/demo-responses'
+
 
 const subscriptionActionSchema = z.object({
   action: z.enum(['cancel', 'upgrade', 'reactivate']),
@@ -200,6 +203,12 @@ async function ensureTenantSubscription(tenantId: string) {
 // ── GET: Fetch subscription info (always returns data, never 404) ────
 export async function GET(request: NextRequest) {
   try {
+    // ── Demo mode fallback ───────────────────────────────────
+    const dbOk = await isDatabaseAvailable()
+    if (!dbOk) {
+      return ok(demoSubscriptions(), request.headers.get('origin'))
+    }
+
     const auth = await withAuth(request, { resource: 'subscriptions', action: 'view' })
     if (auth.error) return auth.error
     const { tenantId: tid } = auth.context

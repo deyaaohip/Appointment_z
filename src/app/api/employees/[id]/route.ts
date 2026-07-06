@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { z } from 'zod'
 import { withAuth, optionsHandler, ok, err, internalError, getCorsHeaders } from '@/lib/api-auth'
+import { isDatabaseAvailable } from '@/lib/demo-mode'
+import { findDemo, DEMO_EMPLOYEES, DEMO_BOOKINGS, DEMO_BRANCHES, enrichDemoBooking } from '@/lib/demo-data'
 
 export async function OPTIONS(request: NextRequest) {
   return optionsHandler(request)
@@ -18,6 +20,34 @@ export async function GET(
     const { tenantId: tid } = auth.context
 
     const { id } = await params
+
+    const dbOk = await isDatabaseAvailable()
+    if (!dbOk) {
+      const employee = findDemo(DEMO_EMPLOYEES, id)
+      if (!employee) return err('Employee not found', 404, request.headers.get('origin'))
+      const branch = findDemo(DEMO_BRANCHES, employee.branchId)
+      const todayStr = new Date().toISOString().slice(0, 10)
+      const todayBookings = DEMO_BOOKINGS
+        .filter(b => b.employeeId === id && b.startDate.slice(0, 10) === todayStr)
+        .map(enrichDemoBooking)
+      const completedBookings = DEMO_BOOKINGS.filter(b => b.employeeId === id && b.status === 'completed')
+      const totalRevenue = completedBookings.reduce((s, b) => s + b.totalPrice, 0)
+      const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10)
+      const monthBookings = completedBookings.filter(b => b.startDate.slice(0, 10) >= monthStart)
+      const monthRevenue = monthBookings.reduce((s, b) => s + b.totalPrice, 0)
+      return ok({
+        employee: { ...employee, branch: branch ? { id: branch.id, name: branch.name } : null, schedules: [], services: [], leaves: [] },
+        todayBookings,
+        performance: {
+          totalCompleted: completedBookings.length,
+          totalRevenue,
+          avgRating: 0,
+          monthBookings: monthBookings.length,
+          monthRevenue,
+        },
+      }, request.headers.get('origin'))
+    }
+
     const tenant = await db.tenant.findFirst({ where: { id: tid, isActive: true } })
     if (!tenant) {
       return err('No tenant found', 404, request.headers.get('origin'))
@@ -152,6 +182,14 @@ export async function PUT(
       )
     }
 
+    const dbOk = await isDatabaseAvailable()
+    if (!dbOk) {
+      const employee = findDemo(DEMO_EMPLOYEES, id)
+      if (!employee) return err('Employee not found', 404, request.headers.get('origin'))
+      const updated = { ...employee, ...parsed.data }
+      return ok({ employee: updated }, request.headers.get('origin'))
+    }
+
     const tenant = await db.tenant.findFirst({ where: { id: tid, isActive: true } })
     if (!tenant) {
       return err('No tenant found', 404, request.headers.get('origin'))
@@ -199,6 +237,14 @@ export async function DELETE(
     const { tenantId: tid } = auth.context
 
     const { id } = await params
+
+    const dbOk = await isDatabaseAvailable()
+    if (!dbOk) {
+      const employee = findDemo(DEMO_EMPLOYEES, id)
+      if (!employee) return err('Employee not found', 404, request.headers.get('origin'))
+      return ok({ employee: { ...employee, isActive: false }, message: 'Employee deactivated successfully' }, request.headers.get('origin'))
+    }
+
     const tenant = await db.tenant.findFirst({ where: { id: tid, isActive: true } })
     if (!tenant) {
       return err('No tenant found', 404, request.headers.get('origin'))

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { z } from 'zod'
 import { withAuth, optionsHandler, ok, err, internalError, getCorsHeaders } from '@/lib/api-auth'
+import { isDatabaseAvailable } from '@/lib/demo-mode'
+import { findDemo, DEMO_ROLES } from '@/lib/demo-data'
 
 export async function OPTIONS(request: NextRequest) {
   return optionsHandler(request)
@@ -18,6 +20,14 @@ export async function GET(
     const { tenantId: tid } = auth.context
 
     const { id } = await params
+
+    const dbOk = await isDatabaseAvailable()
+    if (!dbOk) {
+      const role = findDemo(DEMO_ROLES, id)
+      if (!role) return err('Role not found', 404, request.headers.get('origin'))
+      return ok({ role: { ...role, _count: { users: role.userCount ?? 0 } } }, request.headers.get('origin'))
+    }
+
     const tenant = await db.tenant.findFirst({ where: { id: tid, isActive: true } })
     if (!tenant) {
       return err('No tenant found', 404, request.headers.get('origin'))
@@ -71,6 +81,14 @@ export async function PUT(
       )
     }
 
+    const dbOk = await isDatabaseAvailable()
+    if (!dbOk) {
+      const role = findDemo(DEMO_ROLES, id)
+      if (!role) return err('Role not found', 404, request.headers.get('origin'))
+      const updated = { ...role, ...parsed.data }
+      return ok({ role: updated }, request.headers.get('origin'))
+    }
+
     const tenant = await db.tenant.findFirst({ where: { id: tid, isActive: true } })
     if (!tenant) {
       return err('No tenant found', 404, request.headers.get('origin'))
@@ -120,6 +138,14 @@ export async function DELETE(
     const { tenantId: tid } = auth.context
 
     const { id } = await params
+
+    const dbOk = await isDatabaseAvailable()
+    if (!dbOk) {
+      const role = findDemo(DEMO_ROLES, id)
+      if (!role) return err('Role not found', 404, request.headers.get('origin'))
+      return ok({ success: true, message: 'Role deleted successfully' }, request.headers.get('origin'))
+    }
+
     const tenant = await db.tenant.findFirst({ where: { id: tid, isActive: true } })
     if (!tenant) {
       return err('No tenant found', 404, request.headers.get('origin'))

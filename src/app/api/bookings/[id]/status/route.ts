@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { z } from 'zod'
 import { withAuth, optionsHandler, ok, err, internalError, getCorsHeaders } from '@/lib/api-auth'
+import { isDatabaseAvailable } from '@/lib/demo-mode'
+import { findDemo, enrichDemoBooking, DEMO_BOOKINGS } from '@/lib/demo-data'
 
 export async function OPTIONS(request: NextRequest) {
   return optionsHandler(request)
@@ -38,6 +40,26 @@ export async function PATCH(
         { error: 'Validation failed', details: parsed.error.flatten() },
         { status: 400, headers: getCorsHeaders(request.headers.get('origin')) }
       )
+    }
+
+    const dbOk = await isDatabaseAvailable()
+    if (!dbOk) {
+      const booking = findDemo(DEMO_BOOKINGS, id)
+      if (!booking) return err('Booking not found', 404, request.headers.get('origin'))
+      const { status: newStatus } = parsed.data
+      const currentStatus = booking.status
+      const allowed = VALID_TRANSITIONS[currentStatus]
+      if (!allowed || !allowed.includes(newStatus)) {
+        return NextResponse.json(
+          { error: 'Invalid status transition', message: `Cannot transition from "${currentStatus}" to "${newStatus}"`, allowedTransitions: allowed },
+          { status: 400, headers: getCorsHeaders(request.headers.get('origin')) }
+        )
+      }
+      const updated = { ...booking, status: newStatus }
+      return ok({
+        booking: enrichDemoBooking(updated as typeof DEMO_BOOKINGS[0]),
+        message: `Booking status updated from "${currentStatus}" to "${newStatus}"`,
+      }, request.headers.get('origin'))
     }
 
     const tenant = await db.tenant.findFirst({ where: { id: tid, isActive: true } })

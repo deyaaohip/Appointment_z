@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { z } from 'zod'
 import { withAuth, optionsHandler, ok, err, internalError, getCorsHeaders } from '@/lib/api-auth'
+import { isDatabaseAvailable } from '@/lib/demo-mode'
+import { findDemo, DEMO_BRANCHES, DEMO_EMPLOYEES } from '@/lib/demo-data'
 
 export async function OPTIONS(request: NextRequest) {
   return optionsHandler(request)
@@ -18,6 +20,15 @@ export async function GET(
     const { tenantId: tid } = auth.context
 
     const { id } = await params
+
+    const dbOk = await isDatabaseAvailable()
+    if (!dbOk) {
+      const branch = findDemo(DEMO_BRANCHES, id)
+      if (!branch) return err('Branch not found', 404, request.headers.get('origin'))
+      const employees = DEMO_EMPLOYEES.filter(e => e.branchId === id).map(e => ({ id: e.id, name: e.name, avatar: null }))
+      return ok({ branch: { ...branch, employees } }, request.headers.get('origin'))
+    }
+
     const tenant = await db.tenant.findFirst({ where: { id: tid, isActive: true } })
     if (!tenant) {
       return err('No tenant found', 404, request.headers.get('origin'))
@@ -75,6 +86,14 @@ export async function PUT(
       )
     }
 
+    const dbOk = await isDatabaseAvailable()
+    if (!dbOk) {
+      const branch = findDemo(DEMO_BRANCHES, id)
+      if (!branch) return err('Branch not found', 404, request.headers.get('origin'))
+      const updated = { ...branch, ...parsed.data }
+      return ok({ branch: updated }, request.headers.get('origin'))
+    }
+
     const tenant = await db.tenant.findFirst({ where: { id: tid, isActive: true } })
     if (!tenant) {
       return err('No tenant found', 404, request.headers.get('origin'))
@@ -117,6 +136,14 @@ export async function DELETE(
     const { tenantId: tid } = auth.context
 
     const { id } = await params
+
+    const dbOk = await isDatabaseAvailable()
+    if (!dbOk) {
+      const branch = findDemo(DEMO_BRANCHES, id)
+      if (!branch) return err('Branch not found', 404, request.headers.get('origin'))
+      return ok({ branch: { ...branch, isActive: false }, message: 'Branch deactivated successfully' }, request.headers.get('origin'))
+    }
+
     const tenant = await db.tenant.findFirst({ where: { id: tid, isActive: true } })
     if (!tenant) {
       return err('No tenant found', 404, request.headers.get('origin'))

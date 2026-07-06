@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { z } from 'zod'
 import { withAuth, optionsHandler, ok, err, internalError, getCorsHeaders } from '@/lib/api-auth'
+import { isDatabaseAvailable } from '@/lib/demo-mode'
+import { demoBrandSettings } from '@/lib/demo-responses'
+
 
 export async function OPTIONS(request: NextRequest) {
   return optionsHandler(request)
@@ -17,6 +20,12 @@ const updateBrandSettingsSchema = z.object({
 // ── GET: Fetch brand settings ──────────────────────────────────────
 export async function GET(request: NextRequest) {
   try {
+    // ── Demo mode fallback ───────────────────────────────────
+    const dbOk = await isDatabaseAvailable()
+    if (!dbOk) {
+      return ok(demoBrandSettings(), request.headers.get('origin'))
+    }
+
     const auth = await withAuth(request, { resource: 'settings', action: 'view' })
     if (auth.error) return auth.error
     const { tenantId: tid } = auth.context

@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { z } from 'zod'
 import { withAuth, optionsHandler, ok, created, err, internalError, getPagination, getCorsHeaders } from '@/lib/api-auth'
+import { isDatabaseAvailable } from '@/lib/demo-mode'
+import { demoBookingsList } from '@/lib/demo-responses'
+
 
 export async function OPTIONS(request: NextRequest) {
   return optionsHandler(request)
@@ -10,6 +13,17 @@ export async function OPTIONS(request: NextRequest) {
 // ===================== GET: List Bookings =====================
 export async function GET(request: NextRequest) {
   try {
+    // ── Demo mode fallback ───────────────────────────────────
+    const dbOk = await isDatabaseAvailable()
+    if (!dbOk) {
+      const sp = new URL(request.url).searchParams
+      const page = parseInt(sp.get('page') || '1')
+      const limit = parseInt(sp.get('limit') || '20')
+      const search = sp.get('search') || undefined
+      const status = sp.get('status') || undefined
+      return ok(demoBookingsList(page, limit, status, search), request.headers.get('origin'))
+    }
+
     const auth = await withAuth(request, { resource: 'bookings', action: 'view' })
     if (auth.error) return auth.error
     const { tenantId: tid } = auth.context
