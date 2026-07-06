@@ -88,8 +88,9 @@ export async function POST(request: NextRequest) {
     const email = rawEmail.toLowerCase().trim()
     const name = String(body.name || email.split('@')[0]).trim()
 
-    if (!email.includes('@') || !email.includes('.')) {
-      return NextResponse.json({ error: 'يرجى إدخال بريد إلكتروني صحيح', code: 'INVALID_EMAIL' }, { status: 400, headers: corsHeaders })
+    if (!email || !email.includes('@') || !email.includes('.')) {
+      // Invalid or missing email → fall through to demo mode
+      return demoLogin('demo@bookflow.com', 'Demo User')
     }
 
     // ── Try real database auth ──────────────────────────────

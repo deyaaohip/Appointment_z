@@ -98,16 +98,20 @@ export default function Home() {
     html.lang = locale
   }, [locale])
 
-  // Quick auto-login when entering app mode
+  // Quick auto-login when entering app mode (only if email already filled)
   useEffect(() => {
-    if (appMode !== 'app') return
+    if (appMode !== 'app' || !loginEmail) {
+      // No email → just show login form, don't call API
+      if (appMode === 'app') setIsLoading(false)
+      return
+    }
     const quickLogin = async () => {
       setIsLoading(true)
       try {
         const res = await fetch('/api/auth', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: loginEmail }),
+          body: JSON.stringify({ email: loginEmail, password: loginPassword || undefined }),
         })
         if (res.ok) {
           const data = await res.json()
