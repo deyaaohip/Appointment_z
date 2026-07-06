@@ -35,7 +35,7 @@ const AUTH_REQUIRED_PREFIXES = [
 
 const ALLOWED_ORIGINS = process.env.CORS_ORIGINS
   ? process.env.CORS_ORIGINS.split(',').map((s) => s.trim())
-  : ['http://localhost:3000', 'http://localhost:3456', 'https://preview-9e969ea3-851a-4098-a0a9-024bb4856b9b.space-z.ai']
+  : ['http://localhost:3000', 'http://localhost:3456', 'https://y12n35wyv181-d.space-z.ai']
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
