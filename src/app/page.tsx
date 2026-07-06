@@ -2,7 +2,7 @@
 
 import { useState, useEffect, lazy, Suspense } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Loader2, CalendarDays, ShieldCheck, Zap, Globe, ArrowRight, ArrowLeft, LogIn, UserPlus, Play } from 'lucide-react'
+import { Loader2, CalendarDays, ShieldCheck, Zap, Globe, ArrowRight, ArrowLeft, LogIn, UserPlus, Play, Shield, ArrowLeftRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -34,6 +34,7 @@ import BranchesView from '@/components/branches/branches-view'
 import CouponsView from '@/components/coupons/coupons-view'
 import RolesView from '@/components/roles/roles-view'
 import { WhatsAppView } from '@/components/whatsapp/whatsapp-view'
+import { SuperAdminSidebar, SuperAdminHeader } from '@/components/super-admin/super-admin-sidebar'
 
 // ─── Placeholder component for new views ────────────────────────────
 function PlaceholderView({ viewKey }: { viewKey: string }) {
@@ -70,6 +71,8 @@ export default function Home() {
     userPermissions, setUserPermissions,
     userRole, setUserRole,
     setAuthToken,
+    superAdminView, setSuperAdminView,
+    setIsSuperAdmin, logout,
   } = useAppStore()
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
@@ -80,6 +83,13 @@ export default function Home() {
   const [loginLoading, setLoginLoading] = useState(false)
   const [regForm, setRegForm] = useState({ name: '', email: '', password: '', confirmPassword: '', businessName: '', phone: '' })
   const [regError, setRegError] = useState('')
+
+  // Super Admin login state
+  const [showSALogin, setShowSALogin] = useState(false)
+  const [saEmail, setSaEmail] = useState('')
+  const [saPassword, setSaPassword] = useState('')
+  const [saError, setSaError] = useState('')
+  const [saLoading, setSaLoading] = useState(false)
 
   // Apply RTL/LTR and lang to html element
   useEffect(() => {
@@ -260,6 +270,40 @@ export default function Home() {
     }
   }
 
+  // Super Admin Login Handler
+  const handleSALogin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSaLoading(true)
+    setSaError('')
+    try {
+      const res = await fetch('/api/super-admin/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: saEmail, password: saPassword }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        if (data.token) {
+          localStorage.setItem('bf_sa_token', data.token)
+          setAuthToken(data.token)
+        }
+        setCurrentUser(data.user)
+        setUserRole(data.role)
+        setUserPermissions(data.permissions)
+        setIsSuperAdmin(true)
+        setIsAuthenticated(true)
+        setAppMode('super_admin')
+      } else {
+        const err = await res.json().catch(() => ({}))
+        setSaError(err.error || (locale === 'ar' ? 'بيانات الدخول غير صحيحة' : 'Invalid credentials'))
+      }
+    } catch {
+      setSaError(locale === 'ar' ? 'خطأ في الاتصال بالسيرفر' : 'Server connection error')
+    } finally {
+      setSaLoading(false)
+    }
+  }
+
   const renderView = () => {
     switch (currentView) {
       case 'dashboard': return <DashboardView />
@@ -287,6 +331,32 @@ export default function Home() {
     }
   }
 
+  // ── Super Admin App Mode ────────────────────────────────────
+  if (appMode === 'super_admin' && isAuthenticated) {
+    const dir = getDirection(locale)
+    return (
+      <div dir={dir} className="min-h-screen flex overflow-hidden bg-muted/30">
+        <SuperAdminSidebar />
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+          <SuperAdminHeader />
+          <main dir={dir} className="flex-1 overflow-auto p-4 sm:p-6">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={superAdminView}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+              >
+                <SuperAdminDashboard />
+              </motion.div>
+            </AnimatePresence>
+          </main>
+        </div>
+      </div>
+    )
+  }
+
   // ── Landing Page Mode ──────────────────────────────────────────
   if (appMode === 'landing') {
     return (
@@ -311,6 +381,120 @@ export default function Home() {
           </div>
           <h1 className="text-2xl font-bold text-foreground">BookFlow</h1>
           <Loader2 className="h-6 w-6 text-emerald-600 animate-spin mx-auto" />
+        </motion.div>
+      </div>
+    )
+  }
+
+  // ── Super Admin Login Screen ────────────────────────────────
+  if (showSALogin) {
+    const isRTL = locale === 'ar'
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-violet-50 to-indigo-50 dark:from-violet-950/30 dark:to-indigo-950/30 p-4">
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="w-full max-w-md"
+        >
+          {/* Language Toggle + Back */}
+          <div className="flex justify-between mb-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowSALogin(false)}
+              className="text-sm gap-1"
+            >
+              <ArrowRight className="h-4 w-4" />
+              {isRTL ? 'رجوع' : 'Back'}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setLocale(getOppositeLocale(locale))}
+              className="text-sm gap-1"
+            >
+              <Globe className="h-4 w-4" />
+              {locale === 'ar' ? 'English' : 'عربي'}
+            </Button>
+          </div>
+
+          {/* Logo */}
+          <div className="text-center mb-6">
+            <div className="w-16 h-16 bg-gradient-to-br from-violet-600 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-violet-600/30">
+              <Shield className="h-8 w-8 text-white" />
+            </div>
+            <h1 className="text-3xl font-bold">BookFlow</h1>
+            <p className="text-violet-600 dark:text-violet-400 font-semibold mt-1">
+              {isRTL ? 'مدير النظام' : 'Super Admin'}
+            </p>
+            <p className="text-muted-foreground mt-1 text-sm">
+              {isRTL ? 'لوحة التحكم الرئيسية للمنصة' : 'Platform Main Control Panel'}
+            </p>
+          </div>
+
+          {/* Login Card */}
+          <Card className="shadow-xl border-0">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xl">
+                {isRTL ? 'دخول مدير النظام' : 'Super Admin Sign In'}
+              </CardTitle>
+              <CardDescription>
+                {isRTL ? 'هذه الصفحة مخصصة لمديري النظام فقط' : 'This page is exclusively for system administrators'}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pt-4">
+              <form onSubmit={handleSALogin} className="space-y-4">
+                <div className="space-y-2">
+                  <Label>{isRTL ? 'البريد الإلكتروني' : 'Email'}</Label>
+                  <Input
+                    type="email"
+                    value={saEmail}
+                    onChange={(e) => setSaEmail(e.target.value)}
+                    placeholder="admin@bookflow.com"
+                    dir="ltr"
+                    className="text-left"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>{isRTL ? 'كلمة المرور' : 'Password'}</Label>
+                  <Input
+                    type="password"
+                    value={saPassword}
+                    onChange={(e) => setSaPassword(e.target.value)}
+                    placeholder="••••••••"
+                    dir="ltr"
+                    className="text-left"
+                    required
+                  />
+                </div>
+                {saError && <p className="text-sm text-red-500">{saError}</p>}
+                <Button
+                  type="submit"
+                  className="w-full h-12 text-base font-semibold gap-2 bg-violet-600 hover:bg-violet-700"
+                  disabled={saLoading}
+                >
+                  {saLoading
+                    ? <Loader2 className="h-5 w-5 animate-spin" />
+                    : <><Shield className="h-5 w-5" />{isRTL ? 'دخول كمدير نظام' : 'Sign In as Super Admin'}</>
+                  }
+                </Button>
+              </form>
+
+              {/* Security Notice */}
+              <div className="mt-4 rounded-lg bg-amber-50 dark:bg-amber-950/20 p-3 text-xs text-amber-700 dark:text-amber-400">
+                <p className="font-semibold mb-1">
+                  {isRTL ? '⚠️ تحذير أمني' : '⚠️ Security Warning'}
+                </p>
+                <p>
+                  {isRTL
+                    ? 'هذه الصفحة مخصصة حصريًا لمديري النظام. جميع العمليات مسجلة في سجل المراجعة.'
+                    : 'This page is exclusively for system admins. All actions are logged in the audit trail.'}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
         </motion.div>
       </div>
     )
@@ -576,6 +760,15 @@ export default function Home() {
               </div>
             ))}
           </div>
+
+          {/* Super Admin Access */}
+          <button
+            onClick={() => setShowSALogin(true)}
+            className="mt-6 mx-auto flex items-center gap-1.5 text-xs text-muted-foreground/50 hover:text-violet-600 dark:hover:text-violet-400 transition-colors"
+          >
+            <Shield className="h-3 w-3" />
+            {isRTL ? 'مدير النظام' : 'System Admin'}
+          </button>
         </motion.div>
       </div>
     )

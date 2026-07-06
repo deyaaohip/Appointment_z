@@ -3,7 +3,7 @@ import type { Locale } from '@/lib/i18n'
 import type { PermissionMap } from '@/types'
 import { getPermissionsForPlan, getCanViewResources, generateNavItems, generateNavSections, SUPERADMIN_NAV, type NavItemDef } from '@/lib/permissions'
 
-export type AppMode = 'landing' | 'app'
+export type AppMode = 'landing' | 'app' | 'super_admin'
 
 interface UserSession {
   id: string
@@ -72,6 +72,10 @@ interface AppState {
   isSuperAdmin: boolean
   setIsSuperAdmin: (admin: boolean) => void
 
+  // Super Admin
+  superAdminView: string
+  setSuperAdminView: (view: string) => void
+
   // White Label / Brand
   brandSettings: Record<string, unknown>
   setBrandSettings: (settings: Record<string, unknown>) => void
@@ -81,6 +85,9 @@ interface AppState {
   setCustomTimezone: (tz: string) => void
   themeMode: string
   setThemeMode: (mode: string) => void
+
+  // Logout helper
+  logout: () => void
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -120,6 +127,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   setShowPaymentModal: (show) => set({ showPaymentModal: show }),
 
   // Subscription & Authorization
+  navItems: [],
+  setNavItems: (items) => set({ navItems: items }),
+  isSuperAdmin: false,
+  setIsSuperAdmin: (admin) => set({ isSuperAdmin: admin }),
   subscription: {
     planSlug: 'free',
     isActive: true,
@@ -148,4 +159,31 @@ export const useAppStore = create<AppState>((set, get) => ({
   setCustomTimezone: (tz) => set({ customTimezone: tz }),
   themeMode: 'light',
   setThemeMode: (mode) => set({ themeMode: mode }),
+
+  // Super Admin
+  superAdminView: 'sa_overview',
+  setSuperAdminView: (view) => set({ superAdminView: view }),
+
+  // Logout: reset all auth state
+  logout: () => {
+    localStorage.removeItem('bf_token')
+    localStorage.removeItem('bf_sa_token')
+    set({
+      appMode: 'landing',
+      currentUser: null,
+      userRole: null,
+      userPermissions: {},
+      authToken: '',
+      isAuthenticated: false,
+      isSuperAdmin: false,
+      currentTenantId: null,
+      currentBranchId: null,
+      currentView: 'dashboard',
+      superAdminView: 'sa_overview',
+      sidebarOpen: true,
+      showPaymentModal: false,
+      selectedPlan: null,
+      navItems: [],
+    })
+  },
 }))

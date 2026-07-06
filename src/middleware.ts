@@ -6,6 +6,7 @@ import { verifyToken } from '@/lib/security/jwt'
 
 const PUBLIC_PATHS = [
   '/api/auth',
+  '/api/super-admin/auth',
   '/api/',
   '/_next/',
   '/favicon',
