@@ -1,0 +1,839 @@
+     1→'use client'
+     2→
+     3→import { useState, useEffect, lazy, Suspense } from 'react'
+     4→import { motion, AnimatePresence } from 'framer-motion'
+     5→import { Loader2, CalendarDays, ShieldCheck, Zap, Globe, ArrowRight, ArrowLeft, LogIn, UserPlus, Play, Shield, ArrowLeftRight } from 'lucide-react'
+     6→import { Button } from '@/components/ui/button'
+     7→import { Input } from '@/components/ui/input'
+     8→import { Label } from '@/components/ui/label'
+     9→import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+    10→import { Badge } from '@/components/ui/badge'
+    11→import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+    12→import { useAppStore } from '@/stores/app-store'
+    13→import { t, getDirection, getOppositeLocale } from '@/lib/i18n'
+    14→import { Sidebar, AppHeader } from '@/components/layout'
+    15→import { LandingPage } from '@/components/landing/landing-page'
+    16→import { PaymentModal } from '@/components/payment/payment-modal'
+    17→import { DashboardView } from '@/components/dashboard/dashboard-view'
+    18→import { BookingsView } from '@/components/bookings/bookings-view'
+    19→import CustomersView from '@/components/customers/customers-view'
+    20→import EmployeesView from '@/components/employees/employees-view'
+    21→import ServicesView from '@/components/services/services-view'
+    22→import SubscriptionsView from '@/components/subscriptions/subscriptions-view'
+    23→import NotificationsView from '@/components/bookings/notifications-view'
+    24→import { SettingsView } from '@/components/bookings/settings-view'
+    25→import { AdminPanelView } from '@/components/admin/admin-panel-view'
+    26→import { SuperAdminDashboard } from '@/components/super-admin/super-admin-dashboard'
+    27→import { AuditLogsView } from '@/components/admin/audit-logs-view'
+    28→import { CalendarView } from '@/components/calendar/calendar-view'
+    29→import { InvoicesView } from '@/components/invoices/invoices-view'
+    30→import { ResourcesView } from '@/components/resources/resources-view'
+    31→import { ReportsView } from '@/components/reports/reports-view'
+    32→import { WhitelabelView } from '@/components/whitelabel/whitelabel-view'
+    33→import BranchesView from '@/components/branches/branches-view'
+    34→import CouponsView from '@/components/coupons/coupons-view'
+    35→import RolesView from '@/components/roles/roles-view'
+    36→import { WhatsAppView } from '@/components/whatsapp/whatsapp-view'
+    37→import { SuperAdminSidebar, SuperAdminHeader } from '@/components/super-admin/super-admin-sidebar'
+    38→
+    39→// ─── Placeholder component for new views ────────────────────────────
+    40→function PlaceholderView({ viewKey }: { viewKey: string }) {
+    41→  const { locale } = useAppStore()
+    42→  const isAr = locale === 'ar'
+    43→  const dir = getDirection(locale)
+    44→  const title = t(locale, 'nav', viewKey)
+    45→
+    46→  return (
+    47→    <div dir={dir} className="flex flex-col items-center justify-center py-20 text-center p-6">
+    48→      <div className="rounded-2xl bg-emerald-50 dark:bg-emerald-950/20 p-6 mb-6">
+    49→        <CalendarDays className="h-12 w-12 text-emerald-500" />
+    50→      </div>
+    51→      <h2 className="text-2xl font-bold mb-2">{title}</h2>
+    52→      <p className="text-muted-foreground max-w-md">
+    53→        {isAr
+    54→          ? `صفحة ${title} قيد التطوير وستكون متاحة قريبًا`
+    55→          : `The ${title} page is under development and will be available soon`}
+    56→      </p>
+    57→      <Badge variant="secondary" className="mt-4">
+    58→        {isAr ? 'قادم قريبًا' : 'Coming Soon'}
+    59→      </Badge>
+    60→    </div>
+    61→  )
+    62→}
+    63→
+    64→export default function Home() {
+    65→  const {
+    66→    locale, setLocale, appMode, setAppMode,
+    67→    currentView, setCurrentView,
+    68→    currentTenantId, setCurrentTenantId,
+    69→    currentBranchId, setCurrentBranchId,
+    70→    currentUser, setCurrentUser,
+    71→    userPermissions, setUserPermissions,
+    72→    userRole, setUserRole,
+    73→    setAuthToken,
+    74→    superAdminView, setSuperAdminView,
+    75→    setIsSuperAdmin, logout,
+    76→  } = useAppStore()
+    77→  const [isAuthenticated, setIsAuthenticated] = useState(false)
+    78→  const [isLoading, setIsLoading] = useState(true)
+    79→  const [authTab, setAuthTab] = useState<'login' | 'register' | 'demo'>('login')
+    80→  const [loginEmail, setLoginEmail] = useState('')
+    81→  const [loginPassword, setLoginPassword] = useState('')
+    82→  const [loginError, setLoginError] = useState('')
+    83→  const [loginLoading, setLoginLoading] = useState(false)
+    84→  const [regForm, setRegForm] = useState({ name: '', email: '', password: '', confirmPassword: '', businessName: '', phone: '' })
+    85→  const [regError, setRegError] = useState('')
+    86→
+    87→  // Super Admin login state
+    88→  const [showSALogin, setShowSALogin] = useState(false)
+    89→  const [saEmail, setSaEmail] = useState('')
+    90→  const [saPassword, setSaPassword] = useState('')
+    91→  const [saError, setSaError] = useState('')
+    92→  const [saLoading, setSaLoading] = useState(false)
+    93→
+    94→  // Apply RTL/LTR and lang to html element
+    95→  useEffect(() => {
+    96→    const html = document.documentElement
+    97→    html.dir = getDirection(locale)
+    98→    html.lang = locale
+    99→  }, [locale])
+   100→
+   101→  // Quick auto-login when entering app mode (only if email already filled)
+   102→  useEffect(() => {
+   103→    if (appMode !== 'app' || !loginEmail) {
+   104→      // No email → just show login form, don't call API
+   105→      if (appMode === 'app') setIsLoading(false)
+   106→      return
+   107→    }
+   108→    const quickLogin = async () => {
+   109→      setIsLoading(true)
+   110→      try {
+   111→        const res = await fetch('/api/auth', {
+   112→          method: 'POST',
+   113→          headers: { 'Content-Type': 'application/json' },
+   114→          body: JSON.stringify({ email: loginEmail, password: loginPassword || undefined }),
+   115→        })
+   116→        if (res.ok) {
+   117→          const data = await res.json()
+   118→          if (data.token) {
+   119→            localStorage.setItem('bf_token', data.token)
+   120→            setAuthToken(data.token)
+   121→          }
+   122→          setCurrentTenantId(data.tenant?.id)
+   123→          setCurrentUser(data.user)
+   124→          setUserRole(data.role)
+   125→          setUserPermissions(data.permissions)
+   126→          if (data.tenant?.branches?.[0]?.id) {
+   127→            setCurrentBranchId(data.tenant.branches[0].id)
+   128→          }
+   129→          setIsAuthenticated(true)
+   130→        } else {
+   131→          setIsAuthenticated(false)
+   132→        }
+   133→      } catch {
+   134→        setIsAuthenticated(false)
+   135→      } finally {
+   136→        setIsLoading(false)
+   137→      }
+   138→    }
+   139→    quickLogin()
+   140→  // eslint-disable-next-line react-hooks/exhaustive-deps
+   141→  }, [appMode])
+   142→
+   143→  const handleQuickLogin = () => {
+   144→    setLoginLoading(true)
+   145→    setTimeout(() => {
+   146→      setAppMode('app')
+   147→      setIsAuthenticated(true)
+   148→      setLoginLoading(false)
+   149→    }, 300)
+   150→  }
+   151→
+   152→  const handleLogin = async (e: React.FormEvent) => {
+   153→    e.preventDefault()
+   154→    setLoginLoading(true)
+   155→    setLoginError('')
+   156→    try {
+   157→      const res = await fetch('/api/auth', {
+   158→        method: 'POST',
+   159→        headers: { 'Content-Type': 'application/json' },
+   160→        body: JSON.stringify({ email: loginEmail, password: loginPassword, name: loginEmail.split('@')[0] }),
+   161→      })
+   162→      if (res.ok) {
+   163→        const data = await res.json()
+   164→        if (data.token) {
+   165→          localStorage.setItem('bf_token', data.token)
+   166→          setAuthToken(data.token)
+   167→        }
+   168→        setCurrentTenantId(data.tenant?.id)
+   169→        setCurrentUser(data.user)
+   170→        setUserRole(data.role)
+   171→        setUserPermissions(data.permissions)
+   172→        if (data.tenant?.branches?.[0]?.id) {
+   173→          setCurrentBranchId(data.tenant.branches[0].id)
+   174→        }
+   175→        setAppMode('app')
+   176→        setIsAuthenticated(true)
+   177→      } else {
+   178→        setLoginError(locale === 'ar' ? 'بيانات الدخول غير صحيحة' : 'Invalid credentials')
+   179→        setIsAuthenticated(false)
+   180→      }
+   181→    } catch {
+   182→      setLoginError(locale === 'ar' ? 'خطأ في الاتصال بالسيرفر' : 'Server connection error')
+   183→      setIsAuthenticated(false)
+   184→    } finally {
+   185→      setLoginLoading(false)
+   186→    }
+   187→  }
+   188→
+   189→  const handleRegister = async (e: React.FormEvent) => {
+   190→    e.preventDefault()
+   191→    setRegError('')
+   192→    if (!regForm.name || !regForm.email || !regForm.password) {
+   193→      setRegError(locale === 'ar' ? 'يرجى ملء جميع الحقول المطلوبة' : 'Please fill all required fields')
+   194→      return
+   195→    }
+   196→    if (regForm.password !== regForm.confirmPassword) {
+   197→      setRegError(locale === 'ar' ? 'كلمة المرور غير متطابقة' : 'Passwords do not match')
+   198→      return
+   199→    }
+   200→    if (regForm.password.length < 6) {
+   201→      setRegError(locale === 'ar' ? 'كلمة المرور يجب أن تكون 6 أحرف على الأقل' : 'Password must be at least 6 characters')
+   202→      return
+   203→    }
+   204→    setLoginLoading(true)
+   205→    try {
+   206→      const res = await fetch('/api/auth', {
+   207→        method: 'POST',
+   208→        headers: { 'Content-Type': 'application/json' },
+   209→        body: JSON.stringify({
+   210→          email: regForm.email,
+   211→          password: regForm.password,
+   212→          name: regForm.name,
+   213→          phone: regForm.phone || null,
+   214→          businessName: regForm.businessName || null,
+   215→          isRegister: true,
+   216→        }),
+   217→      })
+   218→      if (res.ok) {
+   219→        const data = await res.json()
+   220→        if (data.token) {
+   221→          localStorage.setItem('bf_token', data.token)
+   222→          setAuthToken(data.token)
+   223→        }
+   224→        setCurrentTenantId(data.tenant?.id)
+   225→        setCurrentUser(data.user)
+   226→        setUserRole(data.role)
+   227→        setUserPermissions(data.permissions)
+   228→        if (data.tenant?.branches?.[0]?.id) {
+   229→          setCurrentBranchId(data.tenant.branches[0].id)
+   230→        }
+   231→        setAppMode('app')
+   232→        setIsAuthenticated(true)
+   233→      } else {
+   234→        const err = await res.json().catch(() => ({}))
+   235→        setRegError(err.error || (locale === 'ar' ? 'فشل إنشاء الحساب' : 'Registration failed'))
+   236→      }
+   237→    } catch {
+   238→      setRegError(locale === 'ar' ? 'خطأ في الاتصال بالسيرفر' : 'Server connection error')
+   239→    } finally {
+   240→      setLoginLoading(false)
+   241→    }
+   242→  }
+   243→
+   244→  const handleDemoLogin = async () => {
+   245→    setLoginLoading(true)
+   246→    try {
+   247→      const res = await fetch('/api/auth', {
+   248→        method: 'POST',
+   249→        headers: { 'Content-Type': 'application/json' },
+   250→        body: JSON.stringify({ email: 'demo@bookflow.com', password: 'demo123', name: 'Demo User', isDemo: true }),
+   251→      })
+   252→      if (res.ok) {
+   253→        const data = await res.json()
+   254→        if (data.token) {
+   255→          localStorage.setItem('bf_token', data.token)
+   256→          setAuthToken(data.token)
+   257→        }
+   258→        setCurrentTenantId(data.tenant?.id)
+   259→        setCurrentUser(data.user)
+   260→        setUserRole(data.role)
+   261→        setUserPermissions(data.permissions)
+   262→        if (data.tenant?.branches?.[0]?.id) {
+   263→          setCurrentBranchId(data.tenant.branches[0].id)
+   264→        }
+   265→        setAppMode('app')
+   266→        setIsAuthenticated(true)
+   267→      }
+   268→    } catch {
+   269→      // Fallback: enter with demo permissions
+   270→      setAppMode('app')
+   271→      setIsAuthenticated(true)
+   272→    } finally {
+   273→      setLoginLoading(false)
+   274→    }
+   275→  }
+   276→
+   277→  // Super Admin Login Handler — with client-side fallback for serverless
+   278→  const handleSALogin = async (e: React.FormEvent) => {
+   279→    e.preventDefault()
+   280→    setSaLoading(true)
+   281→    setSaError('')
+   282→
+   283→    // Hardcoded super admin credentials (same as server-side)
+   284→    const SA_CREDENTIALS: Record<string, { password: string; name: string }> = {
+   285→      'admin@bookflow.com': { password: 'Admin@2024', name: 'مدير النظام' },
+   286→    }
+   287→
+   288→    const email = saEmail.toLowerCase().trim()
+   289→    const admin = SA_CREDENTIALS[email]
+   290→
+   291→    // Step 1: Client-side credential check
+   292→    if (!admin || admin.password !== saPassword) {
+   293→      setSaError(locale === 'ar' ? 'بيانات الدخول غير صحيحة' : 'Invalid credentials')
+   294→      setSaLoading(false)
+   295→      return
+   296→    }
+   297→
+   298→    // Step 2: Try server API, fallback to client-side token if it fails
+   299→    let token = ''
+   300→    try {
+   301→      const res = await fetch('/api/super-admin/auth', {
+   302→        method: 'POST',
+   303→        headers: { 'Content-Type': 'application/json' },
+   304→        body: JSON.stringify({ email, password: saPassword }),
+   305→      })
+   306→      if (res.ok) {
+   307→        const data = await res.json()
+   308→        token = data.token || ''
+   309→      }
+   310→    } catch {
+   311→      // Server unavailable — create token client-side
+   312→    }
+   313→
+   314→    // Step 3: Create token client-side if server didn't provide one
+   315→    if (!token) {
+   316→      const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }))
+   317→      const payload = btoa(unescape(encodeURIComponent(JSON.stringify({
+   318→        userId: 'superadmin-001', email, role: 'superadmin', name: admin.name,
+   319→        isSuperAdmin: true, tenantId: null,
+   320→        iat: Math.floor(Date.now() / 1000), exp: Math.floor(Date.now() / 1000) + 86400,
+   321→        iss: 'bookflow-superadmin', aud: 'bookflow-platform',
+   322→      })))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+   323→      const sig = btoa(payload + ':bookflow-superadmin-secret').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+   324→      token = `${header}.${payload}.${sig}`
+   325→    }
+   326→
+   327→    localStorage.setItem('bf_sa_token', token)
+   328→    setAuthToken(token)
+   329→    setCurrentUser({
+   330→      id: 'superadmin-001', email, name: admin.name,
+   331→      avatar: null, phone: null, lastLoginAt: new Date().toISOString(),
+   332→    })
+   333→    setUserRole({ id: 'superadmin-role', name: 'مدير النظام', description: 'صلاحيات كاملة على المنصة بالكامل' })
+   334→
+   335→    // Build full permissions
+   336→    const allPerms: Record<string, Record<string, boolean>> = {}
+   337→    const resources = ['dashboard','bookings','customers','employees','services','branches','payments','reports','settings','roles','coupons','notifications','audit_logs','whatsapp','subscriptions','tenants','platform_settings','system_health','user_management','billing']
+   338→    for (const r of resources) { allPerms[r] = { view: true, create: true, edit: true, delete: true, manage: true } }
+   339→    setUserPermissions(allPerms)
+   340→    setIsSuperAdmin(true)
+   341→    setIsAuthenticated(true)
+   342→    setAppMode('super_admin')
+   343→    setSaLoading(false)
+   344→  }
+   345→
+   346→  const renderView = () => {
+   347→    switch (currentView) {
+   348→      case 'dashboard': return <DashboardView />
+   349→      case 'calendar': return <CalendarView />
+   350→      case 'bookings': return <BookingsView />
+   351→      case 'customers': return <CustomersView />
+   352→      case 'employees': return <EmployeesView />
+   353→      case 'services': return <ServicesView />
+   354→      case 'resources': return <ResourcesView />
+   355→      case 'invoices': return <InvoicesView />
+   356→      case 'payments': return <PlaceholderView viewKey="payments" />
+   357→      case 'subscriptions': return <SubscriptionsView />
+   358→      case 'reports': return <ReportsView />
+   359→      case 'notifications': return <NotificationsView />
+   360→      case 'audit_logs': return <AuditLogsView />
+   361→      case 'branches': return <BranchesView />
+   362→      case 'coupons': return <CouponsView />
+   363→      case 'roles': return <RolesView />
+   364→      case 'whatsapp': return <WhatsAppView />
+   365→      case 'settings': return <SettingsView />
+   366→      case 'admin_panel': return <AdminPanelView />
+   367→      case 'white_label': return <WhitelabelView />
+   368→      default: return <DashboardView />
+   369→    }
+   370→  }
+   371→
+   372→  // ── Super Admin App Mode ────────────────────────────────────
+   373→  if (appMode === 'super_admin' && isAuthenticated) {
+   374→    const dir = getDirection(locale)
+   375→    return (
+   376→      <div dir={dir} className="min-h-screen flex overflow-hidden bg-muted/30">
+   377→        <SuperAdminSidebar />
+   378→        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+   379→          <SuperAdminHeader />
+   380→          <main dir={dir} className="flex-1 overflow-auto p-4 sm:p-6">
+   381→            <AnimatePresence mode="wait">
+   382→              <motion.div
+   383→                key={superAdminView}
+   384→                initial={{ opacity: 0, y: 10 }}
+   385→                animate={{ opacity: 1, y: 0 }}
+   386→                exit={{ opacity: 0, y: -10 }}
+   387→                transition={{ duration: 0.2 }}
+   388→              >
+   389→                <SuperAdminDashboard />
+   390→              </motion.div>
+   391→            </AnimatePresence>
+   392→          </main>
+   393→        </div>
+   394→      </div>
+   395→    )
+   396→  }
+   397→
+   398→  // ── Landing Page Mode ──────────────────────────────────────────
+   399→  if (appMode === 'landing') {
+   400→    return (
+   401→      <>
+   402→        <LandingPage />
+   403→        <PaymentModal />
+   404→      </>
+   405→    )
+   406→  }
+   407→
+   408→  // ── App Loading ────────────────────────────────────────────────
+   409→  if (isLoading) {
+   410→    return (
+   411→      <div className="min-h-screen flex items-center justify-center bg-background">
+   412→        <motion.div
+   413→          initial={{ opacity: 0, scale: 0.9 }}
+   414→          animate={{ opacity: 1, scale: 1 }}
+   415→          className="text-center space-y-4"
+   416→        >
+   417→          <div className="w-16 h-16 bg-emerald-600 rounded-2xl flex items-center justify-center mx-auto">
+   418→            <CalendarDays className="h-8 w-8 text-white" />
+   419→          </div>
+   420→          <h1 className="text-2xl font-bold text-foreground">BookFlow</h1>
+   421→          <Loader2 className="h-6 w-6 text-emerald-600 animate-spin mx-auto" />
+   422→        </motion.div>
+   423→      </div>
+   424→    )
+   425→  }
+   426→
+   427→  // ── Super Admin Login Screen ────────────────────────────────
+   428→  if (showSALogin) {
+   429→    const isRTL = locale === 'ar'
+   430→    return (
+   431→      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-violet-50 to-indigo-50 dark:from-violet-950/30 dark:to-indigo-950/30 p-4">
+   432→        <motion.div
+   433→          initial={{ opacity: 0, y: 30 }}
+   434→          animate={{ opacity: 1, y: 0 }}
+   435→          transition={{ duration: 0.5 }}
+   436→          className="w-full max-w-md"
+   437→        >
+   438→          {/* Language Toggle + Back */}
+   439→          <div className="flex justify-between mb-4">
+   440→            <Button
+   441→              variant="ghost"
+   442→              size="sm"
+   443→              onClick={() => setShowSALogin(false)}
+   444→              className="text-sm gap-1"
+   445→            >
+   446→              <ArrowRight className="h-4 w-4" />
+   447→              {isRTL ? 'رجوع' : 'Back'}
+   448→            </Button>
+   449→            <Button
+   450→              variant="ghost"
+   451→              size="sm"
+   452→              onClick={() => setLocale(getOppositeLocale(locale))}
+   453→              className="text-sm gap-1"
+   454→            >
+   455→              <Globe className="h-4 w-4" />
+   456→              {locale === 'ar' ? 'English' : 'عربي'}
+   457→            </Button>
+   458→          </div>
+   459→
+   460→          {/* Logo */}
+   461→          <div className="text-center mb-6">
+   462→            <div className="w-16 h-16 bg-gradient-to-br from-violet-600 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-violet-600/30">
+   463→              <Shield className="h-8 w-8 text-white" />
+   464→            </div>
+   465→            <h1 className="text-3xl font-bold">BookFlow</h1>
+   466→            <p className="text-violet-600 dark:text-violet-400 font-semibold mt-1">
+   467→              {isRTL ? 'مدير النظام' : 'Super Admin'}
+   468→            </p>
+   469→            <p className="text-muted-foreground mt-1 text-sm">
+   470→              {isRTL ? 'لوحة التحكم الرئيسية للمنصة' : 'Platform Main Control Panel'}
+   471→            </p>
+   472→          </div>
+   473→
+   474→          {/* Login Card */}
+   475→          <Card className="shadow-xl border-0">
+   476→            <CardHeader className="pb-2">
+   477→              <CardTitle className="text-xl">
+   478→                {isRTL ? 'دخول مدير النظام' : 'Super Admin Sign In'}
+   479→              </CardTitle>
+   480→              <CardDescription>
+   481→                {isRTL ? 'هذه الصفحة مخصصة لمديري النظام فقط' : 'This page is exclusively for system administrators'}
+   482→              </CardDescription>
+   483→            </CardHeader>
+   484→            <CardContent className="pt-4">
+   485→              <form onSubmit={handleSALogin} className="space-y-4">
+   486→                <div className="space-y-2">
+   487→                  <Label>{isRTL ? 'البريد الإلكتروني' : 'Email'}</Label>
+   488→                  <Input
+   489→                    type="email"
+   490→                    value={saEmail}
+   491→                    onChange={(e) => setSaEmail(e.target.value)}
+   492→                    placeholder="admin@bookflow.com"
+   493→                    dir="ltr"
+   494→                    className="text-left"
+   495→                    required
+   496→                  />
+   497→                </div>
+   498→                <div className="space-y-2">
+   499→                  <Label>{isRTL ? 'كلمة المرور' : 'Password'}</Label>
+   500→                  <Input
+   501→                    type="password"
+   502→                    value={saPassword}
+   503→                    onChange={(e) => setSaPassword(e.target.value)}
+   504→                    placeholder="••••••••"
+   505→                    dir="ltr"
+   506→                    className="text-left"
+   507→                    required
+   508→                  />
+   509→                </div>
+   510→                {saError && <p className="text-sm text-red-500">{saError}</p>}
+   511→                <Button
+   512→                  type="submit"
+   513→                  className="w-full h-12 text-base font-semibold gap-2 bg-violet-600 hover:bg-violet-700"
+   514→                  disabled={saLoading}
+   515→                >
+   516→                  {saLoading
+   517→                    ? <Loader2 className="h-5 w-5 animate-spin" />
+   518→                    : <><Shield className="h-5 w-5" />{isRTL ? 'دخول كمدير نظام' : 'Sign In as Super Admin'}</>
+   519→                  }
+   520→                </Button>
+   521→              </form>
+   522→
+   523→              {/* Security Notice */}
+   524→              <div className="mt-4 rounded-lg bg-amber-50 dark:bg-amber-950/20 p-3 text-xs text-amber-700 dark:text-amber-400">
+   525→                <p className="font-semibold mb-1">
+   526→                  {isRTL ? '⚠️ تحذير أمني' : '⚠️ Security Warning'}
+   527→                </p>
+   528→                <p>
+   529→                  {isRTL
+   530→                    ? 'هذه الصفحة مخصصة حصريًا لمديري النظام. جميع العمليات مسجلة في سجل المراجعة.'
+   531→                    : 'This page is exclusively for system admins. All actions are logged in the audit trail.'}
+   532→                </p>
+   533→              </div>
+   534→            </CardContent>
+   535→          </Card>
+   536→        </motion.div>
+   537→      </div>
+   538→    )
+   539→  }
+   540→
+   541→  // ── Login / Register / Demo Screen ───────────────────────────
+   542→  if (!isAuthenticated) {
+   543→    const isRTL = locale === 'ar'
+   544→    const ArrowIcon = isRTL ? ArrowLeft : ArrowRight
+   545→
+   546→    return (
+   547→      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 p-4">
+   548→        <motion.div
+   549→          initial={{ opacity: 0, y: 30 }}
+   550→          animate={{ opacity: 1, y: 0 }}
+   551→          transition={{ duration: 0.5 }}
+   552→          className="w-full max-w-md"
+   553→        >
+   554→          {/* Language Toggle */}
+   555→          <div className="flex justify-end mb-4">
+   556→            <Button
+   557→              variant="ghost"
+   558→              size="sm"
+   559→              onClick={() => setLocale(getOppositeLocale(locale))}
+   560→              className="text-sm gap-1"
+   561→            >
+   562→              <Globe className="h-4 w-4" />
+   563→              {locale === 'ar' ? 'English' : 'عربي'}
+   564→            </Button>
+   565→          </div>
+   566→
+   567→          {/* Logo */}
+   568→          <div className="text-center mb-6">
+   569→            <div className="w-16 h-16 bg-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-600/30">
+   570→              <CalendarDays className="h-8 w-8 text-white" />
+   571→            </div>
+   572→            <h1 className="text-3xl font-bold">BookFlow</h1>
+   573→            <p className="text-muted-foreground mt-2">
+   574→              {isRTL ? 'منصة إدارة الحجوزات الذكية' : 'Smart Booking Management Platform'}
+   575→            </p>
+   576→          </div>
+   577→
+   578→          {/* Auth Tabs */}
+   579→          <Tabs value={authTab} onValueChange={(v) => { setAuthTab(v as any); setLoginError(''); setRegError('') }}>
+   580→            <TabsList className="w-full grid grid-cols-3 mb-4">
+   581→              <TabsTrigger value="login" className="gap-1.5 text-xs sm:text-sm">
+   582→                <LogIn className="h-4 w-4" />
+   583→                {isRTL ? 'دخول' : 'Login'}
+   584→              </TabsTrigger>
+   585→              <TabsTrigger value="register" className="gap-1.5 text-xs sm:text-sm">
+   586→                <UserPlus className="h-4 w-4" />
+   587→                {isRTL ? 'حساب جديد' : 'Sign Up'}
+   588→              </TabsTrigger>
+   589→              <TabsTrigger value="demo" className="gap-1.5 text-xs sm:text-sm">
+   590→                <Play className="h-4 w-4" />
+   591→                {isRTL ? 'تجريبي' : 'Demo'}
+   592→              </TabsTrigger>
+   593→            </TabsList>
+   594→
+   595→            {/* Login Tab */}
+   596→            {authTab === 'login' && (
+   597→              <Card className="shadow-xl border-0">
+   598→                <CardHeader className="pb-2">
+   599→                  <CardTitle className="text-xl">{isRTL ? 'تسجيل الدخول' : 'Sign In'}</CardTitle>
+   600→                  <CardDescription>
+   601→                    {isRTL ? 'أدخل بيانات حسابك للوصول للوحة التحكم' : 'Enter your credentials to access the dashboard'}
+   602→                  </CardDescription>
+   603→                </CardHeader>
+   604→                <CardContent className="pt-4">
+   605→                  <form onSubmit={handleLogin} className="space-y-4">
+   606→                    <div className="space-y-2">
+   607→                      <Label>{isRTL ? 'البريد الإلكتروني' : 'Email'}</Label>
+   608→                      <Input
+   609→                        type="email"
+   610→                        value={loginEmail}
+   611→                        onChange={(e) => setLoginEmail(e.target.value)}
+   612→                        placeholder="name@example.com"
+   613→                        dir="ltr"
+   614→                        className="text-left"
+   615→                        required
+   616→                      />
+   617→                    </div>
+   618→                    <div className="space-y-2">
+   619→                      <Label>{isRTL ? 'كلمة المرور' : 'Password'}</Label>
+   620→                      <Input
+   621→                        type="password"
+   622→                        value={loginPassword}
+   623→                        onChange={(e) => setLoginPassword(e.target.value)}
+   624→                        placeholder="••••••••"
+   625→                        dir="ltr"
+   626→                        className="text-left"
+   627→                        required
+   628→                      />
+   629→                    </div>
+   630→                    {loginError && <p className="text-sm text-red-500">{loginError}</p>}
+   631→                    <Button
+   632→                      type="submit"
+   633→                      className="w-full h-12 text-base font-semibold gap-2 bg-emerald-600 hover:bg-emerald-700"
+   634→                      disabled={loginLoading}
+   635→                    >
+   636→                      {loginLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <>{t(locale, 'common', 'signIn')} <ArrowIcon className="h-4 w-4" /></>}
+   637→                    </Button>
+   638→                  </form>
+   639→                </CardContent>
+   640→              </Card>
+   641→            )}
+   642→
+   643→            {/* Register Tab */}
+   644→            {authTab === 'register' && (
+   645→              <Card className="shadow-xl border-0">
+   646→                <CardHeader className="pb-2">
+   647→                  <CardTitle className="text-xl">{isRTL ? 'إنشاء حساب جديد' : 'Create Account'}</CardTitle>
+   648→                  <CardDescription>
+   649→                    {isRTL ? 'أنشئ حسابك وابدأ إدارة حجوزاتك' : 'Create your account and start managing bookings'}
+   650→                  </CardDescription>
+   651→                </CardHeader>
+   652→                <CardContent className="pt-4">
+   653→                  <form onSubmit={handleRegister} className="space-y-3">
+   654→                    <div className="space-y-2">
+   655→                      <Label>{isRTL ? 'الاسم الكامل' : 'Full Name'} *</Label>
+   656→                      <Input
+   657→                        value={regForm.name}
+   658→                        onChange={(e) => setRegForm({ ...regForm, name: e.target.value })}
+   659→                        placeholder={isRTL ? 'أحمد محمد' : 'Ahmed Mohamed'}
+   660→                        required
+   661→                      />
+   662→                    </div>
+   663→                    <div className="space-y-2">
+   664→                      <Label>{isRTL ? 'البريد الإلكتروني' : 'Email'} *</Label>
+   665→                      <Input
+   666→                        type="email"
+   667→                        value={regForm.email}
+   668→                        onChange={(e) => setRegForm({ ...regForm, email: e.target.value })}
+   669→                        placeholder="name@business.com"
+   670→                        dir="ltr"
+   671→                        className="text-left"
+   672→                        required
+   673→                      />
+   674→                    </div>
+   675→                    <div className="space-y-2">
+   676→                      <Label>{isRTL ? 'اسم المنشأة' : 'Business Name'}</Label>
+   677→                      <Input
+   678→                        value={regForm.businessName}
+   679→                        onChange={(e) => setRegForm({ ...regForm, businessName: e.target.value })}
+   680→                        placeholder={isRTL ? 'مركز التجميل الذهبي' : 'Golden Beauty Center'}
+   681→                      />
+   682→                    </div>
+   683→                    <div className="space-y-2">
+   684→                      <Label>{isRTL ? 'رقم الهاتف' : 'Phone'}</Label>
+   685→                      <Input
+   686→                        type="tel"
+   687→                        value={regForm.phone}
+   688→                        onChange={(e) => setRegForm({ ...regForm, phone: e.target.value })}
+   689→                        placeholder="+966 5x xxx xxxx"
+   690→                        dir="ltr"
+   691→                        className="text-left"
+   692→                      />
+   693→                    </div>
+   694→                    <div className="grid grid-cols-2 gap-3">
+   695→                      <div className="space-y-2">
+   696→                        <Label>{isRTL ? 'كلمة المرور' : 'Password'} *</Label>
+   697→                        <Input
+   698→                          type="password"
+   699→                          value={regForm.password}
+   700→                          onChange={(e) => setRegForm({ ...regForm, password: e.target.value })}
+   701→                          placeholder="••••••••"
+   702→                          dir="ltr"
+   703→                          className="text-left"
+   704→                          required
+   705→                        />
+   706→                      </div>
+   707→                      <div className="space-y-2">
+   708→                        <Label>{isRTL ? 'تأكيد المرور' : 'Confirm'} *</Label>
+   709→                        <Input
+   710→                          type="password"
+   711→                          value={regForm.confirmPassword}
+   712→                          onChange={(e) => setRegForm({ ...regForm, confirmPassword: e.target.value })}
+   713→                          placeholder="••••••••"
+   714→                          dir="ltr"
+   715→                          className="text-left"
+   716→                          required
+   717→                        />
+   718→                      </div>
+   719→                    </div>
+   720→                    {regError && <p className="text-sm text-red-500">{regError}</p>}
+   721→                    <Button
+   722→                      type="submit"
+   723→                      className="w-full h-12 text-base font-semibold gap-2 bg-emerald-600 hover:bg-emerald-700"
+   724→                      disabled={loginLoading}
+   725→                    >
+   726→                      {loginLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <><UserPlus className="h-5 w-5" />{isRTL ? 'إنشاء الحساب' : 'Create Account'}</>}
+   727→                    </Button>
+   728→                  </form>
+   729→                </CardContent>
+   730→              </Card>
+   731→            )}
+   732→
+   733→            {/* Demo Tab */}
+   734→            {authTab === 'demo' && (
+   735→              <Card className="shadow-xl border-0">
+   736→                <CardHeader className="pb-2">
+   737→                  <CardTitle className="text-xl">{isRTL ? 'حساب تجريبي' : 'Demo Account'}</CardTitle>
+   738→                  <CardDescription>
+   739→                    {isRTL ? 'جرب النظام ببيانات تجريبية كاملة' : 'Try the system with full demo data'}
+   740→                  </CardDescription>
+   741→                </CardHeader>
+   742→                <CardContent className="pt-4 space-y-4">
+   743→                  <div className="rounded-xl bg-emerald-50 dark:bg-emerald-950/30 p-4 space-y-3">
+   744→                    <div className="flex items-center gap-3">
+   745→                      <div className="w-10 h-10 rounded-full bg-emerald-600 flex items-center justify-center text-white font-bold text-sm">DM</div>
+   746→                      <div>
+   747→                        <p className="font-semibold text-sm">{isRTL ? 'مستخدم تجريبي' : 'Demo User'}</p>
+   748→                        <p className="text-xs text-muted-foreground" dir="ltr">demo@bookflow.com</p>
+   749→                      </div>
+   750→                      <Badge variant="secondary" className="ms-auto">{isRTL ? 'مشرف' : 'Admin'}</Badge>
+   751→                    </div>
+   752→                    <div className="text-xs text-muted-foreground space-y-1">
+   753→                      <p>✅ {isRTL ? 'كل الصلاحيات مفعّلة' : 'All permissions enabled'}</p>
+   754→                      <p>✅ {isRTL ? 'بيانات تجريبية جاهزة' : 'Pre-loaded demo data'}</p>
+   755→                      <p>✅ {isRTL ? 'بدون الحاجة لكلمة مرور' : 'No password required'}</p>
+   756→                    </div>
+   757→                  </div>
+   758→                  <Button
+   759→                    onClick={handleDemoLogin}
+   760→                    className="w-full h-12 text-base font-semibold gap-2 bg-emerald-600 hover:bg-emerald-700"
+   761→                    disabled={loginLoading}
+   762→                  >
+   763→                    {loginLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <><Play className="h-5 w-5" />{isRTL ? 'دخول كحساب تجريبي' : 'Enter as Demo User'}</>}
+   764→                  </Button>
+   765→                  <p className="text-xs text-center text-muted-foreground">
+   766→                    {isRTL ? 'كلمة المرور: demo123' : 'Password: demo123'}
+   767→                  </p>
+   768→                </CardContent>
+   769→              </Card>
+   770→            )}
+   771→          </Tabs>
+   772→
+   773→          {/* Feature badges */}
+   774→          <div className="mt-6 flex flex-wrap justify-center gap-2">
+   775→            {[
+   776→              { icon: ShieldCheck, label: isRTL ? 'مؤمّن' : 'Secured' },
+   777→              { icon: Zap, label: isRTL ? 'سريع' : 'Fast' },
+   778→              { icon: Globe, label: isRTL ? 'متعدد اللغات' : 'Multilingual' },
+   779→            ].map((f) => (
+   780→              <Badge key={f.label} variant="secondary" className="gap-1.5 px-3 py-1.5 text-xs">
+   781→                <f.icon className="h-3.5 w-3.5" />
+   782→                {f.label}
+   783→              </Badge>
+   784→            ))}
+   785→          </div>
+   786→
+   787→          {/* Enterprise features */}
+   788→          <div className="mt-6 grid grid-cols-2 gap-3 text-xs text-muted-foreground">
+   789→            {[
+   790→              isRTL ? 'JWT + RBAC' : 'JWT + RBAC',
+   791→              isRTL ? 'عزل المستأجرين' : 'Tenant Isolation',
+   792→              isRTL ? 'تشفير AES-256' : 'AES-256 Encryption',
+   793→              isRTL ? 'سجل المراجعة' : 'Audit Logs',
+   794→            ].map((f) => (
+   795→              <div key={f} className="flex items-center gap-1.5 bg-muted/50 rounded-md px-2.5 py-1.5">
+   796→                <ShieldCheck className="h-3 w-3 text-emerald-600" />
+   797→                {f}
+   798→              </div>
+   799→            ))}
+   800→          </div>
+   801→
+   802→          {/* Super Admin Access */}
+   803→          <button
+   804→            onClick={() => setShowSALogin(true)}
+   805→            className="mt-6 mx-auto flex items-center gap-1.5 text-xs text-muted-foreground/50 hover:text-violet-600 dark:hover:text-violet-400 transition-colors"
+   806→          >
+   807→            <Shield className="h-3 w-3" />
+   808→            {isRTL ? 'مدير النظام' : 'System Admin'}
+   809→          </button>
+   810→        </motion.div>
+   811→      </div>
+   812→    )
+   813→  }
+   814→
+   815→  // ── Main Application ───────────────────────────────────────────
+   816→  const dir = getDirection(locale)
+   817→
+   818→  return (
+   819→    <div dir={dir} className="min-h-screen flex overflow-hidden bg-muted/30">
+   820→      <Sidebar />
+   821→      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+   822→        <AppHeader />
+   823→        <main dir={dir} className="flex-1 overflow-auto p-4 sm:p-6">
+   824→          <AnimatePresence mode="wait">
+   825→            <motion.div
+   826→              key={currentView}
+   827→              initial={{ opacity: 0, y: 10 }}
+   828→              animate={{ opacity: 1, y: 0 }}
+   829→              exit={{ opacity: 0, y: -10 }}
+   830→              transition={{ duration: 0.2 }}
+   831→            >
+   832→              {renderView()}
+   833→            </motion.div>
+   834→          </AnimatePresence>
+   835→        </main>
+   836→      </div>
+   837→    </div>
+   838→  )
+   839→}
