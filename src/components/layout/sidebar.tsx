@@ -96,6 +96,7 @@ const navSections: NavSection[] = [
     items: [
       { key: 'settings', icon: Settings, permission: 'settings' },
       { key: 'admin_panel', icon: Monitor },
+      { key: 'super_admin', icon: Shield },
       { key: 'white_label', icon: Palette },
     ],
   },

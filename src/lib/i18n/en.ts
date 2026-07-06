@@ -114,6 +114,7 @@ export const messages: Record<string, Record<string, string>> = {
     resources: 'Resources',
     invoices: 'Invoices',
     admin_panel: 'Platform Admin',
+    super_admin: 'Super Admin',
     white_label: 'White Label',
     profile: 'Profile',
     logout: 'Logout',

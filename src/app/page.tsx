@@ -23,6 +23,7 @@ import SubscriptionsView from '@/components/subscriptions/subscriptions-view'
 import NotificationsView from '@/components/bookings/notifications-view'
 import { SettingsView } from '@/components/bookings/settings-view'
 import { AdminPanelView } from '@/components/admin/admin-panel-view'
+import { SuperAdminDashboard } from '@/components/admin/super-admin-dashboard'
 import { AuditLogsView } from '@/components/admin/audit-logs-view'
 import { CalendarView } from '@/components/calendar/calendar-view'
 import { InvoicesView } from '@/components/invoices/invoices-view'
@@ -280,6 +281,7 @@ export default function Home() {
       case 'whatsapp': return <WhatsAppView />
       case 'settings': return <SettingsView />
       case 'admin_panel': return <AdminPanelView />
+      case 'super_admin': return <SuperAdminDashboard />
       case 'white_label': return <WhitelabelView />
       default: return <DashboardView />
     }
