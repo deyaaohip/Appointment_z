@@ -18,6 +18,7 @@ export interface PlatformUser {
   name: string
   email: string
   tenant: string
+  tenantEn: string
   role: string
   status: string
   lastLogin: string
@@ -36,6 +37,7 @@ export interface SysLog {
 export interface Invoice {
   id: string
   tenant: string
+  tenantEn: string
   amount: number
   status: string
   date: string
@@ -128,14 +130,14 @@ export const INIT_TENANTS: Tenant[] = [
 ]
 
 export const INIT_USERS: PlatformUser[] = [
-  { id: '1', name: 'أحمد المنصور', email: 'ahmed@alnoor.sa', tenant: 'مركز النور الطبي', role: 'owner', status: 'active', lastLogin: '2025-06-18T14:00:00Z' },
-  { id: '2', name: 'سارة العتيبي', email: 'sara@yasmin.sa', tenant: 'صالون ياسمين', role: 'manager', status: 'active', lastLogin: '2025-06-18T12:30:00Z' },
-  { id: '3', name: 'محمد القحطاني', email: 'mohammed@royalbeauty.sa', tenant: 'مركز التجميل الملكي', role: 'owner', status: 'suspended', lastLogin: '2025-06-17T09:00:00Z' },
-  { id: '4', name: 'فاطمة الحربي', email: 'fatima@alnoor.sa', tenant: 'مركز النور الطبي', role: 'receptionist', status: 'active', lastLogin: '2025-06-18T10:30:00Z' },
-  { id: '5', name: 'خالد الدوسري', email: 'khaled@future-edu.sa', tenant: 'أكاديمية المستقبل', role: 'owner', status: 'active', lastLogin: '2025-06-17T16:00:00Z' },
-  { id: '6', name: 'نورة القحطاني', email: 'noura@royalbeauty.sa', tenant: 'مركز التجميل الملكي', role: 'manager', status: 'active', lastLogin: '2025-06-18T09:15:00Z' },
-  { id: '7', name: 'عبدالله الشمري', email: 'abdullah@adv-eye.sa', tenant: 'عيادة العيون المتقدمة', role: 'owner', status: 'active', lastLogin: '2025-06-18T11:20:00Z' },
-  { id: '8', name: 'ريم السبيعي', email: 'reem@smile-clinic.com', tenant: 'عيادة الابتسامة', role: 'owner', status: 'active', lastLogin: '2025-06-16T15:00:00Z' },
+  { id: '1', name: 'أحمد المنصور', email: 'ahmed@alnoor.sa', tenant: 'مركز النور الطبي', tenantEn: 'Al Noor Medical', role: 'owner', status: 'active', lastLogin: '2025-06-18T14:00:00Z' },
+  { id: '2', name: 'سارة العتيبي', email: 'sara@yasmin.sa', tenant: 'صالون ياسمين', tenantEn: 'Yasmin Beauty', role: 'manager', status: 'active', lastLogin: '2025-06-18T12:30:00Z' },
+  { id: '3', name: 'محمد القحطاني', email: 'mohammed@royalbeauty.sa', tenant: 'مركز التجميل الملكي', tenantEn: 'Royal Beauty', role: 'owner', status: 'suspended', lastLogin: '2025-06-17T09:00:00Z' },
+  { id: '4', name: 'فاطمة الحربي', email: 'fatima@alnoor.sa', tenant: 'مركز النور الطبي', tenantEn: 'Al Noor Medical', role: 'receptionist', status: 'active', lastLogin: '2025-06-18T10:30:00Z' },
+  { id: '5', name: 'خالد الدوسري', email: 'khaled@future-edu.sa', tenant: 'أكاديمية المستقبل', tenantEn: 'Future Academy', role: 'owner', status: 'active', lastLogin: '2025-06-17T16:00:00Z' },
+  { id: '6', name: 'نورة القحطاني', email: 'noura@royalbeauty.sa', tenant: 'مركز التجميل الملكي', tenantEn: 'Royal Beauty', role: 'manager', status: 'active', lastLogin: '2025-06-18T09:15:00Z' },
+  { id: '7', name: 'عبدالله الشمري', email: 'abdullah@adv-eye.sa', tenant: 'عيادة العيون المتقدمة', tenantEn: 'Advanced Eye Clinic', role: 'owner', status: 'active', lastLogin: '2025-06-18T11:20:00Z' },
+  { id: '8', name: 'ريم السبيعي', email: 'reem@smile-clinic.com', tenant: 'عيادة الابتسامة', tenantEn: 'Smile Clinic', role: 'owner', status: 'active', lastLogin: '2025-06-16T15:00:00Z' },
 ]
 
 export const INIT_LOGS: SysLog[] = [
@@ -177,12 +179,12 @@ export const SERVERS: Server[] = [
 ]
 
 export const INVOICES: Invoice[] = [
-  { id: 'INV-001', tenant: 'مركز النور الطبي', amount: 999, status: 'paid', date: '2025-06-01', plan: 'Enterprise' },
-  { id: 'INV-002', tenant: 'صالون ياسمين', amount: 299, status: 'paid', date: '2025-06-01', plan: 'Professional' },
-  { id: 'INV-003', tenant: 'أكاديمية المستقبل', amount: 299, status: 'pending', date: '2025-06-01', plan: 'Professional' },
-  { id: 'INV-004', tenant: 'عيادة العيون المتقدمة', amount: 599, status: 'paid', date: '2025-06-01', plan: 'Business' },
-  { id: 'INV-005', tenant: 'مركز التجميل الملكي', amount: 999, status: 'overdue', date: '2025-05-01', plan: 'Enterprise' },
-  { id: 'INV-006', tenant: 'نادي اللياقة الذهبية', amount: 299, status: 'failed', date: '2025-06-01', plan: 'Professional' },
+  { id: 'INV-001', tenant: 'مركز النور الطبي', tenantEn: 'Al Noor Medical', amount: 999, status: 'paid', date: '2025-06-01', plan: 'Enterprise' },
+  { id: 'INV-002', tenant: 'صالون ياسمين', tenantEn: 'Yasmin Beauty', amount: 299, status: 'paid', date: '2025-06-01', plan: 'Professional' },
+  { id: 'INV-003', tenant: 'أكاديمية المستقبل', tenantEn: 'Future Academy', amount: 299, status: 'pending', date: '2025-06-01', plan: 'Professional' },
+  { id: 'INV-004', tenant: 'عيادة العيون المتقدمة', tenantEn: 'Advanced Eye Clinic', amount: 599, status: 'paid', date: '2025-06-01', plan: 'Business' },
+  { id: 'INV-005', tenant: 'مركز التجميل الملكي', tenantEn: 'Royal Beauty', amount: 999, status: 'overdue', date: '2025-05-01', plan: 'Enterprise' },
+  { id: 'INV-006', tenant: 'نادي اللياقة الذهبية', tenantEn: 'Golden Fitness', amount: 299, status: 'failed', date: '2025-06-01', plan: 'Professional' },
 ]
 
 export const BACKUPS: Backup[] = [

@@ -329,6 +329,7 @@ interface T {
   reportGenerated: string
   reportDownloaded: string
   planDetails: string
+  editRoleDlg: string
 }
 
 const ar: T = {
@@ -421,6 +422,10 @@ const ar: T = {
   managePlan: 'إدارة الباقة',
   monthly: 'شهرياً',
   editPlanDlg: 'تعديل الباقة',
+  editRoleDlg: 'تعديل الدور',
+  roleUpdated: 'تم تحديث الدور',
+  roleDeleted: 'تم حذف الدور',
+  userDeleted: 'تم حذف المستخدم',
   willOpenPlanEditor: 'سيتم فتح تعديل الباقة',
   willOpenCreatePlan: 'سيتم فتح نموذج إنشاء باقة جديدة',
   // Billing
@@ -720,6 +725,10 @@ const en: T = {
   managePlan: 'Manage Plan',
   monthly: 'monthly',
   editPlanDlg: 'Edit Plan',
+  editRoleDlg: 'Edit Role',
+  roleUpdated: 'Role updated',
+  roleDeleted: 'Role deleted',
+  userDeleted: 'User deleted',
   willOpenPlanEditor: 'Plan editor will open',
   willOpenCreatePlan: 'Create plan form will open',
   billingTitle: 'Billing & Payments',

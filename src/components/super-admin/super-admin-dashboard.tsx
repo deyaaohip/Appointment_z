@@ -46,6 +46,8 @@ function logMsg(l: SysLog, lang: Lang) { return lang === 'en' ? l.messageEn : l.
 function logSrc(l: SysLog, lang: Lang) { return lang === 'en' ? l.sourceEn : l.source }
 function serverRegion(s: ServerType, lang: Lang) { return lang === 'en' ? s.regionEn : s.region }
 function secCountry(a: SecurityAttempt, lang: Lang) { return lang === 'en' ? a.countryEn : a.country }
+function invTenant(inv: Invoice, lang: Lang) { return lang === 'en' ? (inv.tenantEn || inv.tenant) : inv.tenant }
+function userTenant(u: PlatformUser, lang: Lang) { return lang === 'en' ? (u.tenantEn || u.tenant) : u.tenant }
 
 // ════════════════════════════════════════════════════════════════
 // PAGE 1: OVERVIEW
@@ -365,7 +367,7 @@ function UsersPage() {
                   </div>
                 </TableCell>
                 <TableCell className="px-3 text-sm text-muted-foreground" dir="ltr">{u.email}</TableCell>
-                <TableCell className="px-3 text-sm">{u.tenant}</TableCell>
+                <TableCell className="px-3 text-sm">{userTenant(u, lang)}</TableCell>
                 <TableCell className="px-3"><Badge variant="secondary" className="text-xs">{ROLE_MAP[u.role] || u.role}</Badge></TableCell>
                 <TableCell className="px-3"><StatusBadge status={u.status} locale={lang} /></TableCell>
                 <TableCell className="pe-5">
@@ -395,7 +397,7 @@ function UsersPage() {
               <StatusBadge status={u.status} locale={lang} />
             </div>
             <div className="grid grid-cols-2 gap-3 mb-3">
-              <div className="rounded-lg bg-muted/50 p-2"><p className="text-[10px] text-muted-foreground">{t.tenant}</p><p className="text-xs font-semibold mt-0.5 truncate">{u.tenant}</p></div>
+              <div className="rounded-lg bg-muted/50 p-2"><p className="text-[10px] text-muted-foreground">{t.tenant}</p><p className="text-xs font-semibold mt-0.5 truncate">{userTenant(u, lang)}</p></div>
               <div className="rounded-lg bg-muted/50 p-2"><p className="text-[10px] text-muted-foreground">{t.role}</p><p className="text-xs font-semibold mt-0.5">{ROLE_MAP[u.role] || u.role}</p></div>
             </div>
             <div className="flex items-center justify-end gap-1 pt-2 border-t">
@@ -523,7 +525,7 @@ function BillingPage() {
             {items.length === 0 ? <EmptyRow colSpan={6} /> : items.map(inv => (
             <TableRow key={inv.id} className="group hover:bg-muted/20 transition-colors">
               <TableCell className="ps-5 font-mono text-sm font-semibold">{inv.id}</TableCell>
-              <TableCell className="px-3 text-sm">{inv.tenant}</TableCell>
+              <TableCell className="px-3 text-sm">{invTenant(inv, lang)}</TableCell>
               <TableCell className="px-3 hidden lg:table-cell"><Badge variant="secondary" className="text-xs">{inv.plan}</Badge></TableCell>
               <TableCell className="px-3 text-end font-semibold tabular-nums text-sm">{inv.amount.toLocaleString()} <span className="text-xs font-normal text-muted-foreground">{lang === 'ar' ? 'ر.س' : 'SAR'}</span></TableCell>
               <TableCell className="px-3"><StatusBadge status={inv.status} locale={lang} /></TableCell>
@@ -546,7 +548,7 @@ function BillingPage() {
         {items.length === 0 ? <Card className="border-0 shadow-sm"><CardContent className="py-16 text-center text-muted-foreground text-sm">{t.noResults}</CardContent></Card> : items.map(inv => (
           <Card key={inv.id} className="border-0 shadow-sm"><CardContent className="p-4">
             <div className="flex items-start justify-between gap-3 mb-3">
-              <div className="min-w-0"><p className="font-mono text-sm font-bold">{inv.id}</p><p className="text-xs text-muted-foreground mt-0.5">{inv.tenant}</p></div>
+              <div className="min-w-0"><p className="font-mono text-sm font-bold">{inv.id}</p><p className="text-xs text-muted-foreground mt-0.5">{invTenant(inv, lang)}</p></div>
               <StatusBadge status={inv.status} locale={lang} />
             </div>
             <div className="flex items-center justify-between pt-2 border-t">
@@ -577,6 +579,9 @@ function RolesPage() {
   const openAdd = () => { setForm({ name: '', nameEn: '', desc: '', descEn: '' }); setAddOpen(true) }
   const openEdit = (r: Role) => { setForm({ name: r.name, nameEn: r.nameEn, desc: r.description, descEn: r.descriptionEn }); setEditRole(r) }
 
+  const rName = (r: Role) => lang === 'en' ? r.nameEn : r.name
+  const rDesc = (r: Role) => lang === 'en' ? r.descriptionEn : r.description
+
   const handleCreate = () => {
     if (!form.name.trim()) return
     const r: Role = { id: Date.now().toString(), name: form.name, nameEn: form.nameEn, users: 0, permissions: 0, description: form.desc, descriptionEn: form.descEn }
@@ -603,9 +608,9 @@ function RolesPage() {
                   <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-100 dark:bg-violet-900/30"><Shield className="h-5 w-5 text-violet-600" /></div>
                   <Badge variant="secondary" className="text-xs">{r.permissions} {t.permissions}</Badge>
                 </div>
-                <h3 className="font-bold text-base">{lang === 'en' ? r.nameEn : r.name}</h3>
+                <h3 className="font-bold text-base">{rName(r)}</h3>
                 <p className="text-xs text-muted-foreground mb-2">{lang === 'ar' ? r.nameEn : r.name}</p>
-                <p className="text-sm text-muted-foreground mb-4 leading-relaxed">{lang === 'en' ? r.descriptionEn : r.description}</p>
+                <p className="text-sm text-muted-foreground mb-4 leading-relaxed">{rDesc(r)}</p>
                 <div className="flex items-center justify-between pt-3 border-t">
                   <span className="text-xs text-muted-foreground">{r.users} {t.users}</span>
                   <div className="flex gap-1">
@@ -633,7 +638,7 @@ function RolesPage() {
 
       {/* Edit Dialog */}
       <Dialog open={!!editRole} onOpenChange={() => setEditRole(null)}>
-        <DialogContent className="max-w-md"><DialogHeader><DialogTitle>{t.editPlanDlg}</DialogTitle></DialogHeader>
+        <DialogContent className="max-w-md"><DialogHeader><DialogTitle>{t.editRoleDlg}</DialogTitle></DialogHeader>
           <div className="space-y-4 pt-2">
             <FormField label={t.roleName}><Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} /></FormField>
             <FormField label={t.roleNameEn}><Input value={form.nameEn} onChange={e => setForm(p => ({ ...p, nameEn: e.target.value }))} dir="ltr" /></FormField>

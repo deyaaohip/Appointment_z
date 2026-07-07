@@ -87,10 +87,15 @@ export function FormField({ label, children }: { label: string; children: ReactN
 
 // ─── Toggle ────────────────────────────────────────────────────
 export function Toggle({ on, onToggle, color }: { on: boolean; onToggle: () => void; color?: string }) {
+  const { isRTL } = useSA()
   const bg = color === 'amber' ? (on ? 'bg-amber-500' : 'bg-muted') : (on ? 'bg-violet-600' : 'bg-muted')
+  // In RTL, the toggle knob moves from right to left (opposite of LTR)
+  const knobPos = isRTL
+    ? (on ? '-translate-x-5' : '-translate-x-0.5')
+    : (on ? 'translate-x-5' : 'translate-x-0.5')
   return (
     <div onClick={onToggle} role="switch" aria-checked={on} tabIndex={0} onKeyDown={e => e.key === 'Enter' && onToggle()} className={'relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors cursor-pointer ' + bg}>
-      <span className={'inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform ' + (on ? 'translate-x-5' : 'translate-x-0.5')} />
+      <span className={'inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform ' + knobPos} />
     </div>
   )
 }
