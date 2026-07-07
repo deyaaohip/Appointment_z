@@ -1,4 +1,4 @@
-'use client'
+content = r"""'use client'
 
 import { useState, useMemo, useCallback, useEffect } from 'react'
 import { motion } from 'framer-motion'
@@ -162,16 +162,6 @@ function FormField({ label, children }: { label: string; children: React.ReactNo
   return <div className="space-y-1.5"><label className="text-sm font-medium">{label}</label>{children}</div>
 }
 
-
-function Toggle({ on, onToggle, color }: { on: boolean; onToggle: () => void; color?: string }) {
-  const bg = color === 'amber' ? (on ? 'bg-amber-500' : 'bg-muted') : (on ? 'bg-violet-600' : 'bg-muted')
-  return (
-    <div onClick={onToggle} className={'relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors cursor-pointer ' + bg}>
-      <span className={'inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform ' + (on ? 'translate-x-5' : 'translate-x-0.5')}></span>
-    </div>
-  )
-}
-
 // ─── PAGE 1: OVERVIEW ──────────────────────────────────────────
 function OverviewPage() {
   const totalRevenue = TENANTS.reduce((s, t) => s + t.revenue, 0)
@@ -293,7 +283,7 @@ function OverviewPage() {
 
 // ─── PAGE 2: TENANTS ───────────────────────────────────────────
 function TenantsPage() {
-  const [tenants, setTenants] = useState<Tenant[]>(TENANTS)
+  const [tenants, setTenants] = useState(Tenant[]>(TENANTS)
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('all')
   const [dlg, setDlg] = useState<{ type: string; tenant?: Tenant } | null>(null)
@@ -930,7 +920,9 @@ function SecurityPage() {
             <div key={s.key}>
               <div className="flex items-center justify-between gap-4 py-3.5">
                 <div className="min-w-0"><p className="text-sm font-medium">{s.label}</p><p className="text-xs text-muted-foreground mt-0.5">{s.desc}</p></div>
-                <Toggle on={settings[s.key]} onToggle={() => toggle(s.key)} />
+                <button onClick={() => toggle(s.key)} className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${settings[s.key] ? 'bg-violet-600' : 'bg-muted'}`}>
+                  <span className={`inline-block h-4.5 w-4.5 rounded-full bg-white shadow-sm transition-transform ${settings[s.key] ? 'translate-x-[22px]' : 'translate-x-[3px]`} />
+                </button>
               </div>
               {i < items.length - 1 && <Separator />}
             </div>
@@ -983,7 +975,9 @@ function SettingsPage() {
             ].map(s => (
               <div key={s.key} className="flex items-center justify-between gap-4 py-1">
                 <div><p className="text-sm font-medium">{s.label}</p><p className="text-xs text-muted-foreground">{s.desc}</p></div>
-                <Toggle on={form[s.key]} onToggle={() => { setForm(p => ({ ...p, [s.key]: !p[s.key] })); toast.success('تم التحديث') }} color={s.color} />
+                <button onClick={() => { setForm(p => ({ ...p, [s.key]: !p[s.key] })); toast.success('تم التحديث') }} className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${form[s.key] ? (s.color === 'amber' ? 'bg-amber-500' : 'bg-violet-600') : 'bg-muted'}`}>
+                  <span className={`inline-block h-4.5 w-4.5 rounded-full bg-white shadow-sm transition-transform ${form[s.key] ? 'translate-x-[22px]' : 'translate-x-[3px]'}`} />
+                </button>
               </div>
             ))}
           </CardContent>
@@ -1033,3 +1027,8 @@ export function SuperAdminDashboard() {
     </motion.div>
   )
 }
+"""
+
+with open('/home/z/my-project/src/components/super-admin/super-admin-dashboard.tsx', 'w', encoding='utf-8') as f:
+    f.write(content)
+print(f'Written {len(content)} chars')
