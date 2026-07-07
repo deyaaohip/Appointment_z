@@ -41,6 +41,12 @@ import {
 
 const PER_PAGE = 5
 
+// ─── Bilingual field helper for logs ───────────────────────────
+function logMsg(l: SysLog, lang: Lang) { return lang === 'en' ? l.messageEn : l.message }
+function logSrc(l: SysLog, lang: Lang) { return lang === 'en' ? l.sourceEn : l.source }
+function serverRegion(s: ServerType, lang: Lang) { return lang === 'en' ? s.regionEn : s.region }
+function secCountry(a: SecurityAttempt, lang: Lang) { return lang === 'en' ? a.countryEn : a.country }
+
 // ════════════════════════════════════════════════════════════════
 // PAGE 1: OVERVIEW
 // ════════════════════════════════════════════════════════════════
@@ -95,8 +101,8 @@ function OverviewPage() {
                 <div key={l.id} className="flex gap-3 rounded-lg px-2.5 py-2 hover:bg-muted/50 transition-colors">
                   <LogDot level={l.level} />
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs sm:text-sm leading-relaxed line-clamp-2">{l.message}</p>
-                    <p className="text-[10px] sm:text-[11px] text-muted-foreground mt-0.5">{l.source}</p>
+                    <p className="text-xs sm:text-sm leading-relaxed line-clamp-2">{logMsg(l, lang)}</p>
+                    <p className="text-[10px] sm:text-[11px] text-muted-foreground mt-0.5">{logSrc(l, lang)}</p>
                   </div>
                 </div>
               ))}</div>
@@ -167,7 +173,7 @@ function TenantsPage() {
     setDlg(null); setPage(1)
   }, [form, dlg, t])
 
-  const handleDelete = (tn: Tenant) => { setTenants(p => p.filter(x => x.id !== tn.id)); toast.success(t.deleted) }
+  const handleDelete = (tn: Tenant) => { setTenants(p => p.filter(x => x.id !== tn.id)); toast.success(t.deleted); setPage(1) }
   const handleToggleStatus = (tn: Tenant) => {
     const newStatus = tn.status === 'suspended' ? 'active' : 'suspended'
     setTenants(p => p.map(x => x.id === tn.id ? { ...x, status: newStatus } : x))
@@ -254,6 +260,7 @@ function TenantsPage() {
               </div>
               <div className="flex items-center justify-end gap-1 pt-2 border-t">
                 <ActionBtn icon={Edit} label={t.edit} onClick={() => openEdit(tn)} />
+                <ActionBtn icon={tn.status === 'suspended' ? Power : PowerOff} label={tn.status === 'suspended' ? t.active : t.suspended} onClick={() => handleToggleStatus(tn)} />
                 <ActionBtn icon={Trash2} onClick={() => setDlg({ type: 'delete', tenant: tn })} danger />
               </div>
             </CardContent>
@@ -320,7 +327,7 @@ function UsersPage() {
     setDlg(null); setPage(1)
   }, [form, dlg, t])
 
-  const handleDelete = (u: PlatformUser) => { setUsers(p => p.filter(x => x.id !== u.id)); toast.success(t.deleted) }
+  const handleDelete = (u: PlatformUser) => { setUsers(p => p.filter(x => x.id !== u.id)); toast.success(t.userDeleted); setPage(1) }
   const handleToggleStatus = (u: PlatformUser) => {
     const newStatus = u.status === 'suspended' ? 'active' : 'suspended'
     setUsers(p => p.map(x => x.id === u.id ? { ...x, status: newStatus } : x))
@@ -393,6 +400,7 @@ function UsersPage() {
             </div>
             <div className="flex items-center justify-end gap-1 pt-2 border-t">
               <ActionBtn icon={Edit} label={t.edit} onClick={() => openEdit(u)} />
+              <ActionBtn icon={u.status === 'suspended' ? Power : PowerOff} label={u.status === 'suspended' ? t.active : t.suspended} onClick={() => handleToggleStatus(u)} />
               <ActionBtn icon={Trash2} onClick={() => setDlg({ type: 'delete', user: u })} danger />
             </div>
           </CardContent></Card>
@@ -413,8 +421,7 @@ function UsersPage() {
           <DlgFooter onCancel={() => setDlg(null)} onConfirm={handleSave} />
         </DialogContent>
       </Dialog>
-      <ConfirmDialog open={dlg?.type === 'delete'} onOpenChange={() => setDlg(null)} title={t.deleteUserDlg} desc={dlg?.user?.name || ''} onConfirm={() => { if (dlg?.user) handleDelete(dlg.user) }} danger />
-      <ConfirmDialog open={dlg?.type === 'toggle'} onOpenChange={() => setDlg(null)} title={t.changeStatus} desc={dlg?.user ? (dlg.user.status === 'suspended' ? t.activateUser.replace('{name}', dlg.user.name) : t.suspendUser.replace('{name}', dlg.user.name)) : ''} onConfirm={() => { if (dlg?.user) handleToggleStatus(dlg.user) }} />
+      <ConfirmDialog open={dlg?.type === 'delete'} onOpenChange={() => setDlg(null)} title={t.deleteUserDlg} desc={t.confirmDeleteUser.replace('{name}', dlg?.user?.name || '')} onConfirm={() => { if (dlg?.user) handleDelete(dlg.user) }} danger />
     </div>
   )
 }
@@ -449,7 +456,7 @@ function PlansPage() {
         ))}
       </div>
       <Dialog open={!!detailPlan} onOpenChange={() => setDetailPlan(null)}>
-        <DialogContent className="max-w-sm"><DialogHeader><DialogTitle>{detailPlan?.name}</DialogTitle></DialogHeader>
+        <DialogContent className="max-w-sm"><DialogHeader><DialogTitle>{t.planDetails}</DialogTitle></DialogHeader>
           {detailPlan && <div className="space-y-4 pt-2">
             <div className="text-center"><p className="text-3xl font-extrabold">{detailPlan.price > 0 ? `${detailPlan.price} ${lang === 'ar' ? 'ر.س' : 'SAR'}` : t.free}</p><p className="text-sm text-muted-foreground mt-1">{t.monthly} · {detailPlan.tenants} {t.tenants}</p></div>
             <Separator />
@@ -467,17 +474,23 @@ function PlansPage() {
 // ════════════════════════════════════════════════════════════════
 function BillingPage() {
   const { t, lang } = useSA()
+  const [invoices, setInvoices] = useState<Invoice[]>(INVOICES)
   const [filter, setFilter] = useState('all')
   const [page, setPage] = useState(1)
   const [sort, setSort] = useState<SortState>({ key: 'date', dir: 'desc' })
   const filtered = useMemo(() => {
-    let list = filter === 'all' ? [...INVOICES] : INVOICES.filter(i => i.status === filter)
+    let list = filter === 'all' ? [...invoices] : invoices.filter(i => i.status === filter)
     return genericSort(list, sort.key, sort.dir, lang)
-  }, [filter, sort, lang])
+  }, [invoices, filter, sort, lang])
   const { items, totalPages } = paginate(filtered, page, PER_PAGE)
   const handleSort = (key: string) => setSort(p => p.key === key ? { key, dir: p.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' })
-  const totalPaid = INVOICES.filter(i => i.status === 'paid').reduce((s, i) => s + i.amount, 0)
-  const totalPending = INVOICES.filter(i => i.status === 'pending' || i.status === 'overdue').reduce((s, i) => s + i.amount, 0)
+  const totalPaid = invoices.filter(i => i.status === 'paid').reduce((s, i) => s + i.amount, 0)
+  const totalPending = invoices.filter(i => i.status === 'pending' || i.status === 'overdue').reduce((s, i) => s + i.amount, 0)
+
+  const handleMarkPaid = (inv: Invoice) => {
+    setInvoices(p => p.map(i => i.id === inv.id ? { ...i, status: 'paid' } : i))
+    toast.success(t.paid)
+  }
 
   return (
     <div className="space-y-5">
@@ -485,8 +498,8 @@ function BillingPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <StatCard icon={CheckCircle2} label={t.payments} value={`${totalPaid.toLocaleString()} ${lang === 'ar' ? 'ر.س' : 'SAR'}`} color="text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30" />
         <StatCard icon={Clock} label={t.pending} value={`${totalPending.toLocaleString()} ${lang === 'ar' ? 'ر.س' : 'SAR'}`} color="text-amber-600 bg-amber-50 dark:bg-amber-950/30" />
-        <StatCard icon={DollarSign} label={t.paid} value={`${INVOICES.filter(i => i.status === 'paid').length}`} color="text-sky-600 bg-sky-50 dark:bg-sky-950/30" />
-        <StatCard icon={AlertTriangle} label={t.overdue} value={`${INVOICES.filter(i => i.status === 'overdue').length}`} color="text-red-600 bg-red-50 dark:bg-red-950/30" />
+        <StatCard icon={DollarSign} label={t.paid} value={`${invoices.filter(i => i.status === 'paid').length}`} color="text-sky-600 bg-sky-50 dark:bg-sky-950/30" />
+        <StatCard icon={AlertTriangle} label={t.overdue} value={`${invoices.filter(i => i.status === 'overdue').length}`} color="text-red-600 bg-red-50 dark:bg-red-950/30" />
       </div>
       <div className="flex gap-3">
         <Select value={filter} onValueChange={v => { setFilter(v); setPage(1) }}>
@@ -495,37 +508,42 @@ function BillingPage() {
         </Select>
       </div>
 
-      <Card className="border-0 shadow-sm overflow-hidden hidden sm:block">
+      {/* Desktop Table */}
+      <Card className="border-0 shadow-sm overflow-hidden hidden md:block">
         <div className="overflow-x-auto">
           <Table><TableHeader><TableRow className="bg-muted/50 hover:bg-muted/50">
             <SortableTH label={t.invoiceNo} sortKey="id" currentSort={sort} onSort={handleSort} className="ps-5" />
             <SortableTH label={t.tenant} sortKey="tenant" currentSort={sort} onSort={handleSort} />
-            <SortableTH label={t.plan} sortKey="plan" currentSort={sort} onSort={handleSort} className="hidden md:table-cell" />
+            <SortableTH label={t.plan} sortKey="plan" currentSort={sort} onSort={handleSort} className="hidden lg:table-cell" />
             <SortableTH label={t.amount} sortKey="amount" currentSort={sort} onSort={handleSort} align="end" />
             <SortableTH label={t.status} sortKey="status" currentSort={sort} onSort={handleSort} />
             <TableHead className="pe-5 font-semibold text-xs uppercase tracking-wider text-end">{t.actions}</TableHead>
           </TableRow></TableHeader>
-          <TableBody>{items.map(inv => (
+          <TableBody>
+            {items.length === 0 ? <EmptyRow colSpan={6} /> : items.map(inv => (
             <TableRow key={inv.id} className="group hover:bg-muted/20 transition-colors">
               <TableCell className="ps-5 font-mono text-sm font-semibold">{inv.id}</TableCell>
               <TableCell className="px-3 text-sm">{inv.tenant}</TableCell>
-              <TableCell className="px-3 hidden md:table-cell"><Badge variant="secondary" className="text-xs">{inv.plan}</Badge></TableCell>
+              <TableCell className="px-3 hidden lg:table-cell"><Badge variant="secondary" className="text-xs">{inv.plan}</Badge></TableCell>
               <TableCell className="px-3 text-end font-semibold tabular-nums text-sm">{inv.amount.toLocaleString()} <span className="text-xs font-normal text-muted-foreground">{lang === 'ar' ? 'ر.س' : 'SAR'}</span></TableCell>
               <TableCell className="px-3"><StatusBadge status={inv.status} locale={lang} /></TableCell>
               <TableCell className="pe-5">
                 <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <ActionBtn icon={Eye} label={t.view} onClick={() => toast.info(t.viewingInvoice.replace('{id}', inv.id))} />
+                  {inv.status !== 'paid' && <ActionBtn icon={CheckCircle2} label={t.paid} onClick={() => handleMarkPaid(inv)} />}
                   <ActionBtn icon={Download} onClick={() => toast.success(t.downloadingInvoice.replace('{id}', inv.id))} />
                 </div>
               </TableCell>
             </TableRow>
-          ))}</TableBody></Table>
+          ))}
+          </TableBody></Table>
         </div>
         <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
       </Card>
 
-      <div className="sm:hidden space-y-3">
-        {items.map(inv => (
+      {/* Mobile Cards */}
+      <div className="md:hidden space-y-3">
+        {items.length === 0 ? <Card className="border-0 shadow-sm"><CardContent className="py-16 text-center text-muted-foreground text-sm">{t.noResults}</CardContent></Card> : items.map(inv => (
           <Card key={inv.id} className="border-0 shadow-sm"><CardContent className="p-4">
             <div className="flex items-start justify-between gap-3 mb-3">
               <div className="min-w-0"><p className="font-mono text-sm font-bold">{inv.id}</p><p className="text-xs text-muted-foreground mt-0.5">{inv.tenant}</p></div>
@@ -535,6 +553,7 @@ function BillingPage() {
               <span className="font-bold text-sm">{inv.amount.toLocaleString()} <span className="text-xs font-normal text-muted-foreground">{lang === 'ar' ? 'ر.س' : 'SAR'}</span></span>
               <div className="flex gap-1">
                 <ActionBtn icon={Eye} onClick={() => toast.info(t.viewingInvoice.replace('{id}', inv.id))} />
+                {inv.status !== 'paid' && <ActionBtn icon={CheckCircle2} onClick={() => handleMarkPaid(inv)} />}
                 <ActionBtn icon={Download} onClick={() => toast.success(t.downloadingInvoice.replace('{id}', inv.id))} />
               </div>
             </div>
@@ -546,26 +565,35 @@ function BillingPage() {
 }
 
 // ════════════════════════════════════════════════════════════════
-// PAGE 6: ROLES
+// PAGE 6: ROLES (full CRUD)
 // ════════════════════════════════════════════════════════════════
 function RolesPage() {
   const { t, lang } = useSA()
   const [roles, setRoles] = useState<Role[]>(INIT_ROLES)
   const [addOpen, setAddOpen] = useState(false)
+  const [editRole, setEditRole] = useState<Role | null>(null)
   const [form, setForm] = useState({ name: '', nameEn: '', desc: '', descEn: '' })
+
+  const openAdd = () => { setForm({ name: '', nameEn: '', desc: '', descEn: '' }); setAddOpen(true) }
+  const openEdit = (r: Role) => { setForm({ name: r.name, nameEn: r.nameEn, desc: r.description, descEn: r.descriptionEn }); setEditRole(r) }
 
   const handleCreate = () => {
     if (!form.name.trim()) return
     const r: Role = { id: Date.now().toString(), name: form.name, nameEn: form.nameEn, users: 0, permissions: 0, description: form.desc, descriptionEn: form.descEn }
     setRoles(p => [r, ...p]); toast.success(t.roleCreated); setAddOpen(false)
-    setForm({ name: '', nameEn: '', desc: '', descEn: '' })
   }
 
-  const handleDelete = (r: Role) => { setRoles(p => p.filter(x => x.id !== r.id)); toast.success(t.deleted) }
+  const handleUpdate = () => {
+    if (!editRole || !form.name.trim()) return
+    setRoles(p => p.map(r => r.id === editRole.id ? { ...r, name: form.name, nameEn: form.nameEn, description: form.desc, descriptionEn: form.descEn } : r))
+    toast.success(t.roleUpdated); setEditRole(null)
+  }
+
+  const handleDelete = (r: Role) => { setRoles(p => p.filter(x => x.id !== r.id)); toast.success(t.roleDeleted) }
 
   return (
     <div className="space-y-6">
-      <PageTitle title={t.rolesTitle} action={<PrimaryBtn icon={Plus} label={t.addRole} onClick={() => setAddOpen(true)} />} />
+      <PageTitle title={t.rolesTitle} action={<PrimaryBtn icon={Plus} label={t.addRole} onClick={openAdd} />} />
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
         {roles.map((r, i) => (
           <motion.div key={r.id} variants={fade} initial="hidden" animate="visible" transition={{ delay: i * 0.04 }}>
@@ -581,7 +609,7 @@ function RolesPage() {
                 <div className="flex items-center justify-between pt-3 border-t">
                   <span className="text-xs text-muted-foreground">{r.users} {t.users}</span>
                   <div className="flex gap-1">
-                    <ActionBtn icon={Edit} label={t.edit} onClick={() => toast.info(t.edit)} />
+                    <ActionBtn icon={Edit} label={t.edit} onClick={() => openEdit(r)} />
                     <ActionBtn icon={Trash2} onClick={() => handleDelete(r)} danger />
                   </div>
                 </div>
@@ -590,6 +618,8 @@ function RolesPage() {
           </motion.div>
         ))}
       </div>
+
+      {/* Add Dialog */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent className="max-w-md"><DialogHeader><DialogTitle>{t.addRoleDlg}</DialogTitle></DialogHeader>
           <div className="space-y-4 pt-2">
@@ -600,18 +630,31 @@ function RolesPage() {
           <DlgFooter onCancel={() => setAddOpen(false)} onConfirm={handleCreate} confirmLabel={t.create} />
         </DialogContent>
       </Dialog>
+
+      {/* Edit Dialog */}
+      <Dialog open={!!editRole} onOpenChange={() => setEditRole(null)}>
+        <DialogContent className="max-w-md"><DialogHeader><DialogTitle>{t.editPlanDlg}</DialogTitle></DialogHeader>
+          <div className="space-y-4 pt-2">
+            <FormField label={t.roleName}><Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} /></FormField>
+            <FormField label={t.roleNameEn}><Input value={form.nameEn} onChange={e => setForm(p => ({ ...p, nameEn: e.target.value }))} dir="ltr" /></FormField>
+            <FormField label={t.description}><Input value={form.desc} onChange={e => setForm(p => ({ ...p, desc: e.target.value }))} /></FormField>
+          </div>
+          <DlgFooter onCancel={() => setEditRole(null)} onConfirm={handleUpdate} />
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
 
 // ════════════════════════════════════════════════════════════════
-// PAGE 7: AUDIT
+// PAGE 7: AUDIT LOGS (bilingual)
 // ════════════════════════════════════════════════════════════════
 function AuditPage() {
   const { t, lang } = useSA()
+  const [logs] = useState<SysLog[]>(INIT_LOGS)
   const [filter, setFilter] = useState('all')
   const [page, setPage] = useState(1)
-  const filtered = useMemo(() => filter === 'all' ? INIT_LOGS : INIT_LOGS.filter(l => l.level === filter), [filter])
+  const filtered = useMemo(() => filter === 'all' ? logs : logs.filter(l => l.level === filter), [logs, filter])
   const { items, totalPages } = paginate(filtered, page, 8)
 
   return (
@@ -635,8 +678,8 @@ function AuditPage() {
           <TableBody>{items.map(l => (
             <TableRow key={l.id} className="hover:bg-muted/20 transition-colors">
               <TableCell className="ps-5"><span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${l.level === 'info' ? 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-400' : l.level === 'warn' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400' : l.level === 'error' ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400'}`}>{getLogLabel(l.level, t)}</span></TableCell>
-              <TableCell className="px-3 text-sm max-w-[400px]">{l.message}</TableCell>
-              <TableCell className="px-3 text-xs text-muted-foreground hidden md:table-cell">{l.source}</TableCell>
+              <TableCell className="px-3 text-sm max-w-[400px]">{logMsg(l, lang)}</TableCell>
+              <TableCell className="px-3 text-xs text-muted-foreground hidden md:table-cell">{logSrc(l, lang)}</TableCell>
               <TableCell className="pe-5 text-xs text-muted-foreground whitespace-nowrap text-end">{new Date(l.timestamp).toLocaleString(lang === 'ar' ? 'ar-SA' : 'en-US')}</TableCell>
             </TableRow>
           ))}</TableBody></Table>
@@ -648,8 +691,8 @@ function AuditPage() {
           <Card key={l.id} className="border-0 shadow-sm"><CardContent className="p-3">
             <div className="flex items-start gap-3"><LogDot level={l.level} />
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 mb-1"><span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${l.level === 'info' ? 'bg-sky-100 text-sky-700' : l.level === 'warn' ? 'bg-amber-100 text-amber-700' : l.level === 'error' ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>{getLogLabel(l.level, t)}</span><span className="text-[10px] text-muted-foreground">{l.source}</span></div>
-                <p className="text-xs leading-relaxed">{l.message}</p>
+                <div className="flex items-center gap-2 mb-1"><span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${l.level === 'info' ? 'bg-sky-100 text-sky-700' : l.level === 'warn' ? 'bg-amber-100 text-amber-700' : l.level === 'error' ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>{getLogLabel(l.level, t)}</span><span className="text-[10px] text-muted-foreground">{logSrc(l, lang)}</span></div>
+                <p className="text-xs leading-relaxed">{logMsg(l, lang)}</p>
                 <p className="text-[10px] text-muted-foreground mt-1">{new Date(l.timestamp).toLocaleString(lang === 'ar' ? 'ar-SA' : 'en-US')}</p>
               </div>
             </div>
@@ -668,8 +711,9 @@ function NotificationsPage() {
   const [templates, setTemplates] = useState<NotificationTemplate[]>(NOTIF_TEMPLATES)
   const [sendOpen, setSendOpen] = useState(false)
   const [msg, setMsg] = useState({ title: '', body: '', target: 'all' })
+  const [delTarget, setDelTarget] = useState<NotificationTemplate | null>(null)
 
-  const handleDelete = (tmpl: NotificationTemplate) => { setTemplates(p => p.filter(x => x.id !== tmpl.id)); toast.success(t.deleted) }
+  const handleDelete = (tmpl: NotificationTemplate) => { setTemplates(p => p.filter(x => x.id !== tmpl.id)); toast.success(t.deleted); setDelTarget(null) }
 
   return (
     <div className="space-y-5">
@@ -694,7 +738,7 @@ function NotificationsPage() {
                 <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <ActionBtn icon={Edit} label={t.edit} onClick={() => toast.info(t.editTemplate)} />
                   <ActionBtn icon={Mail} onClick={() => toast.success(t.testSent)} />
-                  <ActionBtn icon={Trash2} onClick={() => handleDelete(tmpl)} danger />
+                  <ActionBtn icon={Trash2} onClick={() => setDelTarget(tmpl)} danger />
                 </div>
               </TableCell>
             </TableRow>
@@ -711,7 +755,8 @@ function NotificationsPage() {
             </div>
             <div className="flex items-center justify-end gap-1 pt-2 border-t">
               <ActionBtn icon={Edit} label={t.edit} onClick={() => toast.info(t.editTemplate)} />
-              <ActionBtn icon={Trash2} onClick={() => handleDelete(tmpl)} danger />
+              <ActionBtn icon={Mail} onClick={() => toast.success(t.testSent)} />
+              <ActionBtn icon={Trash2} onClick={() => setDelTarget(tmpl)} danger />
             </div>
           </CardContent></Card>
         ))}
@@ -724,9 +769,11 @@ function NotificationsPage() {
             <FormField label={t.content}><Input value={msg.body} onChange={e => setMsg(p => ({ ...p, body: e.target.value }))} /></FormField>
             <FormField label={t.target}><Select value={msg.target} onValueChange={v => setMsg(p => ({ ...p, target: v }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">{t.everyone}</SelectItem><SelectItem value="active">{t.activeUsers}</SelectItem><SelectItem value="trial">{t.trialUsers}</SelectItem></SelectContent></Select></FormField>
           </div>
-          <DlgFooter onCancel={() => setSendOpen(false)} onConfirm={() => { toast.success(t.notifSent); setSendOpen(false) }} confirmLabel={t.send} />
+          <DlgFooter onCancel={() => setSendOpen(false)} onConfirm={() => { toast.success(t.notifSent); setSendOpen(false); setMsg({ title: '', body: '', target: 'all' }) }} confirmLabel={t.send} />
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog open={!!delTarget} onOpenChange={() => setDelTarget(null)} title={t.delete} desc={t.confirmDeleteTemplate} onConfirm={() => { if (delTarget) handleDelete(delTarget) }} danger />
     </div>
   )
 }
@@ -753,8 +800,8 @@ function ReportsPage() {
                 <div className="flex items-center justify-between pt-3 border-t">
                   <span className="text-[11px] text-muted-foreground">{t.lastGenerated} {r.last}</span>
                   <div className="flex gap-1">
-                    <ActionBtn icon={RefreshCw} label={t.generate} onClick={() => toast.success(t.generating)} />
-                    <ActionBtn icon={Download} onClick={() => toast.success(t.downloading)} />
+                    <ActionBtn icon={RefreshCw} label={t.generate} onClick={() => toast.success(t.reportGenerated)} />
+                    <ActionBtn icon={Download} onClick={() => toast.success(t.reportDownloaded)} />
                   </div>
                 </div>
               </CardContent>
@@ -767,18 +814,18 @@ function ReportsPage() {
 }
 
 // ════════════════════════════════════════════════════════════════
-// PAGE 10: SYSTEM HEALTH
+// PAGE 10: SYSTEM HEALTH (bilingual gauges)
 // ════════════════════════════════════════════════════════════════
 function SystemPage() {
   const { t, lang } = useSA()
   const [logs] = useState<SysLog[]>(INIT_LOGS)
   const gauges = [
-    { label: 'API', value: 99, icon: Server },
-    { label: lang === 'en' ? 'Database' : 'قاعدة البيانات', value: 85, icon: Database },
-    { label: lang === 'en' ? 'Memory' : 'الذاكرة', value: 78, icon: Monitor },
-    { label: lang === 'en' ? 'Disk' : 'القرص', value: 62, icon: HardDrive },
-    { label: 'CDN', value: 100, icon: Globe },
-    { label: 'Worker', value: 95, icon: RefreshCw },
+    { label: t.gaugeApi, value: 99, icon: Server },
+    { label: t.gaugeDatabase, value: 85, icon: Database },
+    { label: t.gaugeMemory, value: 78, icon: Monitor },
+    { label: t.gaugeDisk, value: 62, icon: HardDrive },
+    { label: t.gaugeCdn, value: 100, icon: Globe },
+    { label: t.gaugeWorker, value: 95, icon: RefreshCw },
   ]
 
   return (
@@ -809,8 +856,8 @@ function SystemPage() {
             <div key={l.id} className="flex items-start gap-3 rounded-lg px-3 py-2.5 hover:bg-muted/50 transition-colors">
               <LogDot level={l.level} />
               <div className="min-w-0 flex-1">
-                <p className="text-sm leading-relaxed">{l.message}</p>
-                <p className="text-[11px] text-muted-foreground mt-0.5">{l.source} — {new Date(l.timestamp).toLocaleString(lang === 'ar' ? 'ar-SA' : 'en-US')}</p>
+                <p className="text-sm leading-relaxed">{logMsg(l, lang)}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">{logSrc(l, lang)} — {new Date(l.timestamp).toLocaleString(lang === 'ar' ? 'ar-SA' : 'en-US')}</p>
               </div>
             </div>
           ))}</div>
@@ -821,7 +868,7 @@ function SystemPage() {
 }
 
 // ════════════════════════════════════════════════════════════════
-// PAGE 11: SERVERS
+// PAGE 11: SERVERS (bilingual regions, full CRUD)
 // ════════════════════════════════════════════════════════════════
 function ServersPage() {
   const { t, lang } = useSA()
@@ -829,15 +876,27 @@ function ServersPage() {
   const [addOpen, setAddOpen] = useState(false)
   const [newName, setNewName] = useState('')
   const [newRegion, setNewRegion] = useState('riyadh')
+  const [delTarget, setDelTarget] = useState<ServerType | null>(null)
+
+  const REGIONS: Record<string, { ar: string; en: string }> = {
+    riyadh: { ar: 'الرياض', en: 'Riyadh' },
+    jeddah: { ar: 'جدة', en: 'Jeddah' },
+    dubai: { ar: 'دبي', en: 'Dubai' },
+  }
 
   const handleAdd = () => {
     if (!newName.trim()) return
-    const s: ServerType = { id: Date.now().toString(), name: newName, region: newRegion === 'riyadh' ? (lang === 'en' ? 'Riyadh' : 'الرياض') : newRegion === 'jeddah' ? (lang === 'en' ? 'Jeddah' : 'جدة') : (lang === 'en' ? 'Dubai' : 'دبي'), status: 'healthy', cpu: 0, memory: 0, disk: 0, uptime: '100%', requests: '0/min' }
+    const region = REGIONS[newRegion] || REGIONS.riyadh
+    const s: ServerType = { id: Date.now().toString(), name: newName, region: region.ar, regionEn: region.en, status: 'healthy', cpu: 0, memory: 0, disk: 0, uptime: '100%', requests: '0/min' }
     setServers(p => [...p, s]); toast.success(t.serverAdded); setAddOpen(false); setNewName('')
   }
 
-  const handleRestart = (s: ServerType) => { toast.info(t.restarting) }
-  const handleDelete = (s: ServerType) => { setServers(p => p.filter(x => x.id !== s.id)); toast.success(t.deleted) }
+  const handleRestart = (s: ServerType) => {
+    setServers(p => p.map(x => x.id === s.id ? { ...x, cpu: 0, memory: 0 } : x))
+    toast.success(t.serverRestarted)
+  }
+
+  const handleDelete = (s: ServerType) => { setServers(p => p.filter(x => x.id !== s.id)); toast.success(t.serverDeleted); setDelTarget(null) }
 
   return (
     <div className="space-y-6">
@@ -850,12 +909,12 @@ function ServersPage() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-sky-100 dark:bg-sky-900/30"><Server className="h-5 w-5 text-sky-600" /></div>
-                    <div><h3 className="font-bold text-sm">{s.name}</h3><p className="text-xs text-muted-foreground">{s.region}</p></div>
+                    <div><h3 className="font-bold text-sm">{s.name}</h3><p className="text-xs text-muted-foreground">{serverRegion(s, lang)}</p></div>
                   </div>
                   <StatusBadge status={s.status} locale={lang} />
                 </div>
                 <div className="grid grid-cols-4 gap-3 sm:gap-4">
-                  {[{ l: 'CPU', v: s.cpu }, { l: lang === 'en' ? 'Memory' : 'الذاكرة', v: s.memory }, { l: lang === 'en' ? 'Disk' : 'القرص', v: s.disk }, { l: 'Uptime', v: parseInt(s.uptime) }].map(m => (
+                  {[{ l: t.gaugeCpu, v: s.cpu }, { l: t.gaugeMemory, v: s.memory }, { l: t.gaugeDisk, v: s.disk }, { l: t.gaugeUptime, v: parseInt(s.uptime) || 0 }].map(m => (
                     <div key={m.l} className="text-center space-y-1.5">
                       <div className="relative mx-auto h-11 w-11 sm:h-12 sm:w-12">
                         <svg className={`h-11 w-11 sm:h-12 sm:w-12 -rotate-90 ${gaugeColor(m.v)}`} viewBox="0 0 48 48">
@@ -873,7 +932,7 @@ function ServersPage() {
                   <div className="flex gap-1">
                     <ActionBtn icon={RefreshCw} label={t.restart} onClick={() => handleRestart(s)} />
                     <ActionBtn icon={Eye} label={t.details} onClick={() => toast.info(t.serverDetails)} />
-                    <ActionBtn icon={Trash2} onClick={() => handleDelete(s)} danger />
+                    <ActionBtn icon={Trash2} onClick={() => setDelTarget(s)} danger />
                   </div>
                 </div>
               </CardContent>
@@ -890,12 +949,13 @@ function ServersPage() {
           <DlgFooter onCancel={() => setAddOpen(false)} onConfirm={handleAdd} />
         </DialogContent>
       </Dialog>
+      <ConfirmDialog open={!!delTarget} onOpenChange={() => setDelTarget(null)} title={t.delete} desc={t.confirmDeleteServer} onConfirm={() => { if (delTarget) handleDelete(delTarget) }} danger />
     </div>
   )
 }
 
 // ════════════════════════════════════════════════════════════════
-// PAGE 12: DATABASE
+// PAGE 12: DATABASE (bilingual labels)
 // ════════════════════════════════════════════════════════════════
 function DatabasePage() {
   const { t, lang } = useSA()
@@ -917,7 +977,12 @@ function DatabasePage() {
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         <Card className="border-0 shadow-sm"><CardHeader className="pb-3"><CardTitle className="text-sm sm:text-base font-semibold">{t.resourceUsage}</CardTitle></CardHeader>
-          <CardContent className="space-y-5">{[{ l: 'CPU', v: 45 }, { l: lang === 'en' ? 'Memory' : 'الذاكرة', v: 72 }, { l: lang === 'en' ? 'Disk' : 'القرص', v: 58 }, { l: lang === 'en' ? 'Connections' : 'الاتصالات', v: 34 }].map(r => (
+          <CardContent className="space-y-5">{[
+            { l: t.gaugeCpu, v: 45 },
+            { l: t.gaugeMemory, v: 72 },
+            { l: t.gaugeDisk, v: 58 },
+            { l: t.gaugeConnections, v: 34 },
+          ].map(r => (
             <div key={r.l}><div className="flex justify-between text-sm mb-2"><span className="font-medium">{r.l}</span><span className="tabular-nums font-semibold">{r.v}%</span></div><Progress value={r.v} className="h-2" /></div>
           ))}</CardContent>
         </Card>
@@ -936,7 +1001,7 @@ function DatabasePage() {
 }
 
 // ════════════════════════════════════════════════════════════════
-// PAGE 13: SECURITY
+// PAGE 13: SECURITY (bilingual countries)
 // ════════════════════════════════════════════════════════════════
 function SecurityPage() {
   const { t, lang } = useSA()
@@ -980,7 +1045,7 @@ function SecurityPage() {
               <TableRow key={i} className="hover:bg-muted/20 transition-colors">
                 <TableCell className="ps-4 font-mono text-sm" dir="ltr">{a.ip}</TableCell>
                 <TableCell className="px-3 text-xs text-muted-foreground">{a.time}</TableCell>
-                <TableCell className="px-3 text-sm">{a.country}</TableCell>
+                <TableCell className="px-3 text-sm">{secCountry(a, lang)}</TableCell>
                 <TableCell className="pe-4"><StatusBadge status={a.status} locale={lang} /></TableCell>
               </TableRow>
             ))}</TableBody></Table>
@@ -988,7 +1053,7 @@ function SecurityPage() {
           <div className="sm:hidden space-y-2">
             {SECURITY_ATTEMPTS.map((a, i) => (
               <div key={i} className="flex items-center justify-between gap-3 rounded-lg border p-3">
-                <div className="min-w-0"><p className="font-mono text-sm font-semibold" dir="ltr">{a.ip}</p><p className="text-[11px] text-muted-foreground mt-0.5">{a.country} · {a.time}</p></div>
+                <div className="min-w-0"><p className="font-mono text-sm font-semibold" dir="ltr">{a.ip}</p><p className="text-[11px] text-muted-foreground mt-0.5">{secCountry(a, lang)} · {a.time}</p></div>
                 <StatusBadge status={a.status} locale={lang} />
               </div>
             ))}

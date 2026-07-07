@@ -27,7 +27,9 @@ export interface SysLog {
   id: string
   level: string
   source: string
+  sourceEn: string
   message: string
+  messageEn: string
   timestamp: string
 }
 
@@ -64,6 +66,7 @@ export interface Server {
   id: string
   name: string
   region: string
+  regionEn: string
   status: string
   cpu: number
   memory: number
@@ -85,6 +88,7 @@ export interface SecurityAttempt {
   time: string
   status: string
   country: string
+  countryEn: string
 }
 
 export interface NotificationTemplate {
@@ -135,18 +139,18 @@ export const INIT_USERS: PlatformUser[] = [
 ]
 
 export const INIT_LOGS: SysLog[] = [
-  { id: '1', level: 'success', source: 'الدفع', message: 'دفعة ناجحة: 999 ر.س — Enterprise — مركز النور الطبي', timestamp: '2025-06-18T14:15:00Z' },
-  { id: '2', level: 'info', source: 'المستأجرين', message: 'تسجيل مستأجر جديد: عيادة الابتسامة (Trial)', timestamp: '2025-06-18T14:10:00Z' },
-  { id: '3', level: 'warn', source: 'النظام', message: 'استخدام الذاكرة تجاوز 80% على الخادم #3', timestamp: '2025-06-18T13:55:00Z' },
-  { id: '4', level: 'info', source: 'المستخدمين', message: 'ترقية خطة صالون ياسمين من Starter إلى Professional', timestamp: '2025-06-18T13:45:00Z' },
-  { id: '5', level: 'error', source: 'الدفع', message: 'فشل عملية دفع: بطاقة مسربة — نادي اللياقة الذهبية', timestamp: '2025-06-18T12:30:00Z' },
-  { id: '6', level: 'success', source: 'النظام', message: 'اكتمل النسخ الاحتياطي اليومي بنجاح (2.4 GB)', timestamp: '2025-06-18T06:00:00Z' },
-  { id: '7', level: 'info', source: 'الأمان', message: 'تعليق حساب محمد العتيبي — 3 محاولات فاشلة', timestamp: '2025-06-18T11:00:00Z' },
-  { id: '8', level: 'warn', source: 'النظام', message: 'القرص على الخادم #2 عند 85%', timestamp: '2025-06-18T10:20:00Z' },
-  { id: '9', level: 'info', source: 'المستأجرين', message: 'تم تفعيل حساب نادي اللياقة الذهبية', timestamp: '2025-06-18T09:00:00Z' },
-  { id: '10', level: 'error', source: 'API', message: 'خطأ 500 على /api/bookings — مهلة الطلب', timestamp: '2025-06-18T08:30:00Z' },
-  { id: '11', level: 'success', source: 'الدفع', message: 'دفعة ناجحة: 599 ر.س — Business — عيادة العيون المتقدمة', timestamp: '2025-06-18T07:45:00Z' },
-  { id: '12', level: 'info', source: 'النظام', message: 'تحديث النظام إلى الإصدار 2.4.1', timestamp: '2025-06-18T03:00:00Z' },
+  { id: '1', level: 'success', source: 'الدفع', sourceEn: 'Payments', message: 'دفعة ناجحة: 999 ر.س — Enterprise — مركز النور الطبي', messageEn: 'Successful payment: 999 SAR — Enterprise — Al Noor Medical', timestamp: '2025-06-18T14:15:00Z' },
+  { id: '2', level: 'info', source: 'المستأجرين', sourceEn: 'Tenants', message: 'تسجيل مستأجر جديد: عيادة الابتسامة (Trial)', messageEn: 'New tenant registered: Smile Clinic (Trial)', timestamp: '2025-06-18T14:10:00Z' },
+  { id: '3', level: 'warn', source: 'النظام', sourceEn: 'System', message: 'استخدام الذاكرة تجاوز 80% على الخادم #3', messageEn: 'Memory usage exceeded 80% on Server #3', timestamp: '2025-06-18T13:55:00Z' },
+  { id: '4', level: 'info', source: 'المستخدمين', sourceEn: 'Users', message: 'ترقية خطة صالون ياسمين من Starter إلى Professional', messageEn: 'Upgraded Yasmin Beauty plan from Starter to Professional', timestamp: '2025-06-18T13:45:00Z' },
+  { id: '5', level: 'error', source: 'الدفع', sourceEn: 'Payments', message: 'فشل عملية دفع: بطاقة مسربة — نادي اللياقة الذهبية', messageEn: 'Payment failed: declined card — Golden Fitness', timestamp: '2025-06-18T12:30:00Z' },
+  { id: '6', level: 'success', source: 'النظام', sourceEn: 'System', message: 'اكتمل النسخ الاحتياطي اليومي بنجاح (2.4 GB)', messageEn: 'Daily backup completed successfully (2.4 GB)', timestamp: '2025-06-18T06:00:00Z' },
+  { id: '7', level: 'info', source: 'الأمان', sourceEn: 'Security', message: 'تعليق حساب محمد العتيبي — 3 محاولات فاشلة', messageEn: 'Suspended Mohammed Al-Otaibi account — 3 failed attempts', timestamp: '2025-06-18T11:00:00Z' },
+  { id: '8', level: 'warn', source: 'النظام', sourceEn: 'System', message: 'القرص على الخادم #2 عند 85%', messageEn: 'Disk on Server #2 at 85%', timestamp: '2025-06-18T10:20:00Z' },
+  { id: '9', level: 'info', source: 'المستأجرين', sourceEn: 'Tenants', message: 'تم تفعيل حساب نادي اللياقة الذهبية', messageEn: 'Golden Fitness account activated', timestamp: '2025-06-18T09:00:00Z' },
+  { id: '10', level: 'error', source: 'API', sourceEn: 'API', message: 'خطأ 500 على /api/bookings — مهلة الطلب', messageEn: 'Error 500 on /api/bookings — request timeout', timestamp: '2025-06-18T08:30:00Z' },
+  { id: '11', level: 'success', source: 'الدفع', sourceEn: 'Payments', message: 'دفعة ناجحة: 599 ر.س — Business — عيادة العيون المتقدمة', messageEn: 'Successful payment: 599 SAR — Business — Advanced Eye Clinic', timestamp: '2025-06-18T07:45:00Z' },
+  { id: '12', level: 'info', source: 'النظام', sourceEn: 'System', message: 'تحديث النظام إلى الإصدار 2.4.1', messageEn: 'System updated to version 2.4.1', timestamp: '2025-06-18T03:00:00Z' },
 ]
 
 export const PLANS: Plan[] = [
@@ -166,10 +170,10 @@ export const INIT_ROLES: Role[] = [
 ]
 
 export const SERVERS: Server[] = [
-  { id: '1', name: 'API Server #1', region: 'الرياض', status: 'healthy', cpu: 45, memory: 62, disk: 40, uptime: '99.98%', requests: '12.5K/min' },
-  { id: '2', name: 'API Server #2', region: 'جدة', status: 'healthy', cpu: 38, memory: 55, disk: 35, uptime: '99.95%', requests: '8.2K/min' },
-  { id: '3', name: 'Worker Server', region: 'الرياض', status: 'warning', cpu: 82, memory: 85, disk: 60, uptime: '99.80%', requests: '3.1K/min' },
-  { id: '4', name: 'CDN Edge', region: 'دبي', status: 'healthy', cpu: 12, memory: 30, disk: 20, uptime: '100%', requests: '45K/min' },
+  { id: '1', name: 'API Server #1', region: 'الرياض', regionEn: 'Riyadh', status: 'healthy', cpu: 45, memory: 62, disk: 40, uptime: '99.98%', requests: '12.5K/min' },
+  { id: '2', name: 'API Server #2', region: 'جدة', regionEn: 'Jeddah', status: 'healthy', cpu: 38, memory: 55, disk: 35, uptime: '99.95%', requests: '8.2K/min' },
+  { id: '3', name: 'Worker Server', region: 'الرياض', regionEn: 'Riyadh', status: 'warning', cpu: 82, memory: 85, disk: 60, uptime: '99.80%', requests: '3.1K/min' },
+  { id: '4', name: 'CDN Edge', region: 'دبي', regionEn: 'Dubai', status: 'healthy', cpu: 12, memory: 30, disk: 20, uptime: '100%', requests: '45K/min' },
 ]
 
 export const INVOICES: Invoice[] = [
@@ -189,9 +193,9 @@ export const BACKUPS: Backup[] = [
 ]
 
 export const SECURITY_ATTEMPTS: SecurityAttempt[] = [
-  { ip: '192.168.1.55', time: '2025-06-18 23:00', status: 'suspended', country: 'مجهول' },
-  { ip: '10.0.0.12', time: '2025-06-18 20:15', status: 'suspended', country: 'مجهول' },
-  { ip: '172.16.0.8', time: '2025-06-18 15:30', status: 'active', country: 'السعودية' },
+  { ip: '192.168.1.55', time: '2025-06-18 23:00', status: 'suspended', country: 'مجهول', countryEn: 'Unknown' },
+  { ip: '10.0.0.12', time: '2025-06-18 20:15', status: 'suspended', country: 'مجهول', countryEn: 'Unknown' },
+  { ip: '172.16.0.8', time: '2025-06-18 15:30', status: 'active', country: 'السعودية', countryEn: 'Saudi Arabia' },
 ]
 
 export const NOTIF_TEMPLATES: NotificationTemplate[] = [

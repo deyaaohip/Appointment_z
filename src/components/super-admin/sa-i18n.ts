@@ -302,6 +302,33 @@ interface T {
   notifWeekly: string
   notifTypeEmail: string
   notifTypeEmailSms: string
+
+  // System gauge labels
+  gaugeApi: string
+  gaugeDatabase: string
+  gaugeMemory: string
+  gaugeDisk: string
+  gaugeCdn: string
+  gaugeWorker: string
+  gaugeConnections: string
+  gaugeCpu: string
+  gaugeUptime: string
+
+  // Confirm dialog descriptions
+  confirmDeleteUser: string
+  confirmDeleteServer: string
+  confirmDeleteRole: string
+  confirmDeleteTemplate: string
+
+  // Actions
+  serverRestarted: string
+  serverDeleted: string
+  roleDeleted: string
+  roleUpdated: string
+  userDeleted: string
+  reportGenerated: string
+  reportDownloaded: string
+  planDetails: string
 }
 
 const ar: T = {
@@ -582,6 +609,30 @@ const ar: T = {
   notifWeekly: 'تقرير أسبوعي',
   notifTypeEmail: 'بريد إلكتروني',
   notifTypeEmailSms: 'بريد + SMS',
+  // System gauge labels
+  gaugeApi: 'API',
+  gaugeDatabase: 'قاعدة البيانات',
+  gaugeMemory: 'الذاكرة',
+  gaugeDisk: 'القرص',
+  gaugeCdn: 'CDN',
+  gaugeWorker: 'العامل',
+  gaugeConnections: 'الاتصالات',
+  gaugeCpu: 'المعالج',
+  gaugeUptime: 'وقت التشغيل',
+  // Confirm dialog descriptions
+  confirmDeleteUser: 'هل أنت متأكد من حذف "{name}"؟',
+  confirmDeleteServer: 'هل أنت متأكد من حذف هذا الخادم؟',
+  confirmDeleteRole: 'هل أنت متأكد من حذف هذا الدور؟',
+  confirmDeleteTemplate: 'هل أنت متأكد من حذف هذا القالب؟',
+  // Actions
+  serverRestarted: 'تم إعادة تشغيل الخادم',
+  serverDeleted: 'تم حذف الخادم',
+  roleDeleted: 'تم حذف الدور',
+  roleUpdated: 'تم تحديث الدور',
+  userDeleted: 'تم حذف المستخدم',
+  reportGenerated: 'تم توليد التقرير',
+  reportDownloaded: 'جاري تنزيل التقرير...',
+  planDetails: 'تفاصيل الباقة',
 }
 
 const en: T = {
@@ -840,6 +891,30 @@ const en: T = {
   notifWeekly: 'Weekly Report',
   notifTypeEmail: 'Email',
   notifTypeEmailSms: 'Email + SMS',
+  // System gauge labels
+  gaugeApi: 'API',
+  gaugeDatabase: 'Database',
+  gaugeMemory: 'Memory',
+  gaugeDisk: 'Disk',
+  gaugeCdn: 'CDN',
+  gaugeWorker: 'Worker',
+  gaugeConnections: 'Connections',
+  gaugeCpu: 'CPU',
+  gaugeUptime: 'Uptime',
+  // Confirm dialog descriptions
+  confirmDeleteUser: 'Are you sure you want to delete "{name}"?',
+  confirmDeleteServer: 'Are you sure you want to delete this server?',
+  confirmDeleteRole: 'Are you sure you want to delete this role?',
+  confirmDeleteTemplate: 'Are you sure you want to delete this template?',
+  // Actions
+  serverRestarted: 'Server restarted',
+  serverDeleted: 'Server deleted',
+  roleDeleted: 'Role deleted',
+  roleUpdated: 'Role updated',
+  userDeleted: 'User deleted',
+  reportGenerated: 'Report generated',
+  reportDownloaded: 'Downloading report...',
+  planDetails: 'Plan Details',
 }
 
 const translations: Record<Lang, T> = { ar, en }
