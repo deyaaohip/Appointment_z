@@ -1,0 +1,486 @@
+     1→'use client'
+     2→
+     3→import { useState, useMemo } from 'react'
+     4→import { motion } from 'framer-motion'
+     5→import { toast } from 'sonner'
+     6→import { useAppStore } from '@/stores/app-store'
+     7→import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+     8→import { Badge } from '@/components/ui/badge'
+     9→import { Button } from '@/components/ui/button'
+    10→import { Input } from '@/components/ui/input'
+    11→import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+    12→import {
+    13→  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+    14→} from '@/components/ui/table'
+    15→import { ScrollArea } from '@/components/ui/scroll-area'
+    16→import {
+    17→  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
+    18→} from '@/components/ui/dialog'
+    19→import {
+    20→  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+    21→} from '@/components/ui/select'
+    22→import {
+    23→  Building2, Users, DollarSign, CalendarDays, ArrowUpRight, ArrowDownRight,
+    24→  Activity, CreditCard, Settings, Shield, Eye, Edit, Trash2, Plus,
+    25→  Search, BarChart3, Server, Database, Lock, Bell, FileText, UserCog,
+    26→  TrendingUp, CheckCircle2, XCircle, AlertTriangle, RefreshCw,
+    27→} from 'lucide-react'
+    28→
+    29→// ─── Animation Variants ──────────────────────────────────────
+    30→const container = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.06 } } }
+    31→const item = { hidden: { opacity: 0, y: 14 }, visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: 'easeOut' } } }
+    32→const fadeUp = { hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0, transition: { duration: 0.35 } } }
+    33→
+    34→// ─── Data Types ──────────────────────────────────────────────
+    35→interface Tenant { id: string; name: string; nameEn: string; plan: string; bookings: number; revenue: number; users: number; status: string; createdAt: string; country: string }
+    36→interface PlatformUser { id: string; name: string; email: string; tenant: string; role: string; status: string; lastLogin: string }
+    37→interface SystemLog { id: string; level: string; source: string; message: string; timestamp: string }
+    38→
+    39→// ─── Mock Data ───────────────────────────────────────────────
+    40→const TENANTS: Tenant[] = [
+    41→  { id: '1', name: 'مركز النور الطبي', nameEn: 'Al Noor Medical', plan: 'Enterprise', bookings: 1250, revenue: 187500, users: 12, status: 'active', createdAt: '2025-01-15', country: '🇸🇦 السعودية' },
+    42→  { id: '2', name: 'صالون ياسمين للتجميل', nameEn: 'Yasmin Beauty', plan: 'Professional', bookings: 680, revenue: 54200, users: 8, status: 'active', createdAt: '2025-02-20', country: '🇸🇦 السعودية' },
+    43→  { id: '3', name: 'أكاديمية المستقبل', nameEn: 'Future Academy', plan: 'Professional', bookings: 420, revenue: 38000, users: 6, status: 'active', createdAt: '2025-03-10', country: '🇦🇪 الإمارات' },
+    44→  { id: '4', name: 'عيادة الابتسامة', nameEn: 'Smile Clinic', plan: 'Starter', bookings: 45, revenue: 0, users: 2, status: 'trial', createdAt: '2025-06-01', country: '🇪🇬 مصر' },
+    45→  { id: '5', name: 'نادي اللياقة الذهبية', nameEn: 'Golden Fitness', plan: 'Professional', bookings: 310, revenue: 22000, users: 5, status: 'suspended', createdAt: '2025-01-28', country: '🇯🇴 الأردن' },
+    46→  { id: '6', name: 'مركز التجميل الملكي', nameEn: 'Royal Beauty', plan: 'Enterprise', bookings: 920, revenue: 145000, users: 15, status: 'active', createdAt: '2025-02-01', country: '🇸🇦 السعودية' },
+    47→  { id: '7', name: 'عيادة العيون المتقدمة', nameEn: 'Advanced Eye', plan: 'Business', bookings: 560, revenue: 78000, users: 9, status: 'active', createdAt: '2025-04-15', country: '🇸🇦 السعودية' },
+    48→  { id: '8', name: 'مركز الفيزيوترابي', nameEn: 'Physio Center', plan: 'Starter', bookings: 120, revenue: 8500, users: 3, status: 'trial', createdAt: '2025-05-20', country: '🇰🇼 الكويت' },
+    49→]
+    50→
+    51→const ALL_USERS: PlatformUser[] = [
+    52→  { id: '1', name: 'أحمد المطيري', email: 'ahmed@alnoor.sa', tenant: 'مركز النور الطبي', role: 'مالك', status: 'active', lastLogin: '2025-06-18T14:30:00Z' },
+    53→  { id: '2', name: 'سارة الأحمد', email: 'sara@yasmin.sa', tenant: 'صالون ياسمين', role: 'مدير', status: 'active', lastLogin: '2025-06-18T13:45:00Z' },
+    54→  { id: '3', name: 'محمد العتيبي', email: 'mohammed@goldenfit.com', tenant: 'نادي اللياقة', role: 'مالك', status: 'suspended', lastLogin: '2025-06-10T12:00:00Z' },
+    55→  { id: '4', name: 'فاطمة الحربي', email: 'fatima@alnoor.sa', tenant: 'مركز النور الطبي', role: 'موظف استقبال', status: 'active', lastLogin: '2025-06-18T10:30:00Z' },
+    56→  { id: '5', name: 'خالد الدوسري', email: 'khaled@future-edu.sa', tenant: 'أكاديمية المستقبل', role: 'مالك', status: 'active', lastLogin: '2025-06-17T16:00:00Z' },
+    57→  { id: '6', name: 'نورة القحطاني', email: 'noura@royalbeauty.sa', tenant: 'مركز التجميل الملكي', role: 'مدير', status: 'active', lastLogin: '2025-06-18T09:15:00Z' },
+    58→  { id: '7', name: 'عبدالله الشمري', email: 'abdullah@adv-eye.sa', tenant: 'عيادة العيون', role: 'مالك', status: 'active', lastLogin: '2025-06-18T11:20:00Z' },
+    59→  { id: '8', name: 'ريم السبيعي', email: 'reem@smile-clinic.com', tenant: 'عيادة الابتسامة', role: 'مالك', status: 'active', lastLogin: '2025-06-16T15:00:00Z' },
+    60→]
+    61→
+    62→const LOGS: SystemLog[] = [
+    63→  { id: '1', level: 'success', source: 'الدفع', message: 'دفعة ناجحة: 999 ر.س — Enterprise — مركز النور الطبي', timestamp: '2025-06-18T14:15:00Z' },
+    64→  { id: '2', level: 'info', source: 'المستأجرين', message: 'تسجيل مستأجر جديد: عيادة الابتسامة (Trial)', timestamp: '2025-06-18T14:10:00Z' },
+    65→  { id: '3', level: 'warn', source: 'النظام', message: 'استخدام الذاكرة تجاوز 80% على الخادم #3', timestamp: '2025-06-18T13:55:00Z' },
+    66→  { id: '4', level: 'info', source: 'المستخدمين', message: 'ترقية خطة صالون ياسمين من Starter إلى Professional', timestamp: '2025-06-18T13:45:00Z' },
+    67→  { id: '5', level: 'error', source: 'الدفع', message: 'فشل عملية دفع: بطاقة مسربة — نادي اللياقة الذهبية', timestamp: '2025-06-18T12:30:00Z' },
+    68→  { id: '6', level: 'success', source: 'النظام', message: 'اكتمل النسخ الاحتياطي اليومي بنجاح (2.4 GB)', timestamp: '2025-06-18T06:00:00Z' },
+    69→  { id: '7', level: 'info', source: 'الأمان', message: 'تعليق حساب محمد العتيبي — 3 محاولات فاشلة', timestamp: '2025-06-18T11:00:00Z' },
+    70→  { id: '8', level: 'warn', source: 'الأداء', message: 'زمن استجابة API تجاوز 500ms — /api/bookings', timestamp: '2025-06-18T10:20:00Z' },
+    71→  { id: '9', level: 'success', source: 'المستأجرين', message: 'تفعيل مركز التجميل الملكي بعد الدفع', timestamp: '2025-06-18T09:30:00Z' },
+    72→  { id: '10', level: 'info', source: 'النظام', message: 'تحديث النظام إلى الإصدار 2.5.0 بنجاح', timestamp: '2025-06-18T03:00:00Z' },
+    73→]
+    74→
+    75→// ─── Helper: Status Badge ────────────────────────────────────
+    76→function StatusBadge({ status }: { status: string }) {
+    77→  const map: Record<string, string> = {
+    78→    active: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400',
+    79→    suspended: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400',
+    80→    trial: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400',
+    81→    inactive: 'bg-gray-100 text-gray-600 dark:bg-gray-900/40 dark:text-gray-400',
+    82→  }
+    83→  const labels: Record<string, string> = { active: 'نشط', suspended: 'معلق', trial: 'تجريبي', inactive: 'غير نشط' }
+    84→  return <Badge variant="outline" className={map[status] || ''}>{labels[status] || status}</Badge>
+    85→}
+    86→
+    87→function LogBadge({ level }: { level: string }) {
+    88→  const map: Record<string, string> = {
+    89→    info: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400',
+    90→    warn: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400',
+    91→    error: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400',
+    92→    success: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400',
+    93→  }
+    94→  return <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ${map[level] || ''}`}>{level.toUpperCase()}</span>
+    95→}
+    96→
+    97→// ─── KPI Card ────────────────────────────────────────────────
+    98→function KpiCard({ icon, iconBg, value, label, trend }: { icon: React.ReactNode; iconBg: string; value: string; label: string; trend?: number }) {
+    99→  const isPos = (trend ?? 0) >= 0
+   100→  return (
+   101→    <motion.div variants={item}>
+   102→      <Card className="transition-shadow hover:shadow-md">
+   103→        <CardContent className="flex items-center gap-4 p-4">
+   104→          <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${iconBg}`}>{icon}</div>
+   105→          <div className="min-w-0 flex-1">
+   106→            <p className="text-2xl font-bold tracking-tight">{value}</p>
+   107→            <p className="text-sm text-muted-foreground truncate">{label}</p>
+   108→          </div>
+   109→          {trend !== undefined && (
+   110→            <div className={`flex shrink-0 items-center gap-0.5 text-sm font-medium ${isPos ? 'text-emerald-600' : 'text-red-500'}`}>
+   111→              {isPos ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}
+   112→              {Math.abs(trend)}%
+   113→            </div>
+   114→          )}
+   115→        </CardContent>
+   116→      </Card>
+   117→    </motion.div>
+   118→  )
+   119→}
+   120→
+   121→// ─── Tab: Overview ───────────────────────────────────────────
+   122→function OverviewTab() {
+   123→  const totalRevenue = TENANTS.reduce((s, t) => s + t.revenue, 0)
+   124→  const totalBookings = TENANTS.reduce((s, t) => s + t.bookings, 0)
+   125→  const activeTenants = TENANTS.filter(t => t.status === 'active').length
+   126→
+   127→  return (
+   128→    <div className="space-y-6">
+   129→      <motion.div variants={container} initial="hidden" animate="visible" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+   130→        <KpiCard icon={<Building2 className="h-6 w-6 text-white" />} iconBg="bg-violet-500" value={TENANTS.length.toString()} label="إجمالي المستأجرين" trend={12} />
+   131→        <KpiCard icon={<Users className="h-6 w-6 text-white" />} iconBg="bg-blue-500" value={ALL_USERS.length.toString()} label="إجمالي المستخدمين" trend={8} />
+   132→        <KpiCard icon={<DollarSign className="h-6 w-6 text-white" />} iconBg="bg-amber-500" value={`${(totalRevenue / 1000).toFixed(0)}K`} label="إجمالي الإيرادات (ر.س)" trend={18} />
+   133→        <KpiCard icon={<CalendarDays className="h-6 w-6 text-white" />} iconBg="bg-emerald-500" value={totalBookings.toLocaleString()} label="إجمالي الحجوزات" trend={5} />
+   134→      </motion.div>
+   135→
+   136→      {/* Plans Revenue */}
+   137→      <motion.div variants={fadeUp} initial="hidden" animate="visible" transition={{ delay: 0.1 }}>
+   138→        <Card>
+   139→          <CardHeader><CardTitle className="text-base">الإيرادات حسب الباقة</CardTitle></CardHeader>
+   140→          <CardContent>
+   141→            <div className="space-y-3">
+   142→              {[
+   143→                { name: 'المؤسسية', revenue: TENANTS.filter(t => t.plan === 'Enterprise').reduce((s, t) => s + t.revenue, 0), color: 'bg-violet-500' },
+   144→                { name: 'الأعمال', revenue: TENANTS.filter(t => t.plan === 'Business').reduce((s, t) => s + t.revenue, 0), color: 'bg-blue-500' },
+   145→                { name: 'الاحترافية', revenue: TENANTS.filter(t => t.plan === 'Professional').reduce((s, t) => s + t.revenue, 0), color: 'bg-emerald-500' },
+   146→                { name: 'الأساسية', revenue: TENANTS.filter(t => t.plan === 'Starter').reduce((s, t) => s + t.revenue, 0), color: 'bg-amber-500' },
+   147→              ].map(plan => {
+   148→                const pct = totalRevenue > 0 ? Math.round((plan.revenue / totalRevenue) * 100) : 0
+   149→                return (
+   150→                  <div key={plan.name} className="flex items-center gap-4">
+   151→                    <span className="w-24 text-sm font-medium">{plan.name}</span>
+   152→                    <div className="flex-1 h-3 rounded-full bg-muted overflow-hidden">
+   153→                      <div className={`h-full rounded-full ${plan.color} transition-all duration-700`} style={{ width: `${pct}%` }} />
+   154→                    </div>
+   155→                    <span className="w-20 text-sm font-semibold text-end">{plan.revenue.toLocaleString()} ر.س</span>
+   156→                    <span className="w-10 text-xs text-muted-foreground text-end">{pct}%</span>
+   157→                  </div>
+   158→                )
+   159→              })}
+   160→            </div>
+   161→          </CardContent>
+   162→        </Card>
+   163→      </motion.div>
+   164→
+   165→      {/* Activity + Quick Actions */}
+   166→      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+   167→        <motion.div variants={fadeUp} initial="hidden" animate="visible" transition={{ delay: 0.15 }}>
+   168→          <Card className="h-full">
+   169→            <CardHeader><CardTitle className="flex items-center gap-2"><Activity className="h-5 w-5 text-blue-500" />آخر النشاطات</CardTitle></CardHeader>
+   170→            <CardContent>
+   171→              <ScrollArea className="max-h-64">
+   172→                <div className="space-y-2">
+   173→                  {LOGS.slice(0, 6).map(log => (
+   174→                    <div key={log.id} className="flex gap-3 rounded-lg p-2 hover:bg-muted/50 transition-colors">
+   175→                      <LogBadge level={log.level} />
+   176→                      <div className="min-w-0 flex-1">
+   177→                        <p className="text-sm">{log.message}</p>
+   178→                        <p className="text-xs text-muted-foreground">{log.source} — {new Date(log.timestamp).toLocaleString('ar-SA')}</p>
+   179→                      </div>
+   180→                    </div>
+   181→                  ))}
+   182→                </div>
+   183→              </ScrollArea>
+   184→            </CardContent>
+   185→          </Card>
+   186→        </motion.div>
+   187→
+   188→        <motion.div variants={fadeUp} initial="hidden" animate="visible" transition={{ delay: 0.2 }}>
+   189→          <Card>
+   190→            <CardHeader><CardTitle className="flex items-center gap-2"><Settings className="h-5 w-5 text-violet-500" />إجراءات سريعة</CardTitle></CardHeader>
+   191→            <CardContent>
+   192→              <div className="grid grid-cols-2 gap-3">
+   193→                {[
+   194→                  { icon: <Plus className="h-5 w-5" />, label: 'إضافة مستأجر', color: 'hover:border-violet-300 hover:bg-violet-50/50' },
+   195→                  { icon: <CreditCard className="h-5 w-5" />, label: 'إدارة الباقات', color: 'hover:border-blue-300 hover:bg-blue-50/50' },
+   196→                  { icon: <BarChart3 className="h-5 w-5" />, label: 'تصدير تقرير', color: 'hover:border-emerald-300 hover:bg-emerald-50/50' },
+   197→                  { icon: <RefreshCw className="h-5 w-5" />, label: 'تحديث النظام', color: 'hover:border-amber-300 hover:bg-amber-50/50' },
+   198→                ].map(a => (
+   199→                  <button key={a.label} onClick={() => toast.info(`سيتم فتح: ${a.label}`)} className={`flex flex-col items-center gap-2.5 rounded-xl border p-4 text-center transition-all ${a.color}`}>
+   200→                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-violet-100 text-violet-600">{a.icon}</div>
+   201→                    <span className="text-xs font-medium">{a.label}</span>
+   202→                  </button>
+   203→                ))}
+   204→              </div>
+   205→            </CardContent>
+   206→          </Card>
+   207→        </motion.div>
+   208→      </div>
+   209→    </div>
+   210→  )
+   211→}
+   212→
+   213→// ─── Tab: Tenants ────────────────────────────────────────────
+   214→function TenantsTab() {
+   215→  const [search, setSearch] = useState('')
+   216→  const [statusFilter, setStatusFilter] = useState('all')
+   217→  const [detailOpen, setDetailOpen] = useState(false)
+   218→  const [selected, setSelected] = useState<Tenant | null>(null)
+   219→
+   220→  const filtered = useMemo(() => {
+   221→    let list = [...TENANTS]
+   222→    if (statusFilter !== 'all') list = list.filter(t => t.status === statusFilter)
+   223→    if (search) { const q = search.toLowerCase(); list = list.filter(t => t.name.includes(q) || t.nameEn.toLowerCase().includes(q)) }
+   224→    return list
+   225→  }, [search, statusFilter])
+   226→
+   227→  return (
+   228→    <div className="space-y-4">
+   229→      <div className="flex flex-wrap items-center gap-3">
+   230→        <div className="relative flex-1 min-w-[200px]">
+   231→          <Search className="absolute start-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+   232→          <Input placeholder="بحث بالاسم..." value={search} onChange={e => setSearch(e.target.value)} className="ps-9" />
+   233→        </div>
+   234→        <Select value={statusFilter} onValueChange={setStatusFilter}>
+   235→          <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+   236→          <SelectContent>
+   237→            <SelectItem value="all">الكل</SelectItem>
+   238→            <SelectItem value="active">نشط</SelectItem>
+   239→            <SelectItem value="trial">تجريبي</SelectItem>
+   240→            <SelectItem value="suspended">معلق</SelectItem>
+   241→          </SelectContent>
+   242→        </Select>
+   243→        <Button className="gap-2 bg-violet-600 hover:bg-violet-700"><Plus className="h-4 w-4" />إضافة مستأجر</Button>
+   244→      </div>
+   245→
+   246→      <Card className="p-0">
+   247→        <CardContent className="p-0">
+   248→          <Table>
+   249→            <TableHeader>
+   250→              <TableRow className="bg-muted/50">
+   251→                <TableHead className="ps-4">المستأجر</TableHead>
+   252→                <TableHead>الباقة</TableHead>
+   253→                <TableHead>الحجوزات</TableHead>
+   254→                <TableHead>الإيرادات</TableHead>
+   255→                <TableHead>المستخدمين</TableHead>
+   256→                <TableHead>الحالة</TableHead>
+   257→                <TableHead>التاريخ</TableHead>
+   258→                <TableHead className="pe-4"></TableHead>
+   259→              </TableRow>
+   260→            </TableHeader>
+   261→            <TableBody>
+   262→              {filtered.map(t => (
+   263→                <TableRow key={t.id} className="hover:bg-muted/30 cursor-pointer" onClick={() => { setSelected(t); setDetailOpen(true) }}>
+   264→                  <TableCell className="ps-4">
+   265→                    <div className="flex items-center gap-3">
+   266→                      <div className="h-9 w-9 rounded-lg bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center text-violet-600 font-bold text-sm">{t.name.charAt(0)}</div>
+   267→                      <div>
+   268→                        <p className="font-medium text-sm">{t.name}</p>
+   269→                        <p className="text-xs text-muted-foreground">{t.nameEn}</p>
+   270→                      </div>
+   271→                    </div>
+   272→                  </TableCell>
+   273→                  <TableCell><Badge variant="secondary">{t.plan}</Badge></TableCell>
+   274→                  <TableCell className="font-medium">{t.bookings.toLocaleString()}</TableCell>
+   275→                  <TableCell className="font-medium">{t.revenue.toLocaleString()} ر.س</TableCell>
+   276→                  <TableCell>{t.users}</TableCell>
+   277→                  <TableCell><StatusBadge status={t.status} /></TableCell>
+   278→                  <TableCell className="text-xs text-muted-foreground">{t.createdAt}</TableCell>
+   279→                  <TableCell className="pe-4"><Eye className="h-4 w-4 text-muted-foreground" /></TableCell>
+   280→                </TableRow>
+   281→              ))}
+   282→            </TableBody>
+   283→          </Table>
+   284→        </CardContent>
+   285→      </Card>
+   286→
+   287→      {/* Tenant Detail Dialog */}
+   288→      <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
+   289→        <DialogContent className="max-w-lg">
+   290→          <DialogHeader>
+   291→            <DialogTitle>{selected?.name}</DialogTitle>
+   292→          </DialogHeader>
+   293→          {selected && (
+   294→            <div className="space-y-4">
+   295→              <div className="grid grid-cols-2 gap-4">
+   296→                <div className="rounded-lg bg-muted/50 p-3">
+   297→                  <p className="text-xs text-muted-foreground">الباقة</p>
+   298→                  <p className="font-semibold">{selected.plan}</p>
+   299→                </div>
+   300→                <div className="rounded-lg bg-muted/50 p-3">
+   301→                  <p className="text-xs text-muted-foreground">الحالة</p>
+   302→                  <StatusBadge status={selected.status} />
+   303→                </div>
+   304→                <div className="rounded-lg bg-muted/50 p-3">
+   305→                  <p className="text-xs text-muted-foreground">الحجوزات</p>
+   306→                  <p className="font-semibold">{selected.bookings.toLocaleString()}</p>
+   307→                </div>
+   308→                <div className="rounded-lg bg-muted/50 p-3">
+   309→                  <p className="text-xs text-muted-foreground">الإيرادات</p>
+   310→                  <p className="font-semibold">{selected.revenue.toLocaleString()} ر.س</p>
+   311→                </div>
+   312→                <div className="rounded-lg bg-muted/50 p-3">
+   313→                  <p className="text-xs text-muted-foreground">المستخدمين</p>
+   314→                  <p className="font-semibold">{selected.users}</p>
+   315→                </div>
+   316→                <div className="rounded-lg bg-muted/50 p-3">
+   317→                  <p className="text-xs text-muted-foreground">البلد</p>
+   318→                  <p className="font-semibold">{selected.country}</p>
+   319→                </div>
+   320→              </div>
+   321→              <div className="flex gap-2 pt-2">
+   322→                <Button className="flex-1 gap-2" variant="outline"><Edit className="h-4 w-4" />تعديل</Button>
+   323→                <Button className="flex-1 gap-2" variant="outline"><Eye className="h-4 w-4" />عرض التفاصيل</Button>
+   324→                <Button className="gap-2 text-red-600 hover:bg-red-50" variant="ghost"><Trash2 className="h-4 w-4" /></Button>
+   325→              </div>
+   326→            </div>
+   327→          )}
+   328→          <DialogFooter>
+   329→            <Button variant="outline" onClick={() => setDetailOpen(false)}>إغلاق</Button>
+   330→          </DialogFooter>
+   331→        </DialogContent>
+   332→      </Dialog>
+   333→    </div>
+   334→  )
+   335→}
+   336→
+   337→// ─── Tab: Users ──────────────────────────────────────────────
+   338→function UsersTab() {
+   339→  const [search, setSearch] = useState('')
+   340→  const filtered = useMemo(() => {
+   341→    if (!search) return ALL_USERS
+   342→    const q = search.toLowerCase()
+   343→    return ALL_USERS.filter(u => u.name.includes(q) || u.email.toLowerCase().includes(q) || u.tenant.includes(q))
+   344→  }, [search])
+   345→
+   346→  return (
+   347→    <div className="space-y-4">
+   348→      <div className="flex items-center gap-3">
+   349→        <div className="relative flex-1 max-w-sm">
+   350→          <Search className="absolute start-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+   351→          <Input placeholder="بحث بالاسم أو الإيميل..." value={search} onChange={e => setSearch(e.target.value)} className="ps-9" />
+   352→        </div>
+   353→        <Button className="gap-2 bg-violet-600 hover:bg-violet-700"><UserPlus className="h-4 w-4" />إضافة مستخدم</Button>
+   354→      </div>
+   355→      <Card className="p-0">
+   356→        <CardContent className="p-0">
+   357→          <Table>
+   358→            <TableHeader>
+   359→              <TableRow className="bg-muted/50">
+   360→                <TableHead className="ps-4">المستخدم</TableHead>
+   361→                <TableHead>البريد</TableHead>
+   362→                <TableHead>المستأجر</TableHead>
+   363→                <TableHead>الدور</TableHead>
+   364→                <TableHead>الحالة</TableHead>
+   365→                <TableHead>آخر دخول</TableHead>
+   366→              </TableRow>
+   367→            </TableHeader>
+   368→            <TableBody>
+   369→              {filtered.map(u => (
+   370→                <TableRow key={u.id} className="hover:bg-muted/30">
+   371→                  <TableCell className="ps-4 font-medium">{u.name}</TableCell>
+   372→                  <TableCell className="text-muted-foreground" dir="ltr">{u.email}</TableCell>
+   373→                  <TableCell>{u.tenant}</TableCell>
+   374→                  <TableCell><Badge variant="secondary">{u.role}</Badge></TableCell>
+   375→                  <TableCell><StatusBadge status={u.status} /></TableCell>
+   376→                  <TableCell className="text-xs text-muted-foreground">{new Date(u.lastLogin).toLocaleString('ar-SA')}</TableCell>
+   377→                </TableRow>
+   378→              ))}
+   379→            </TableBody>
+   380→          </Table>
+   381→        </CardContent>
+   382→      </Card>
+   383→    </div>
+   384→  )
+   385→}
+   386→
+   387→// ─── Tab: System Health ──────────────────────────────────────
+   388→function SystemTab() {
+   389→  const healthItems = [
+   390→    { label: 'API Server', value: 99, status: 'healthy' as const, icon: <Server className="h-4 w-4" /> },
+   391→    { label: 'Database', value: 85, status: 'healthy' as const, icon: <Database className="h-4 w-4" /> },
+   392→    { label: 'Memory', value: 78, status: 'healthy' as const, icon: <Activity className="h-4 w-4" /> },
+   393→    { label: 'Disk Space', value: 62, status: 'healthy' as const, icon: <Server className="h-4 w-4" /> },
+   394→    { label: 'CDN', value: 100, status: 'healthy' as const, icon: <Globe className="h-4 w-4" /> },
+   395→    { label: 'Queue Worker', value: 95, status: 'healthy' as const, icon: <RefreshCw className="h-4 w-4" /> },
+   396→  ]
+   397→  const colors = { healthy: 'text-emerald-500', warning: 'text-amber-500', critical: 'text-red-500' }
+   398→
+   399→  return (
+   400→    <div className="space-y-6">
+   401→      <motion.div variants={container} initial="hidden" animate="visible" className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+   402→        {healthItems.map(h => (
+   403→          <motion.div key={h.label} variants={item} className="flex flex-col items-center gap-2 rounded-xl border p-4">
+   404→            <div className="relative flex h-16 w-16 items-center justify-center">
+   405→              <svg className={`h-16 w-16 -rotate-90 ${colors[h.status]}`} viewBox="0 0 64 64">
+   406→                <circle cx="32" cy="32" r="28" fill="none" stroke="currentColor" strokeWidth="5" className="opacity-15" />
+   407→                <circle cx="32" cy="32" r="28" fill="none" stroke="currentColor" strokeWidth="5" strokeDasharray={`${2 * Math.PI * 28 * (h.value / 100)} ${2 * Math.PI * 28}`} strokeLinecap="round" />
+   408→              </svg>
+   409→              <span className="absolute text-sm font-bold">{h.value}%</span>
+   410→            </div>
+   411→            <div className="flex items-center gap-1 text-muted-foreground">{h.icon}<span className="text-xs font-medium">{h.label}</span></div>
+   412→          </motion.div>
+   413→        ))}
+   414→      </motion.div>
+   415→
+   416→      {/* Audit Logs */}
+   417→      <motion.div variants={fadeUp} initial="hidden" animate="visible" transition={{ delay: 0.1 }}>
+   418→        <Card>
+   419→          <CardHeader><CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5 text-violet-500" />سجل النظام</CardTitle></CardHeader>
+   420→          <CardContent>
+   421→            <ScrollArea className="max-h-80">
+   422→              <div className="space-y-2">
+   423→                {LOGS.map(log => (
+   424→                  <div key={log.id} className="flex gap-3 rounded-lg p-2.5 hover:bg-muted/50 transition-colors">
+   425→                    <LogBadge level={log.level} />
+   426→                    <div className="min-w-0 flex-1">
+   427→                      <p className="text-sm">{log.message}</p>
+   428→                      <p className="text-xs text-muted-foreground">{log.source} — {new Date(log.timestamp).toLocaleString('ar-SA')}</p>
+   429→                    </div>
+   430→                  </div>
+   431→                ))}
+   432→              </div>
+   433→            </ScrollArea>
+   434→          </CardContent>
+   435→        </Card>
+   436→      </motion.div>
+   437→    </div>
+   438→  )
+   439→}
+   440→
+   441→// ─── Placeholder for other tabs ──────────────────────────────
+   442→function PlaceholderTab({ title }: { title: string }) {
+   443→  return (
+   444→    <div className="flex flex-col items-center justify-center py-20 text-center">
+   445→      <div className="rounded-2xl bg-violet-50 dark:bg-violet-950/20 p-6 mb-4">
+   446→        <Shield className="h-12 w-12 text-violet-500" />
+   447→      </div>
+   448→      <h2 className="text-2xl font-bold mb-2">{title}</h2>
+   449→      <p className="text-muted-foreground">هذه الصفحة قيد التطوير وستكون متاحة قريبًا</p>
+   450→      <Badge variant="secondary" className="mt-4">قادم قريبًا</Badge>
+   451→    </div>
+   452→  )
+   453→}
+   454→
+   455→// ─── Main Component ──────────────────────────────────────────
+   456→export function SuperAdminDashboard() {
+   457→  const { superAdminView } = useAppStore()
+   458→  const [activeTab, setActiveTab] = useState('overview')
+   459→
+   460→  // Map sidebar view to tab
+   461→  const viewToTab: Record<string, string> = {
+   462→    sa_overview: 'overview',
+   463→    sa_tenants: 'tenants',
+   464→    sa_users: 'users',
+   465→    sa_system: 'system',
+   466→    sa_audit: 'system',
+   467→  }
+   468→
+   469→  const currentTab = viewToTab[superAdminView] || 'overview'
+   470→
+   471→  return (
+   472→    <Tabs value={currentTab} onValueChange={setActiveTab} className="space-y-6">
+   473→      <TabsList className="bg-muted/50">
+   474→        <TabsTrigger value="overview" className="gap-1.5"><BarChart3 className="h-4 w-4" />نظرة عامة</TabsTrigger>
+   475→        <TabsTrigger value="tenants" className="gap-1.5"><Building2 className="h-4 w-4" />المستأجرين</TabsTrigger>
+   476→        <TabsTrigger value="users" className="gap-1.5"><Users className="h-4 w-4" />المستخدمين</TabsTrigger>
+   477→        <TabsTrigger value="system" className="gap-1.5"><Server className="h-4 w-4" />النظام</TabsTrigger>
+   478→      </TabsList>
+   479→
+   480→      <TabsContent value="overview"><OverviewTab /></TabsContent>
+   481→      <TabsContent value="tenants"><TenantsTab /></TabsContent>
+   482→      <TabsContent value="users"><UsersTab /></TabsContent>
+   483→      <TabsContent value="system"><SystemTab /></TabsContent>
+   484→    </Tabs>
+   485→  )
+   486→}

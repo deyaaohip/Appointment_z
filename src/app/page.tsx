@@ -377,18 +377,8 @@ export default function Home() {
         <SuperAdminSidebar />
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
           <SuperAdminHeader />
-          <main dir={dir} className="flex-1 overflow-auto p-4 sm:p-6">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={superAdminView}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.2 }}
-              >
-                <SuperAdminDashboard />
-              </motion.div>
-            </AnimatePresence>
+          <main className="flex-1 overflow-auto">
+            <SuperAdminDashboard />
           </main>
         </div>
       </div>

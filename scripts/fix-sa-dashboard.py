@@ -1,4 +1,7 @@
-'use client'
+# This script generates the complete SuperAdminDashboard component
+import os
+
+content = r"""'use client'
 
 import { useState, useMemo, useCallback, useEffect } from 'react'
 import { motion } from 'framer-motion'
@@ -954,3 +957,9 @@ export function SuperAdminDashboard() {
     </motion.div>
   )
 }
+"""
+
+filepath = '/home/z/my-project/src/components/super-admin/super-admin-dashboard.tsx'
+with open(filepath, 'w', encoding='utf-8') as f:
+    f.write(content)
+print(f'Written {len(content)} chars to {filepath}')

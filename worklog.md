@@ -1,20 +1,23 @@
 ---
 Task ID: 1
-Agent: main
-Task: Fix Internal Server Error on preview URL - add demo mode fallback
+Agent: Main Agent
+Task: Fix super admin dashboard crash and rebuild all 14 pages with responsive design and working buttons
 
 Work Log:
-- Diagnosed root cause: preview URL runs as serverless function where SQLite DB is unavailable
-- Created /src/lib/demo-data.ts with rich Arabic demo data (10 customers, 5 employees, 8 services, 4 branches, 18 bookings, 3 coupons, etc.)
-- Created /src/lib/demo-mode.ts with isDatabaseAvailable() detector
-- Created /src/lib/demo-responses.ts with response builders matching every API route shape
-- Rewrote /src/app/api/auth/route.ts to auto-fallback to demo mode when DB fails
-- Added demo fallback to 16 collection routes via automated script
-- Added demo fallback to 8 [id] routes via subagent (23 handlers total)
-- Updated CORS origins to include https://y12n35wyv181-d.space-z.ai
-- Local testing confirms all APIs still work with real DB
+- Investigated crash: missing imports (Globe, UserPlus) in super-admin-dashboard.tsx caused "This page couldn't load"
+- Removed duplicate old file at /components/admin/super-admin-dashboard.tsx
+- Rewrote /components/super-admin/super-admin-dashboard.tsx (74K chars) with all 14 functional pages
+- Fixed /components/super-admin/super-admin-sidebar.tsx for RTL-aware collapse button, mobile Sheet, removed duplicate menu button
+- Fixed /app/page.tsx to remove redundant AnimatePresence wrapper around SA dashboard
+- All 14 pages now have working buttons: add/edit/delete/suspend with dialogs, toast feedback
+- Responsive design: mobile-first grids, scrollable tables, hidden columns on small screens
+- Security: useEffect token validation, auto-redirect if no auth
+- Performance: useMemo for filtered data, useCallback for handlers, lazy page rendering via PAGE_MAP
 
 Stage Summary:
-- All 25 API routes now support demo mode fallback
-- Auth route catches ALL errors and falls back to demo login
-- Preview URL should now work without SQLite database
+- Super admin dashboard now loads without crash
+- All 14 pages implemented: overview, tenants, users, plans, billing, roles, audit, notifications, reports, system health, servers, database, security, settings
+- All buttons functional with proper dialogs, confirmations, and toast feedback
+- Fully responsive for mobile/tablet/desktop
+- RTL-aware sidebar collapse button
+- Build passes with zero errors
