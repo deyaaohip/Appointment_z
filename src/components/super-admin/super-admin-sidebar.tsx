@@ -232,7 +232,7 @@ export function SuperAdminSidebar() {
   if (isMobile) {
     return (
       <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
-        <SheetContent side={isRTL ? 'right' : 'left'} className="w-72 p-0">
+        <SheetContent side={isRTL ? 'right' : 'left'} className="w-72 p-0" dir={isRTL ? 'rtl' : 'ltr'}>
           <SheetTitle className="sr-only">القائمة</SheetTitle>
           <SidebarContent collapsed={false} onNavigate={() => setSidebarOpen(false)} />
         </SheetContent>
@@ -246,6 +246,7 @@ export function SuperAdminSidebar() {
         animate={{ width: collapsed ? 64 : 256 }}
         transition={{ duration: 0.2, ease: 'easeInOut' }}
         className="flex flex-col border-e bg-background h-screen sticky top-0 overflow-hidden"
+        dir={isRTL ? 'rtl' : 'ltr'}
       >
         {/* Collapse toggle */}
         <button
