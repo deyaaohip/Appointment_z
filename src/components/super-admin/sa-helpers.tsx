@@ -13,6 +13,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Search, ArrowUp, ArrowDown, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useT, type Lang } from './sa-i18n'
 import { useAppStore } from '@/stores/app-store'
+import { currencyLabel } from './sa-data'
+
+// ─── Currency display helper ────────────────────────────────────
+export function useCurrency() {
+  const { locale, customCurrency } = useAppStore()
+  const sym = currencyLabel(locale, customCurrency)
+  const fmt = (amount: number) => `${amount.toLocaleString(locale === 'ar' ? 'ar-JO' : 'en-JO')} ${sym}`
+  return { sym, fmt, currency: customCurrency }
+}
 
 // ─── Animation variants ─────────────────────────────────────────
 export const fade = { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.25 } } }
@@ -39,6 +48,10 @@ const STATUS_MAP: Record<string, { cls: string; ar: string; en: string }> = {
   healthy:   { cls: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400', ar: 'سليم', en: 'Healthy' },
   warning:   { cls: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400', ar: 'تحذير', en: 'Warning' },
   critical:  { cls: 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-400', ar: 'حرج', en: 'Critical' },
+  pending_verification: { cls: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400', ar: 'قيد التحقق', en: 'Pending Verification' },
+  approved:  { cls: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400', ar: 'مقبول', en: 'Approved' },
+  rejected:  { cls: 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-400', ar: 'مرفوض', en: 'Rejected' },
+  info_requested: { cls: 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/40 dark:text-sky-400', ar: 'مطلوب معلومات', en: 'Info Requested' },
 }
 
 export function StatusBadge({ status, locale }: { status: string; locale?: string }) {

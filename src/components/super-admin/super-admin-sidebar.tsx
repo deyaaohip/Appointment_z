@@ -15,7 +15,7 @@ import {
   LayoutDashboard, Building2, Users, Shield, Settings, Activity,
   CreditCard, Database, Server, BarChart3, FileText,
   LogOut, ChevronRight, Menu, ShieldCheck, Lock, Globe, Wrench,
-  Bell, UserCog, ChevronLeft,
+  Bell, UserCog, ChevronLeft, Wallet,
 } from 'lucide-react'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -30,6 +30,7 @@ const NAV_ITEMS = [
   { id: 'sa_users', ar: 'إدارة المستخدمين', en: 'Users', icon: Users, section: 'main' },
   { id: 'sa_plans', ar: 'الباقات والاشتراكات', en: 'Plans', icon: CreditCard, section: 'main' },
   { id: 'sa_billing', ar: 'الفواتير والمدفوعات', en: 'Billing', icon: FileText, section: 'main' },
+  { id: 'sa_cliq', ar: 'مدفوعات CLIQ', en: 'CLIQ Payments', icon: Wallet, section: 'main' },
   { id: 'sa_roles', ar: 'الأدوار والصلاحيات', en: 'Roles', icon: Shield, section: 'management' },
   { id: 'sa_audit', ar: 'سجل العمليات', en: 'Audit Logs', icon: FileText, section: 'management' },
   { id: 'sa_notifications', ar: 'الإشعارات', en: 'Notifications', icon: Bell, section: 'management' },
@@ -206,6 +207,7 @@ export function SuperAdminHeader() {
     sa_users: t.userMgmt,
     sa_plans: t.plansTitle,
     sa_billing: t.billingTitle,
+    sa_cliq: t.cliqTitle,
     sa_roles: t.rolesTitle,
     sa_audit: t.auditTitle,
     sa_notifications: t.notificationsTitle,

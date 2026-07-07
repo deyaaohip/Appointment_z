@@ -175,7 +175,6 @@ interface T {
   serversTitle: string
   addServer: string
   restart: string
-  details: string
   requests: string
   addServerDlg: string
   serverName: string
@@ -249,6 +248,64 @@ interface T {
   sortAsc: string
   sortDesc: string
 
+  // Overview audit additions
+  expiredSubs: string
+  pendingRequests: string
+  monthlyRevenue: string
+  recentPayments: string
+  systemNotifications: string
+  quickActions: string
+
+  // CLIQ Payment Gateway
+  cliqTitle: string
+  cliqSettings: string
+  cliqEnabled: string
+  cliqEnabledDesc: string
+  cliqBankName: string
+  cliqAccountHolder: string
+  cliqAlias: string
+  cliqInstructions: string
+  cliqQrCode: string
+  cliqSupportContact: string
+  cliqUploadQr: string
+  cliqPending: string
+  cliqApproved: string
+  cliqRejected: string
+  cliqInfoRequested: string
+  cliqReferenceNo: string
+  cliqCustomer: string
+  cliqSubmissionDate: string
+  cliqScreenshot: string
+  cliqNotes: string
+  cliqApprove: string
+  cliqReject: string
+  cliqRequestInfo: string
+  cliqApproveDesc: string
+  cliqRejectDesc: string
+  cliqApprovedMsg: string
+  cliqRejectedMsg: string
+  cliqInfoRequestedMsg: string
+  cliqRejectionReason: string
+  cliqEnterReason: string
+  cliqInfoRequestPrompt: string
+  cliqNoScreenshot: string
+  cliqTotalPending: string
+  cliqTotalApproved: string
+  cliqTotalRejected: string
+  cliqNoPayments: string
+  cliqPaymentMethod: string
+  cliqTransferInfo: string
+  cliqTransferComplete: string
+  cliqReferenceRequired: string
+  cliqDuplicateRef: string
+  cliqSubmitPayment: string
+  cliqPaymentSubmitted: string
+  cliqWaitingVerification: string
+  cliqResubmit: string
+  cliqAuditApprove: string
+  cliqAuditReject: string
+  cliqAuditInfo: string
+
   // Super Admin labels
   superAdmin: string
   superAdminDashboard: string
@@ -276,6 +333,7 @@ interface T {
   navDatabase: string
   navSecurity: string
   navSettings: string
+  navCliq: string
 
   // Report names
   reportRevenue: string
@@ -428,6 +486,11 @@ const ar: T = {
   userDeleted: 'تم حذف المستخدم',
   willOpenPlanEditor: 'سيتم فتح تعديل الباقة',
   willOpenCreatePlan: 'سيتم فتح نموذج إنشاء باقة جديدة',
+  serverRestarted: 'تم إعادة تشغيل الخادم',
+  serverDeleted: 'تم حذف الخادم',
+  reportGenerated: 'تم توليد التقرير',
+  reportDownloaded: 'جاري تنزيل التقرير...',
+  planDetails: 'تفاصيل الباقة',
   // Billing
   billingTitle: 'الفواتير والمدفوعات',
   createInvoice: 'إنشاء فاتورة',
@@ -497,7 +560,6 @@ const ar: T = {
   serversTitle: 'الخوادم',
   addServer: 'إضافة خادم',
   restart: 'إعادة تشغيل',
-  details: 'تفاصيل',
   requests: 'الطلبات',
   addServerDlg: 'إضافة خادم',
   serverName: 'اسم الخادم',
@@ -590,6 +652,63 @@ const ar: T = {
   navDatabase: 'قاعدة البيانات',
   navSecurity: 'الأمان',
   navSettings: 'إعدادات المنصة',
+  navCliq: 'مدفوعات CLIQ',
+  // Overview audit additions
+  expiredSubs: 'اشتراكات منتهية',
+  pendingRequests: 'طلبات معلقة',
+  monthlyRevenue: 'إيرادات الشهر',
+  recentPayments: 'المدفوعات الأخيرة',
+  systemNotifications: 'إشعارات النظام',
+  quickActions: 'إجراءات سريعة',
+  // CLIQ Payment Gateway
+  cliqTitle: 'مدفوعات CLIQ المعلقة',
+  cliqSettings: 'إعدادات الدفع CLIQ',
+  cliqEnabled: 'تفعيل دفع CLIQ',
+  cliqEnabledDesc: 'السماح للعملاء بالدفع عبر تحويل CLIQ',
+  cliqBankName: 'اسم البنك',
+  cliqAccountHolder: 'صاحب الحساب',
+  cliqAlias: 'CLIQ Alias',
+  cliqInstructions: 'تعليمات الدفع',
+  cliqQrCode: 'رمز QR (اختياري)',
+  cliqSupportContact: 'معلومات الدعم',
+  cliqUploadQr: 'رفع رمز QR',
+  cliqPending: 'قيد التحقق',
+  cliqApproved: 'مقبول',
+  cliqRejected: 'مرفوض',
+  cliqInfoRequested: 'مطلوب معلومات',
+  cliqReferenceNo: 'رقم المرجع',
+  cliqCustomer: 'العميل',
+  cliqSubmissionDate: 'تاريخ التقديم',
+  cliqScreenshot: 'لقطة الشاشة',
+  cliqNotes: 'ملاحظات',
+  cliqApprove: 'قبول الدفعة',
+  cliqReject: 'رفض الدفعة',
+  cliqRequestInfo: 'طلب معلومات',
+  cliqApproveDesc: 'هل أنت متأكد من قبول هذا الدفع؟ سيتم تفعيل الاشتراك تلقائياً.',
+  cliqRejectDesc: 'هل أنت متأكد من رفض هذا الدفع؟',
+  cliqApprovedMsg: 'تم قبول الدفعة وتفعيل الاشتراك',
+  cliqRejectedMsg: 'تم رفض الدفعة',
+  cliqInfoRequestedMsg: 'تم طلب معلومات إضافية من العميل',
+  cliqRejectionReason: 'سبب الرفض',
+  cliqEnterReason: 'أدخل سبب الرفض',
+  cliqInfoRequestPrompt: 'ما هي المعلومات الإضافية المطلوبة؟',
+  cliqNoScreenshot: 'لم يتم رفع لقطة',
+  cliqTotalPending: 'إجمالي المعلق',
+  cliqTotalApproved: 'إجمالي المقبول',
+  cliqTotalRejected: 'إجمالي المرفوض',
+  cliqNoPayments: 'لا توجد مدفوعات CLIQ معلقة',
+  cliqPaymentMethod: 'CLIQ (تحويل بنكي)',
+  cliqTransferInfo: 'معلومات التحويل',
+  cliqTransferComplete: 'قم بإتمام التحويل ثم أدخل رقم المرجع',
+  cliqReferenceRequired: 'رقم المرجع مطلوب',
+  cliqDuplicateRef: 'رقم المرجع مستخدم مسبقاً',
+  cliqSubmitPayment: 'تقديم إثبات الدفع',
+  cliqPaymentSubmitted: 'تم تقديم إثبات الدفع بنجاح. سيتم مراجعته من قبل الإدارة.',
+  cliqWaitingVerification: 'في انتظار التحقق من الدفعة',
+  cliqResubmit: 'إعادة تقديم',
+  cliqAuditApprove: 'تم قبول دفع CLIQ',
+  cliqAuditReject: 'تم رفض دفع CLIQ',
+  cliqAuditInfo: 'تم طلب معلومات إضافية لدفع CLIQ',
   // Reports
   reportRevenue: 'تقرير الإيرادات الشهري',
   reportRevenueDesc: 'ملخص شامل للإيرادات حسب المستأجر والباقة',
@@ -629,15 +748,6 @@ const ar: T = {
   confirmDeleteServer: 'هل أنت متأكد من حذف هذا الخادم؟',
   confirmDeleteRole: 'هل أنت متأكد من حذف هذا الدور؟',
   confirmDeleteTemplate: 'هل أنت متأكد من حذف هذا القالب؟',
-  // Actions
-  serverRestarted: 'تم إعادة تشغيل الخادم',
-  serverDeleted: 'تم حذف الخادم',
-  roleDeleted: 'تم حذف الدور',
-  roleUpdated: 'تم تحديث الدور',
-  userDeleted: 'تم حذف المستخدم',
-  reportGenerated: 'تم توليد التقرير',
-  reportDownloaded: 'جاري تنزيل التقرير...',
-  planDetails: 'تفاصيل الباقة',
 }
 
 const en: T = {
@@ -669,7 +779,7 @@ const en: T = {
   recentActivity: 'Recent Activity',
   activeTenants: 'Active Tenants',
   details: 'Details',
-  perMonth: 'SAR / month',
+  perMonth: 'JOD / month',
   tenantMgmt: 'Tenant Management',
   addTenant: 'Add Tenant',
   tenantSearch: 'Search by name or email...',
@@ -731,6 +841,11 @@ const en: T = {
   userDeleted: 'User deleted',
   willOpenPlanEditor: 'Plan editor will open',
   willOpenCreatePlan: 'Create plan form will open',
+  serverRestarted: 'Server restarted',
+  serverDeleted: 'Server deleted',
+  reportGenerated: 'Report generated',
+  reportDownloaded: 'Downloading report...',
+  planDetails: 'Plan Details',
   billingTitle: 'Billing & Payments',
   createInvoice: 'Create Invoice',
   payments: 'Payments',
@@ -793,7 +908,6 @@ const en: T = {
   serversTitle: 'Servers',
   addServer: 'Add Server',
   restart: 'Restart',
-  details: 'Details',
   requests: 'Requests',
   addServerDlg: 'Add Server',
   serverName: 'Server Name',
@@ -878,6 +992,63 @@ const en: T = {
   navDatabase: 'Database',
   navSecurity: 'Security',
   navSettings: 'Settings',
+  navCliq: 'CLIQ Payments',
+  // Overview audit additions
+  expiredSubs: 'Expired Subscriptions',
+  pendingRequests: 'Pending Requests',
+  monthlyRevenue: 'Monthly Revenue',
+  recentPayments: 'Recent Payments',
+  systemNotifications: 'System Notifications',
+  quickActions: 'Quick Actions',
+  // CLIQ Payment Gateway
+  cliqTitle: 'Pending CLIQ Payments',
+  cliqSettings: 'CLIQ Payment Settings',
+  cliqEnabled: 'Enable CLIQ Payment',
+  cliqEnabledDesc: 'Allow customers to pay via CLIQ bank transfer',
+  cliqBankName: 'Bank Name',
+  cliqAccountHolder: 'Account Holder Name',
+  cliqAlias: 'CLIQ Alias',
+  cliqInstructions: 'Payment Instructions',
+  cliqQrCode: 'QR Code (Optional)',
+  cliqSupportContact: 'Support Contact',
+  cliqUploadQr: 'Upload QR Code',
+  cliqPending: 'Pending Verification',
+  cliqApproved: 'Approved',
+  cliqRejected: 'Rejected',
+  cliqInfoRequested: 'Info Requested',
+  cliqReferenceNo: 'Reference Number',
+  cliqCustomer: 'Customer',
+  cliqSubmissionDate: 'Submission Date',
+  cliqScreenshot: 'Screenshot',
+  cliqNotes: 'Notes',
+  cliqApprove: 'Approve Payment',
+  cliqReject: 'Reject Payment',
+  cliqRequestInfo: 'Request Info',
+  cliqApproveDesc: 'Are you sure? The subscription will be activated automatically.',
+  cliqRejectDesc: 'Are you sure you want to reject this payment?',
+  cliqApprovedMsg: 'Payment approved and subscription activated',
+  cliqRejectedMsg: 'Payment rejected',
+  cliqInfoRequestedMsg: 'Additional information requested from customer',
+  cliqRejectionReason: 'Rejection Reason',
+  cliqEnterReason: 'Enter rejection reason',
+  cliqInfoRequestPrompt: 'What additional information is needed?',
+  cliqNoScreenshot: 'No screenshot uploaded',
+  cliqTotalPending: 'Total Pending',
+  cliqTotalApproved: 'Total Approved',
+  cliqTotalRejected: 'Total Rejected',
+  cliqNoPayments: 'No pending CLIQ payments',
+  cliqPaymentMethod: 'CLIQ (Bank Transfer)',
+  cliqTransferInfo: 'Transfer Information',
+  cliqTransferComplete: 'Complete the transfer then enter the reference number',
+  cliqReferenceRequired: 'Reference number is required',
+  cliqDuplicateRef: 'This reference number is already used',
+  cliqSubmitPayment: 'Submit Payment Proof',
+  cliqPaymentSubmitted: 'Payment proof submitted successfully. It will be reviewed by administration.',
+  cliqWaitingVerification: 'Waiting for payment verification',
+  cliqResubmit: 'Resubmit',
+  cliqAuditApprove: 'CLIQ payment approved',
+  cliqAuditReject: 'CLIQ payment rejected',
+  cliqAuditInfo: 'CLIQ payment: additional info requested',
   reportRevenue: 'Monthly Revenue Report',
   reportRevenueDesc: 'Comprehensive revenue summary by tenant and plan',
   reportGrowth: 'Growth Report',
@@ -915,15 +1086,6 @@ const en: T = {
   confirmDeleteServer: 'Are you sure you want to delete this server?',
   confirmDeleteRole: 'Are you sure you want to delete this role?',
   confirmDeleteTemplate: 'Are you sure you want to delete this template?',
-  // Actions
-  serverRestarted: 'Server restarted',
-  serverDeleted: 'Server deleted',
-  roleDeleted: 'Role deleted',
-  roleUpdated: 'Role updated',
-  userDeleted: 'User deleted',
-  reportGenerated: 'Report generated',
-  reportDownloaded: 'Downloading report...',
-  planDetails: 'Plan Details',
 }
 
 const translations: Record<Lang, T> = { ar, en }

@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import type { Locale } from '@/lib/i18n'
 import type { PermissionMap } from '@/types'
 import { getPermissionsForPlan, getCanViewResources, generateNavItems, generateNavSections, SUPERADMIN_NAV, type NavItemDef } from '@/lib/permissions'
+import { getPlanPermissions } from '@/lib/subscription/plans'
 
 export type AppMode = 'landing' | 'app' | 'super_admin'
 
@@ -141,11 +142,14 @@ export const useAppStore = create<AppState>((set, get) => ({
   setSubscription: (sub) => {
     const updated = { ...get().subscription, ...sub }
     set({ subscription: updated })
-    // Generate nav items from new permissions
-    const perms = sub.permissions || {}
-    const planPerms = getPermissionsForPlan(sub.planSlug)
-    const finalPerms = Object.keys(planPerms).length > 0 ? planPerms : perms
+    // Get permissions from the new plan definition (single source of truth)
+    const planPerms = getPlanPermissions(sub.planSlug)
+    // Merge: use new plan perms, fall back to provided perms, then old perms
+    const finalPerms = Object.keys(planPerms).length > 0
+      ? planPerms
+      : (sub.permissions || get().subscription.permissions || {})
     set({ userPermissions: finalPerms })
+    // Regenerate nav items for any code that uses them
     const navItems = generateNavItems(finalPerms, get().isSuperAdmin)
     set({ navItems })
   },
@@ -153,7 +157,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   // White Label / Brand
   brandSettings: {},
   setBrandSettings: (settings) => set({ brandSettings: settings }),
-  customCurrency: 'SAR',
+  customCurrency: 'JOD',
   setCustomCurrency: (currency) => set({ customCurrency: currency }),
   customTimezone: 'Asia/Riyadh',
   setCustomTimezone: (tz) => set({ customTimezone: tz }),

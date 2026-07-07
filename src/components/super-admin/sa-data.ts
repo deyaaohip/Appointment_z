@@ -1,3 +1,19 @@
+// ─── Currency ────────────────────────────────────────────────────
+export const DEFAULT_CURRENCY = 'JOD'
+export const CURRENCY_SYMBOLS: Record<string, { ar: string; en: string }> = {
+  JOD: { ar: 'د.أ', en: 'JOD' },
+  SAR: { ar: 'ر.س', en: 'SAR' },
+  AED: { ar: 'د.إ', en: 'AED' },
+  USD: { ar: '$', en: 'USD' },
+  EGP: { ar: 'ج.م', en: 'EGP' },
+}
+
+export function currencyLabel(locale: string, currency?: string): string {
+  const c = currency || DEFAULT_CURRENCY
+  const sym = CURRENCY_SYMBOLS[c] || CURRENCY_SYMBOLS.JOD
+  return locale === 'en' ? sym.en : sym.ar
+}
+
 // ─── Types ───────────────────────────────────────────────────────
 export interface Tenant {
   id: string
@@ -11,6 +27,8 @@ export interface Tenant {
   createdAt: string
   country: string
   email: string
+  subscriptionStatus: string
+  subscriptionEndDate: string
 }
 
 export interface PlatformUser {
@@ -42,6 +60,7 @@ export interface Invoice {
   status: string
   date: string
   plan: string
+  currency: string
 }
 
 export interface Role {
@@ -62,6 +81,7 @@ export interface Plan {
   features: { ar: string; en: string }[]
   color: string
   popular: boolean
+  currency: string
 }
 
 export interface Server {
@@ -114,19 +134,50 @@ export interface Report {
   last: string
 }
 
+export interface CliqConfig {
+  enabled: boolean
+  bankName: string
+  accountHolder: string
+  cliqAlias: string
+  instructions: string
+  instructionsEn: string
+  qrCodeUrl: string | null
+  supportContact: string
+}
+
+export interface CliqPayment {
+  id: string
+  tenantName: string
+  tenantNameEn: string
+  customerName: string
+  customerEmail: string
+  plan: string
+  amount: number
+  currency: string
+  referenceNumber: string
+  notes: string
+  screenshotUrl: string | null
+  status: 'pending_verification' | 'approved' | 'rejected' | 'info_requested'
+  submittedAt: string
+  reviewedAt: string | null
+  reviewedBy: string | null
+  rejectionReason: string | null
+  additionalInfoRequest: string | null
+}
+
 export type SortDir = 'asc' | 'desc'
 export interface SortState { key: string; dir: SortDir }
 
-// ─── Mock Data (bilingual) ──────────────────────────────────────
+// ─── Mock Data (bilingual, JOD currency) ─────────────────────────
 export const INIT_TENANTS: Tenant[] = [
-  { id: '1', name: 'مركز النور الطبي', nameEn: 'Al Noor Medical', plan: 'Enterprise', bookings: 1250, revenue: 187500, users: 12, status: 'active', createdAt: '2025-01-15', country: 'السعودية', email: 'info@alnoor.sa' },
-  { id: '2', name: 'صالون ياسمين', nameEn: 'Yasmin Beauty', plan: 'Professional', bookings: 680, revenue: 54200, users: 8, status: 'active', createdAt: '2025-02-20', country: 'السعودية', email: 'info@yasmin.sa' },
-  { id: '3', name: 'أكاديمية المستقبل', nameEn: 'Future Academy', plan: 'Professional', bookings: 420, revenue: 38000, users: 6, status: 'active', createdAt: '2025-03-10', country: 'الإمارات', email: 'info@future-edu.sa' },
-  { id: '4', name: 'عيادة الابتسامة', nameEn: 'Smile Clinic', plan: 'Starter', bookings: 45, revenue: 0, users: 2, status: 'trial', createdAt: '2025-06-01', country: 'مصر', email: 'info@smile.eg' },
-  { id: '5', name: 'نادي اللياقة الذهبية', nameEn: 'Golden Fitness', plan: 'Professional', bookings: 310, revenue: 22000, users: 5, status: 'suspended', createdAt: '2025-01-28', country: 'الأردن', email: 'info@goldenfit.jo' },
-  { id: '6', name: 'مركز التجميل الملكي', nameEn: 'Royal Beauty', plan: 'Enterprise', bookings: 920, revenue: 145000, users: 15, status: 'active', createdAt: '2025-02-01', country: 'السعودية', email: 'info@royalbeauty.sa' },
-  { id: '7', name: 'عيادة العيون المتقدمة', nameEn: 'Advanced Eye Clinic', plan: 'Business', bookings: 580, revenue: 72000, users: 10, status: 'active', createdAt: '2025-01-20', country: 'السعودية', email: 'info@adv-eye.sa' },
-  { id: '8', name: 'مركز اللياقة البدنية', nameEn: 'Fit Life Center', plan: 'Starter', bookings: 120, revenue: 5990, users: 3, status: 'active', createdAt: '2025-04-15', country: 'الإمارات', email: 'info@fitlife.ae' },
+  { id: '1', name: 'مركز النور الطبي', nameEn: 'Al Noor Medical', plan: 'Enterprise', bookings: 1250, revenue: 37500, users: 12, status: 'active', createdAt: '2025-01-15', country: 'السعودية', email: 'info@alnoor.sa', subscriptionStatus: 'active', subscriptionEndDate: '2026-01-15' },
+  { id: '2', name: 'صالون ياسمين', nameEn: 'Yasmin Beauty', plan: 'Professional', bookings: 680, revenue: 10840, users: 8, status: 'active', createdAt: '2025-02-20', country: 'السعودية', email: 'info@yasmin.sa', subscriptionStatus: 'active', subscriptionEndDate: '2025-08-20' },
+  { id: '3', name: 'أكاديمية المستقبل', nameEn: 'Future Academy', plan: 'Professional', bookings: 420, revenue: 7600, users: 6, status: 'active', createdAt: '2025-03-10', country: 'الإمارات', email: 'info@future-edu.ae', subscriptionStatus: 'active', subscriptionEndDate: '2025-09-10' },
+  { id: '4', name: 'عيادة الابتسامة', nameEn: 'Smile Clinic', plan: 'Starter', bookings: 45, revenue: 0, users: 2, status: 'trial', createdAt: '2025-06-01', country: 'مصر', email: 'info@smile.eg', subscriptionStatus: 'trial', subscriptionEndDate: '2025-07-01' },
+  { id: '5', name: 'نادي اللياقة الذهبية', nameEn: 'Golden Fitness', plan: 'Professional', bookings: 310, revenue: 4400, users: 5, status: 'suspended', createdAt: '2025-01-28', country: 'الأردن', email: 'info@goldenfit.jo', subscriptionStatus: 'expired', subscriptionEndDate: '2025-04-28' },
+  { id: '6', name: 'مركز التجميل الملكي', nameEn: 'Royal Beauty', plan: 'Enterprise', bookings: 920, revenue: 29000, users: 15, status: 'active', createdAt: '2025-02-01', country: 'السعودية', email: 'info@royalbeauty.sa', subscriptionStatus: 'active', subscriptionEndDate: '2026-02-01' },
+  { id: '7', name: 'عيادة العيون المتقدمة', nameEn: 'Advanced Eye Clinic', plan: 'Business', bookings: 580, revenue: 14400, users: 10, status: 'active', createdAt: '2025-01-20', country: 'السعودية', email: 'info@adv-eye.sa', subscriptionStatus: 'active', subscriptionEndDate: '2025-07-20' },
+  { id: '8', name: 'مركز اللياقة البدنية', nameEn: 'Fit Life Center', plan: 'Starter', bookings: 120, revenue: 1198, users: 3, status: 'active', createdAt: '2025-04-15', country: 'الإمارات', email: 'info@fitlife.ae', subscriptionStatus: 'active', subscriptionEndDate: '2025-10-15' },
 ]
 
 export const INIT_USERS: PlatformUser[] = [
@@ -141,7 +192,7 @@ export const INIT_USERS: PlatformUser[] = [
 ]
 
 export const INIT_LOGS: SysLog[] = [
-  { id: '1', level: 'success', source: 'الدفع', sourceEn: 'Payments', message: 'دفعة ناجحة: 999 ر.س — Enterprise — مركز النور الطبي', messageEn: 'Successful payment: 999 SAR — Enterprise — Al Noor Medical', timestamp: '2025-06-18T14:15:00Z' },
+  { id: '1', level: 'success', source: 'الدفع', sourceEn: 'Payments', message: 'دفعة ناجحة: 250 د.أ — Enterprise — مركز النور الطبي', messageEn: 'Successful payment: 250 JOD — Enterprise — Al Noor Medical', timestamp: '2025-06-18T14:15:00Z' },
   { id: '2', level: 'info', source: 'المستأجرين', sourceEn: 'Tenants', message: 'تسجيل مستأجر جديد: عيادة الابتسامة (Trial)', messageEn: 'New tenant registered: Smile Clinic (Trial)', timestamp: '2025-06-18T14:10:00Z' },
   { id: '3', level: 'warn', source: 'النظام', sourceEn: 'System', message: 'استخدام الذاكرة تجاوز 80% على الخادم #3', messageEn: 'Memory usage exceeded 80% on Server #3', timestamp: '2025-06-18T13:55:00Z' },
   { id: '4', level: 'info', source: 'المستخدمين', sourceEn: 'Users', message: 'ترقية خطة صالون ياسمين من Starter إلى Professional', messageEn: 'Upgraded Yasmin Beauty plan from Starter to Professional', timestamp: '2025-06-18T13:45:00Z' },
@@ -151,16 +202,18 @@ export const INIT_LOGS: SysLog[] = [
   { id: '8', level: 'warn', source: 'النظام', sourceEn: 'System', message: 'القرص على الخادم #2 عند 85%', messageEn: 'Disk on Server #2 at 85%', timestamp: '2025-06-18T10:20:00Z' },
   { id: '9', level: 'info', source: 'المستأجرين', sourceEn: 'Tenants', message: 'تم تفعيل حساب نادي اللياقة الذهبية', messageEn: 'Golden Fitness account activated', timestamp: '2025-06-18T09:00:00Z' },
   { id: '10', level: 'error', source: 'API', sourceEn: 'API', message: 'خطأ 500 على /api/bookings — مهلة الطلب', messageEn: 'Error 500 on /api/bookings — request timeout', timestamp: '2025-06-18T08:30:00Z' },
-  { id: '11', level: 'success', source: 'الدفع', sourceEn: 'Payments', message: 'دفعة ناجحة: 599 ر.س — Business — عيادة العيون المتقدمة', messageEn: 'Successful payment: 599 SAR — Business — Advanced Eye Clinic', timestamp: '2025-06-18T07:45:00Z' },
+  { id: '11', level: 'success', source: 'الدفع', sourceEn: 'Payments', message: 'دفعة ناجحة: 150 د.أ — Business — عيادة العيون المتقدمة', messageEn: 'Successful payment: 150 JOD — Business — Advanced Eye Clinic', timestamp: '2025-06-18T07:45:00Z' },
   { id: '12', level: 'info', source: 'النظام', sourceEn: 'System', message: 'تحديث النظام إلى الإصدار 2.4.1', messageEn: 'System updated to version 2.4.1', timestamp: '2025-06-18T03:00:00Z' },
+  { id: '13', level: 'info', source: 'CLIQ', sourceEn: 'CLIQ', message: 'طلب دفع CLIQ جديد من مركز اللياقة البدنية — Professional', messageEn: 'New CLIQ payment request from Fit Life Center — Professional', timestamp: '2025-06-18T15:30:00Z' },
+  { id: '14', level: 'success', source: 'CLIQ', sourceEn: 'CLIQ', message: 'تم قبول دفع CLIQ لعيادة الابتسامة — Starter', messageEn: 'CLIQ payment approved for Smile Clinic — Starter', timestamp: '2025-06-18T16:00:00Z' },
 ]
 
 export const PLANS: Plan[] = [
-  { id: '1', name: 'Free', price: 0, tenants: 0, features: [{ ar: 'حجز واحد', en: '1 Booking' }, { ar: 'تقويم أساسي', en: 'Basic Calendar' }, { ar: 'دعم بالبريد', en: 'Email Support' }], color: 'bg-gray-500', popular: false },
-  { id: '2', name: 'Starter', price: 99, tenants: 15, features: [{ ar: '50 حجز/شهر', en: '50 Bookings/mo' }, { ar: '3 موظفين', en: '3 Employees' }, { ar: 'تقارير أساسية', en: 'Basic Reports' }, { ar: 'دعم بالبريد', en: 'Email Support' }], color: 'bg-sky-500', popular: false },
-  { id: '3', name: 'Professional', price: 299, tenants: 120, features: [{ ar: 'حجوزات غير محدودة', en: 'Unlimited Bookings' }, { ar: '10 موظفين', en: '10 Employees' }, { ar: 'تقارير متقدمة', en: 'Advanced Reports' }, { ar: 'دعم على مدار الساعة', en: '24/7 Support' }], color: 'bg-violet-500', popular: true },
-  { id: '4', name: 'Business', price: 599, tenants: 60, features: [{ ar: 'كل ميزات الاحترافي', en: 'All Pro Features' }, { ar: '25 موظف', en: '25 Employees' }, { ar: 'API وصول', en: 'API Access' }, { ar: 'مدير مخصص', en: 'Dedicated Manager' }], color: 'bg-indigo-500', popular: false },
-  { id: '5', name: 'Enterprise', price: 999, tenants: 45, features: [{ ar: 'كل الميزات', en: 'All Features' }, { ar: 'موظفون غير محدودون', en: 'Unlimited Employees' }, { ar: 'SLA مخصص', en: 'Custom SLA' }, { ar: 'نشر خاص', en: 'Private Deployment' }], color: 'bg-emerald-500', popular: false },
+  { id: '1', name: 'Free', price: 0, tenants: 0, features: [{ ar: 'حجز واحد', en: '1 Booking' }, { ar: 'تقويم أساسي', en: 'Basic Calendar' }, { ar: 'دعم بالبريد', en: 'Email Support' }], color: 'bg-gray-500', popular: false, currency: 'JOD' },
+  { id: '2', name: 'Starter', price: 25, tenants: 15, features: [{ ar: '50 حجز/شهر', en: '50 Bookings/mo' }, { ar: '3 موظفين', en: '3 Employees' }, { ar: 'تقارير أساسية', en: 'Basic Reports' }, { ar: 'دعم بالبريد', en: 'Email Support' }], color: 'bg-sky-500', popular: false, currency: 'JOD' },
+  { id: '3', name: 'Professional', price: 75, tenants: 120, features: [{ ar: 'حجوزات غير محدودة', en: 'Unlimited Bookings' }, { ar: '10 موظفين', en: '10 Employees' }, { ar: 'تقارير متقدمة', en: 'Advanced Reports' }, { ar: 'دعم على مدار الساعة', en: '24/7 Support' }], color: 'bg-violet-500', popular: true, currency: 'JOD' },
+  { id: '4', name: 'Business', price: 150, tenants: 60, features: [{ ar: 'كل ميزات الاحترافي', en: 'All Pro Features' }, { ar: '25 موظف', en: '25 Employees' }, { ar: 'API وصول', en: 'API Access' }, { ar: 'مدير مخصص', en: 'Dedicated Manager' }], color: 'bg-indigo-500', popular: false, currency: 'JOD' },
+  { id: '5', name: 'Enterprise', price: 250, tenants: 45, features: [{ ar: 'كل الميزات', en: 'All Features' }, { ar: 'موظفون غير محدودون', en: 'Unlimited Employees' }, { ar: 'SLA مخصص', en: 'Custom SLA' }, { ar: 'نشر خاص', en: 'Private Deployment' }], color: 'bg-emerald-500', popular: false, currency: 'JOD' },
 ]
 
 export const INIT_ROLES: Role[] = [
@@ -179,12 +232,12 @@ export const SERVERS: Server[] = [
 ]
 
 export const INVOICES: Invoice[] = [
-  { id: 'INV-001', tenant: 'مركز النور الطبي', tenantEn: 'Al Noor Medical', amount: 999, status: 'paid', date: '2025-06-01', plan: 'Enterprise' },
-  { id: 'INV-002', tenant: 'صالون ياسمين', tenantEn: 'Yasmin Beauty', amount: 299, status: 'paid', date: '2025-06-01', plan: 'Professional' },
-  { id: 'INV-003', tenant: 'أكاديمية المستقبل', tenantEn: 'Future Academy', amount: 299, status: 'pending', date: '2025-06-01', plan: 'Professional' },
-  { id: 'INV-004', tenant: 'عيادة العيون المتقدمة', tenantEn: 'Advanced Eye Clinic', amount: 599, status: 'paid', date: '2025-06-01', plan: 'Business' },
-  { id: 'INV-005', tenant: 'مركز التجميل الملكي', tenantEn: 'Royal Beauty', amount: 999, status: 'overdue', date: '2025-05-01', plan: 'Enterprise' },
-  { id: 'INV-006', tenant: 'نادي اللياقة الذهبية', tenantEn: 'Golden Fitness', amount: 299, status: 'failed', date: '2025-06-01', plan: 'Professional' },
+  { id: 'INV-001', tenant: 'مركز النور الطبي', tenantEn: 'Al Noor Medical', amount: 250, status: 'paid', date: '2025-06-01', plan: 'Enterprise', currency: 'JOD' },
+  { id: 'INV-002', tenant: 'صالون ياسمين', tenantEn: 'Yasmin Beauty', amount: 75, status: 'paid', date: '2025-06-01', plan: 'Professional', currency: 'JOD' },
+  { id: 'INV-003', tenant: 'أكاديمية المستقبل', tenantEn: 'Future Academy', amount: 75, status: 'pending', date: '2025-06-01', plan: 'Professional', currency: 'JOD' },
+  { id: 'INV-004', tenant: 'عيادة العيون المتقدمة', tenantEn: 'Advanced Eye Clinic', amount: 150, status: 'paid', date: '2025-06-01', plan: 'Business', currency: 'JOD' },
+  { id: 'INV-005', tenant: 'مركز التجميل الملكي', tenantEn: 'Royal Beauty', amount: 250, status: 'overdue', date: '2025-05-01', plan: 'Enterprise', currency: 'JOD' },
+  { id: 'INV-006', tenant: 'نادي اللياقة الذهبية', tenantEn: 'Golden Fitness', amount: 75, status: 'failed', date: '2025-06-01', plan: 'Professional', currency: 'JOD' },
 ]
 
 export const BACKUPS: Backup[] = [
@@ -216,8 +269,26 @@ export const REPORTS: Report[] = [
   { id: '6', name: 'تقرير الفواتير', nameEn: 'Billing Report', desc: 'ملخص الفواتير والمدفوعات المتأخرة', descEn: 'Invoice and overdue payments summary', type: 'مالي', typeEn: 'Financial', last: '2025-06-14' },
 ]
 
+// ─── CLIQ Payment Gateway ────────────────────────────────────────
+export const DEFAULT_CLIQ_CONFIG: CliqConfig = {
+  enabled: true,
+  bankName: 'البنك العربي',
+  accountHolder: 'BookFlow for Technology',
+  cliqAlias: 'BOOKFLOWJO',
+  instructions: 'قم بفتح تطبيق البنك الخاص بك واختر خدمة CLIQ. أدخل الاسم المستعار (Alias) الموضح أدناه وقم بتحويل المبلغ المطلوب. بعد إتمام التحويل، أدخل رقم المرجع الخاص بالتحويل أدناه.',
+  instructionsEn: 'Open your banking app and select the CLIQ service. Enter the alias shown below and transfer the required amount. After completing the transfer, enter the transfer reference number below.',
+  qrCodeUrl: null,
+  supportContact: 'support@bookflow.com',
+}
+
+export const INIT_CLIQ_PAYMENTS: CliqPayment[] = [
+  { id: 'CLIQ-001', tenantName: 'مركز اللياقة البدنية', tenantNameEn: 'Fit Life Center', customerName: 'أيمن الحسن', customerEmail: 'ayman@fitlife.ae', plan: 'Professional', amount: 75, currency: 'JOD', referenceNumber: 'TXN-2025-884731', notes: '', screenshotUrl: null, status: 'pending_verification', submittedAt: '2025-06-18T15:30:00Z', reviewedAt: null, reviewedBy: null, rejectionReason: null, additionalInfoRequest: null },
+  { id: 'CLIQ-002', tenantName: 'عيادة الابتسامة', tenantNameEn: 'Smile Clinic', customerName: 'ريم السبيعي', customerEmail: 'reem@smile-clinic.com', plan: 'Starter', amount: 25, currency: 'JOD', referenceNumber: 'TXN-2025-772145', notes: 'تحويل من حساب الأعمال', screenshotUrl: null, status: 'approved', submittedAt: '2025-06-17T10:00:00Z', reviewedAt: '2025-06-17T14:30:00Z', reviewedBy: 'Super Admin', rejectionReason: null, additionalInfoRequest: null },
+  { id: 'CLIQ-003', tenantName: 'صالون ياسمين', tenantNameEn: 'Yasmin Beauty', customerName: 'سارة العتيبي', customerEmail: 'sara@yasmin.sa', plan: 'Professional', amount: 75, currency: 'JOD', referenceNumber: 'TXN-2025-663902', notes: '', screenshotUrl: null, status: 'rejected', submittedAt: '2025-06-16T09:15:00Z', reviewedAt: '2025-06-16T12:00:00Z', reviewedBy: 'Super Admin', rejectionReason: 'رقم المرجع غير صحيح أو لا يطابق المبلغ المطلوب', additionalInfoRequest: null },
+]
+
 // ─── Utility: bilingual field accessor ──────────────────────────
-export function bField<T extends Record<string, unknown>>(obj: T, field: keyof T, locale: string): string {
+export function bField<T extends object>(obj: T, field: keyof T, locale: string): string {
   const enField = `${String(field)}En` as keyof T
   if (locale === 'en' && enField in obj) return String(obj[enField] || obj[field] || '')
   return String(obj[field] || '')

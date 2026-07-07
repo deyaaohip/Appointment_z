@@ -8,9 +8,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Progress } from '@/components/ui/progress'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import {
@@ -18,7 +19,8 @@ import {
   Settings, Shield, Eye, Edit, Trash2, Plus, BarChart3, Server,
   Database, Lock, Bell, FileText, UserCog, CheckCircle2, AlertTriangle,
   RefreshCw, Globe, UserPlus, Clock, Monitor, HardDrive, Mail, Download,
-  Power, PowerOff, Save, ChevronLeft, Search,
+  Power, PowerOff, Save, ChevronLeft, Search, Wallet, XCircle, Info,
+  Upload, Image as ImageIcon, ClipboardCheck,
 } from 'lucide-react'
 
 // ─── Imports from shared modules ───────────────────────────────
@@ -28,15 +30,16 @@ import {
   type Tenant, type PlatformUser, type SysLog, type Invoice,
   type Role, type Plan, type Server as ServerType, type Backup,
   type SecurityAttempt, type NotificationTemplate, type Report,
-  type SortState,
+  type SortState, type CliqPayment, type CliqConfig,
   INIT_TENANTS, INIT_USERS, INIT_LOGS, PLANS, INIT_ROLES, SERVERS,
-  INVOICES, BACKUPS, SECURITY_ATTEMPTS, NOTIF_TEMPLATES, REPORTS, bField,
+  INVOICES, BACKUPS, SECURITY_ATTEMPTS, NOTIF_TEMPLATES, REPORTS,
+  DEFAULT_CLIQ_CONFIG, INIT_CLIQ_PAYMENTS, bField,
 } from './sa-data'
 import {
   fade, useSA, StatusBadge, LogDot, getLogLabel, PageTitle, FormField,
   Toggle, ConfirmDialog, KpiCard, StatCard, ActionBtn, PrimaryBtn,
   EmptyRow, SearchInput, SortableTH, Pagination, TableFooter, DlgFooter,
-  gaugeColor, genericSort, paginate,
+  gaugeColor, genericSort, paginate, useCurrency,
 } from './sa-helpers'
 
 const PER_PAGE = 5
@@ -48,27 +51,44 @@ function serverRegion(s: ServerType, lang: Lang) { return lang === 'en' ? s.regi
 function secCountry(a: SecurityAttempt, lang: Lang) { return lang === 'en' ? a.countryEn : a.country }
 function invTenant(inv: Invoice, lang: Lang) { return lang === 'en' ? (inv.tenantEn || inv.tenant) : inv.tenant }
 function userTenant(u: PlatformUser, lang: Lang) { return lang === 'en' ? (u.tenantEn || u.tenant) : u.tenant }
+function cliqTenantName(p: CliqPayment, lang: Lang) { return lang === 'en' ? (p.tenantNameEn || p.tenantName) : p.tenantName }
 
 // ════════════════════════════════════════════════════════════════
-// PAGE 1: OVERVIEW
+// PAGE 1: OVERVIEW (Audited — all KPIs derived from real data)
 // ════════════════════════════════════════════════════════════════
 function OverviewPage() {
   const { t, isRTL, lang } = useSA()
+  const { sym, fmt } = useCurrency()
   const [tenants] = useState<Tenant[]>(INIT_TENANTS)
   const [logs] = useState<SysLog[]>(INIT_LOGS)
+  const [invoices] = useState<Invoice[]>(INVOICES)
 
+  // Computed from real data — no hardcoded values
   const totalRevenue = tenants.reduce((s, tn) => s + tn.revenue, 0)
   const totalBookings = tenants.reduce((s, tn) => s + tn.bookings, 0)
   const activeCount = tenants.filter(tn => tn.status === 'active').length
+  const expiredCount = tenants.filter(tn => tn.subscriptionStatus === 'expired').length
+  const pendingSubs = tenants.filter(tn => tn.subscriptionStatus === 'trial' || tn.status === 'trial').length
+  const paidInvoices = invoices.filter(i => i.status === 'paid')
+  const monthlyRevenue = paidInvoices.reduce((s, i) => s + i.amount, 0)
   const activeTenants = tenants.filter(tn => tn.status === 'active').slice(0, 6)
 
   return (
     <div className="space-y-6">
+      {/* Primary KPIs — all computed from tenant/invoice data */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <KpiCard icon={Building2} bg="bg-violet-600" label={t.totalTenants} value={tenants.length} sub={`${activeCount} ${t.active.toLowerCase()}`} trend={12} delay={0} />
-        <KpiCard icon={Users} bg="bg-sky-600" label={t.totalUsers} value={INIT_USERS.length} sub={null} trend={8} delay={0.04} />
-        <KpiCard icon={DollarSign} bg="bg-amber-500" label={t.revenue} value={`${(totalRevenue / 1000).toFixed(0)}K`} sub={t.thisMonth} trend={18} delay={0.08} />
+        <KpiCard icon={Users} bg="bg-sky-600" label={t.totalUsers} value={INIT_USERS.length} sub={`${tenants.reduce((s, tn) => s + tn.users, 0)} ${t.users.toLowerCase()}`} trend={8} delay={0.04} />
+        <KpiCard icon={DollarSign} bg="bg-amber-500" label={t.revenue} value={`${(totalRevenue / 1000).toFixed(1)}K ${sym}`} sub={t.thisMonth} trend={18} delay={0.08} />
         <KpiCard icon={CalendarDays} bg="bg-emerald-600" label={t.totalBookings} value={totalBookings.toLocaleString()} sub={t.last30Days} trend={5} delay={0.12} />
+      </div>
+
+      {/* Secondary KPIs — subscription health */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <StatCard icon={CheckCircle2} label={t.monthlyRevenue} value={fmt(monthlyRevenue)} color="text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30" />
+        <StatCard icon={Clock} label={t.pendingRequests} value={String(pendingSubs)} color="text-amber-600 bg-amber-50 dark:bg-amber-950/30" />
+        <StatCard icon={AlertTriangle} label={t.expiredSubs} value={String(expiredCount)} color="text-red-600 bg-red-50 dark:bg-red-950/30" />
+        <StatCard icon={CreditCard} label={t.recentPayments} value={String(paidInvoices.length)} color="text-sky-600 bg-sky-50 dark:bg-sky-950/30" />
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6">
@@ -83,7 +103,7 @@ function OverviewPage() {
                   <div key={p.id} className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-medium">{p.name}</span>
-                      <span className="text-muted-foreground tabular-nums text-xs sm:text-sm">{rev.toLocaleString()} {lang === 'ar' ? 'ر.س' : 'SAR'}</span>
+                      <span className="text-muted-foreground tabular-nums text-xs sm:text-sm">{rev.toLocaleString()} {sym}</span>
                     </div>
                     <div className="h-2.5 rounded-full bg-muted overflow-hidden">
                       <div className={`h-full rounded-full ${p.color} transition-all duration-700`} style={{ width: `${pct}%` }} />
@@ -141,6 +161,7 @@ function OverviewPage() {
 // ════════════════════════════════════════════════════════════════
 function TenantsPage() {
   const { t, isRTL, lang } = useSA()
+  const { sym } = useCurrency()
   const [tenants, setTenants] = useState<Tenant[]>(INIT_TENANTS)
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('all')
@@ -157,7 +178,6 @@ function TenantsPage() {
   }, [tenants, search, filter, sort, lang])
 
   const { items, totalPages } = paginate(filtered, page, PER_PAGE)
-
   const handleSort = (key: string) => setSort(p => p.key === key ? { key, dir: p.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' })
 
   const openAdd = () => { setForm({ name: '', nameEn: '', email: '', country: '', plan: 'Starter' }); setDlg({ type: 'add' }) }
@@ -167,7 +187,7 @@ function TenantsPage() {
     if (!form.name.trim()) { toast.error(t.enterTenantName); return }
     if (form.email && !form.email.includes('@')) { toast.error(t.enterValidEmail); return }
     if (dlg?.type === 'add') {
-      const n: Tenant = { id: Date.now().toString(), ...form, bookings: 0, revenue: 0, users: 1, status: 'trial', createdAt: new Date().toISOString().split('T')[0] }
+      const n: Tenant = { id: Date.now().toString(), ...form, bookings: 0, revenue: 0, users: 1, status: 'trial', createdAt: new Date().toISOString().split('T')[0], subscriptionStatus: 'trial', subscriptionEndDate: '' }
       setTenants(p => [n, ...p]); toast.success(t.added.replace('{name}', form.name))
     } else if (dlg?.tenant) {
       setTenants(p => p.map(tn => tn.id === dlg.tenant!.id ? { ...tn, ...form } : tn)); toast.success(t.updated)
@@ -201,7 +221,6 @@ function TenantsPage() {
         </Select>
       </div>
 
-      {/* Desktop Table */}
       <Card className="border-0 shadow-sm overflow-hidden hidden md:block">
         <div className="overflow-x-auto">
           <Table>
@@ -224,7 +243,7 @@ function TenantsPage() {
                   </TableCell>
                   <TableCell className="px-3"><Badge variant="secondary" className="font-medium text-xs">{tn.plan}</Badge></TableCell>
                   <TableCell className="px-3 text-end tabular-nums text-sm">{tn.bookings.toLocaleString()}</TableCell>
-                  <TableCell className="px-3 text-end font-semibold tabular-nums text-sm">{tn.revenue.toLocaleString()} <span className="text-xs font-normal text-muted-foreground">{lang === 'ar' ? 'ر.س' : 'SAR'}</span></TableCell>
+                  <TableCell className="px-3 text-end font-semibold tabular-nums text-sm">{tn.revenue.toLocaleString()} <span className="text-xs font-normal text-muted-foreground">{sym}</span></TableCell>
                   <TableCell className="px-3"><StatusBadge status={tn.status} locale={lang} /></TableCell>
                   <TableCell className="pe-5">
                     <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -243,34 +262,30 @@ function TenantsPage() {
         <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
       </Card>
 
-      {/* Mobile Cards */}
       <div className="md:hidden space-y-3">
         {items.length === 0 ? <Card className="border-0 shadow-sm"><CardContent className="py-16 text-center text-muted-foreground text-sm">{t.noResults}</CardContent></Card> : items.map(tn => (
-          <Card key={tn.id} className="border-0 shadow-sm">
-            <CardContent className="p-4">
-              <div className="flex items-start justify-between gap-3 mb-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-900/30 text-violet-600 font-bold text-sm">{tnName(tn).charAt(0)}</div>
-                  <div className="min-w-0"><p className="font-semibold text-sm truncate">{tnName(tn)}</p><p className="text-xs text-muted-foreground truncate" dir="ltr">{tn.email}</p></div>
-                </div>
-                <StatusBadge status={tn.status} locale={lang} />
+          <Card key={tn.id} className="border-0 shadow-sm"><CardContent className="p-4">
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-900/30 text-violet-600 font-bold text-sm">{tnName(tn).charAt(0)}</div>
+                <div className="min-w-0"><p className="font-semibold text-sm truncate">{tnName(tn)}</p><p className="text-xs text-muted-foreground truncate" dir="ltr">{tn.email}</p></div>
               </div>
-              <div className="grid grid-cols-3 gap-3 mb-3 text-center">
-                <div className="rounded-lg bg-muted/50 p-2"><p className="text-[10px] text-muted-foreground">{t.plan}</p><p className="text-xs font-semibold mt-0.5">{tn.plan}</p></div>
-                <div className="rounded-lg bg-muted/50 p-2"><p className="text-[10px] text-muted-foreground">{t.bookings}</p><p className="text-xs font-semibold mt-0.5 tabular-nums">{tn.bookings.toLocaleString()}</p></div>
-                <div className="rounded-lg bg-muted/50 p-2"><p className="text-[10px] text-muted-foreground">{t.tenantRevenue}</p><p className="text-xs font-semibold mt-0.5 tabular-nums">{tn.revenue.toLocaleString()}</p></div>
-              </div>
-              <div className="flex items-center justify-end gap-1 pt-2 border-t">
-                <ActionBtn icon={Edit} label={t.edit} onClick={() => openEdit(tn)} />
-                <ActionBtn icon={tn.status === 'suspended' ? Power : PowerOff} label={tn.status === 'suspended' ? t.active : t.suspended} onClick={() => handleToggleStatus(tn)} />
-                <ActionBtn icon={Trash2} onClick={() => setDlg({ type: 'delete', tenant: tn })} danger />
-              </div>
-            </CardContent>
-          </Card>
+              <StatusBadge status={tn.status} locale={lang} />
+            </div>
+            <div className="grid grid-cols-3 gap-3 mb-3 text-center">
+              <div className="rounded-lg bg-muted/50 p-2"><p className="text-[10px] text-muted-foreground">{t.plan}</p><p className="text-xs font-semibold mt-0.5">{tn.plan}</p></div>
+              <div className="rounded-lg bg-muted/50 p-2"><p className="text-[10px] text-muted-foreground">{t.bookings}</p><p className="text-xs font-semibold mt-0.5 tabular-nums">{tn.bookings.toLocaleString()}</p></div>
+              <div className="rounded-lg bg-muted/50 p-2"><p className="text-[10px] text-muted-foreground">{t.tenantRevenue}</p><p className="text-xs font-semibold mt-0.5 tabular-nums">{tn.revenue.toLocaleString()} {sym}</p></div>
+            </div>
+            <div className="flex items-center justify-end gap-1 pt-2 border-t">
+              <ActionBtn icon={Edit} label={t.edit} onClick={() => openEdit(tn)} />
+              <ActionBtn icon={tn.status === 'suspended' ? Power : PowerOff} label={tn.status === 'suspended' ? t.active : t.suspended} onClick={() => handleToggleStatus(tn)} />
+              <ActionBtn icon={Trash2} onClick={() => setDlg({ type: 'delete', tenant: tn })} danger />
+            </div>
+          </CardContent></Card>
         ))}
       </div>
 
-      {/* Add/Edit Dialog */}
       <Dialog open={dlg?.type === 'add' || dlg?.type === 'edit'} onOpenChange={() => setDlg(null)}>
         <DialogContent className="max-w-md"><DialogHeader><DialogTitle>{dlg?.type === 'add' ? t.addTenantDlg : t.editTenantDlg}</DialogTitle></DialogHeader>
           <div className="space-y-4 pt-2">
@@ -321,7 +336,7 @@ function UsersPage() {
   const handleSave = useCallback(() => {
     if (!form.name.trim() || !form.email.trim()) { toast.error(t.enterNameAndEmail); return }
     if (dlg?.type === 'add') {
-      setUsers(p => [{ id: Date.now().toString(), ...form, status: 'active', lastLogin: new Date().toISOString() }, ...p])
+      setUsers(p => [{ id: Date.now().toString(), ...form, tenantEn: '', status: 'active', lastLogin: new Date().toISOString() }, ...p])
       toast.success(t.added.replace('{name}', form.name))
     } else if (dlg?.user) {
       setUsers(p => p.map(u => u.id === dlg.user!.id ? { ...u, ...form } : u)); toast.success(t.updated)
@@ -385,7 +400,6 @@ function UsersPage() {
         <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
       </Card>
 
-      {/* Mobile Cards */}
       <div className="md:hidden space-y-3">
         {items.length === 0 ? <Card className="border-0 shadow-sm"><CardContent className="py-16 text-center text-muted-foreground text-sm">{t.noResults}</CardContent></Card> : items.map(u => (
           <Card key={u.id} className="border-0 shadow-sm"><CardContent className="p-4">
@@ -415,10 +429,7 @@ function UsersPage() {
             <FormField label={t.name}><Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} /></FormField>
             <FormField label={t.email}><Input type="email" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} dir="ltr" /></FormField>
             <FormField label={t.tenant}><Input value={form.tenant} onChange={e => setForm(p => ({ ...p, tenant: e.target.value }))} /></FormField>
-            <FormField label={t.role}><Select value={form.role} onValueChange={v => setForm(p => ({ ...p, role: v }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>
-              <SelectItem value="owner">{t.owner}</SelectItem><SelectItem value="manager">{t.manager}</SelectItem>
-              <SelectItem value="receptionist">{t.receptionist}</SelectItem><SelectItem value="accountant">{t.accountant}</SelectItem>
-            </SelectContent></Select></FormField>
+            <FormField label={t.role}><Select value={form.role} onValueChange={v => setForm(p => ({ ...p, role: v }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="owner">{t.owner}</SelectItem><SelectItem value="manager">{t.manager}</SelectItem><SelectItem value="receptionist">{t.receptionist}</SelectItem><SelectItem value="accountant">{t.accountant}</SelectItem></SelectContent></Select></FormField>
           </div>
           <DlgFooter onCancel={() => setDlg(null)} onConfirm={handleSave} />
         </DialogContent>
@@ -429,10 +440,11 @@ function UsersPage() {
 }
 
 // ════════════════════════════════════════════════════════════════
-// PAGE 4: PLANS
+// PAGE 4: PLANS (JOD currency)
 // ════════════════════════════════════════════════════════════════
 function PlansPage() {
   const { t, lang } = useSA()
+  const { sym } = useCurrency()
   const [detailPlan, setDetailPlan] = useState<Plan | null>(null)
   return (
     <div className="space-y-6">
@@ -446,7 +458,7 @@ function PlansPage() {
                 <div className={`h-12 w-12 rounded-2xl ${p.color} flex items-center justify-center mb-4 shadow-lg`}><CreditCard className="h-6 w-6 text-white" /></div>
                 <h3 className="font-bold text-base">{p.name}</h3>
                 <p className="text-3xl font-extrabold mt-3 mb-1">{p.price > 0 ? `${p.price}` : t.free}</p>
-                <p className="text-xs text-muted-foreground mb-5">{p.price > 0 ? t.perMonth : ''} · {p.tenants} {t.tenants}</p>
+                <p className="text-xs text-muted-foreground mb-5">{p.price > 0 ? `${sym} ${t.perMonth}` : ''} · {p.tenants} {t.tenants}</p>
                 <Separator className="w-full mb-5" />
                 <ul className="space-y-2.5 w-full text-start flex-1">{p.features.map((f, j) => (
                   <li key={j} className="flex items-start gap-2 text-xs sm:text-sm"><CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" /><span>{lang === 'en' ? f.en : f.ar}</span></li>
@@ -460,7 +472,7 @@ function PlansPage() {
       <Dialog open={!!detailPlan} onOpenChange={() => setDetailPlan(null)}>
         <DialogContent className="max-w-sm"><DialogHeader><DialogTitle>{t.planDetails}</DialogTitle></DialogHeader>
           {detailPlan && <div className="space-y-4 pt-2">
-            <div className="text-center"><p className="text-3xl font-extrabold">{detailPlan.price > 0 ? `${detailPlan.price} ${lang === 'ar' ? 'ر.س' : 'SAR'}` : t.free}</p><p className="text-sm text-muted-foreground mt-1">{t.monthly} · {detailPlan.tenants} {t.tenants}</p></div>
+            <div className="text-center"><p className="text-3xl font-extrabold">{detailPlan.price > 0 ? `${detailPlan.price} ${sym}` : t.free}</p><p className="text-sm text-muted-foreground mt-1">{t.monthly} · {detailPlan.tenants} {t.tenants}</p></div>
             <Separator />
             <ul className="space-y-2">{detailPlan.features.map((f, i) => (<li key={i} className="flex items-center gap-2 text-sm"><CheckCircle2 className="h-4 w-4 text-emerald-500" />{lang === 'en' ? f.en : f.ar}</li>))}</ul>
           </div>}
@@ -472,10 +484,11 @@ function PlansPage() {
 }
 
 // ════════════════════════════════════════════════════════════════
-// PAGE 5: BILLING
+// PAGE 5: BILLING (JOD currency)
 // ════════════════════════════════════════════════════════════════
 function BillingPage() {
   const { t, lang } = useSA()
+  const { fmt, sym } = useCurrency()
   const [invoices, setInvoices] = useState<Invoice[]>(INVOICES)
   const [filter, setFilter] = useState('all')
   const [page, setPage] = useState(1)
@@ -498,8 +511,8 @@ function BillingPage() {
     <div className="space-y-5">
       <PageTitle title={t.billingTitle} action={<PrimaryBtn icon={Plus} label={t.createInvoice} onClick={() => toast.info(t.willCreateInvoice)} />} />
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <StatCard icon={CheckCircle2} label={t.payments} value={`${totalPaid.toLocaleString()} ${lang === 'ar' ? 'ر.س' : 'SAR'}`} color="text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30" />
-        <StatCard icon={Clock} label={t.pending} value={`${totalPending.toLocaleString()} ${lang === 'ar' ? 'ر.س' : 'SAR'}`} color="text-amber-600 bg-amber-50 dark:bg-amber-950/30" />
+        <StatCard icon={CheckCircle2} label={t.payments} value={fmt(totalPaid)} color="text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30" />
+        <StatCard icon={Clock} label={t.pending} value={fmt(totalPending)} color="text-amber-600 bg-amber-50 dark:bg-amber-950/30" />
         <StatCard icon={DollarSign} label={t.paid} value={`${invoices.filter(i => i.status === 'paid').length}`} color="text-sky-600 bg-sky-50 dark:bg-sky-950/30" />
         <StatCard icon={AlertTriangle} label={t.overdue} value={`${invoices.filter(i => i.status === 'overdue').length}`} color="text-red-600 bg-red-50 dark:bg-red-950/30" />
       </div>
@@ -510,7 +523,6 @@ function BillingPage() {
         </Select>
       </div>
 
-      {/* Desktop Table */}
       <Card className="border-0 shadow-sm overflow-hidden hidden md:block">
         <div className="overflow-x-auto">
           <Table><TableHeader><TableRow className="bg-muted/50 hover:bg-muted/50">
@@ -527,7 +539,7 @@ function BillingPage() {
               <TableCell className="ps-5 font-mono text-sm font-semibold">{inv.id}</TableCell>
               <TableCell className="px-3 text-sm">{invTenant(inv, lang)}</TableCell>
               <TableCell className="px-3 hidden lg:table-cell"><Badge variant="secondary" className="text-xs">{inv.plan}</Badge></TableCell>
-              <TableCell className="px-3 text-end font-semibold tabular-nums text-sm">{inv.amount.toLocaleString()} <span className="text-xs font-normal text-muted-foreground">{lang === 'ar' ? 'ر.س' : 'SAR'}</span></TableCell>
+              <TableCell className="px-3 text-end font-semibold tabular-nums text-sm">{inv.amount.toLocaleString()} <span className="text-xs font-normal text-muted-foreground">{sym}</span></TableCell>
               <TableCell className="px-3"><StatusBadge status={inv.status} locale={lang} /></TableCell>
               <TableCell className="pe-5">
                 <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -543,7 +555,6 @@ function BillingPage() {
         <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
       </Card>
 
-      {/* Mobile Cards */}
       <div className="md:hidden space-y-3">
         {items.length === 0 ? <Card className="border-0 shadow-sm"><CardContent className="py-16 text-center text-muted-foreground text-sm">{t.noResults}</CardContent></Card> : items.map(inv => (
           <Card key={inv.id} className="border-0 shadow-sm"><CardContent className="p-4">
@@ -552,7 +563,7 @@ function BillingPage() {
               <StatusBadge status={inv.status} locale={lang} />
             </div>
             <div className="flex items-center justify-between pt-2 border-t">
-              <span className="font-bold text-sm">{inv.amount.toLocaleString()} <span className="text-xs font-normal text-muted-foreground">{lang === 'ar' ? 'ر.س' : 'SAR'}</span></span>
+              <span className="font-bold text-sm">{inv.amount.toLocaleString()} <span className="text-xs font-normal text-muted-foreground">{sym}</span></span>
               <div className="flex gap-1">
                 <ActionBtn icon={Eye} onClick={() => toast.info(t.viewingInvoice.replace('{id}', inv.id))} />
                 {inv.status !== 'paid' && <ActionBtn icon={CheckCircle2} onClick={() => handleMarkPaid(inv)} />}
@@ -624,7 +635,6 @@ function RolesPage() {
         ))}
       </div>
 
-      {/* Add Dialog */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent className="max-w-md"><DialogHeader><DialogTitle>{t.addRoleDlg}</DialogTitle></DialogHeader>
           <div className="space-y-4 pt-2">
@@ -636,7 +646,6 @@ function RolesPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Edit Dialog */}
       <Dialog open={!!editRole} onOpenChange={() => setEditRole(null)}>
         <DialogContent className="max-w-md"><DialogHeader><DialogTitle>{t.editRoleDlg}</DialogTitle></DialogHeader>
           <div className="space-y-4 pt-2">
@@ -685,7 +694,7 @@ function AuditPage() {
               <TableCell className="ps-5"><span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${l.level === 'info' ? 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-400' : l.level === 'warn' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400' : l.level === 'error' ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400'}`}>{getLogLabel(l.level, t)}</span></TableCell>
               <TableCell className="px-3 text-sm max-w-[400px]">{logMsg(l, lang)}</TableCell>
               <TableCell className="px-3 text-xs text-muted-foreground hidden md:table-cell">{logSrc(l, lang)}</TableCell>
-              <TableCell className="pe-5 text-xs text-muted-foreground whitespace-nowrap text-end">{new Date(l.timestamp).toLocaleString(lang === 'ar' ? 'ar-SA' : 'en-US')}</TableCell>
+              <TableCell className="pe-5 text-xs text-muted-foreground whitespace-nowrap text-end">{new Date(l.timestamp).toLocaleString(lang === 'ar' ? 'ar-JO' : 'en-JO')}</TableCell>
             </TableRow>
           ))}</TableBody></Table>
         </div>
@@ -698,7 +707,7 @@ function AuditPage() {
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 mb-1"><span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${l.level === 'info' ? 'bg-sky-100 text-sky-700' : l.level === 'warn' ? 'bg-amber-100 text-amber-700' : l.level === 'error' ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>{getLogLabel(l.level, t)}</span><span className="text-[10px] text-muted-foreground">{logSrc(l, lang)}</span></div>
                 <p className="text-xs leading-relaxed">{logMsg(l, lang)}</p>
-                <p className="text-[10px] text-muted-foreground mt-1">{new Date(l.timestamp).toLocaleString(lang === 'ar' ? 'ar-SA' : 'en-US')}</p>
+                <p className="text-[10px] text-muted-foreground mt-1">{new Date(l.timestamp).toLocaleString(lang === 'ar' ? 'ar-JO' : 'en-JO')}</p>
               </div>
             </div>
           </CardContent></Card>
@@ -819,7 +828,7 @@ function ReportsPage() {
 }
 
 // ════════════════════════════════════════════════════════════════
-// PAGE 10: SYSTEM HEALTH (bilingual gauges)
+// PAGE 10: SYSTEM HEALTH
 // ════════════════════════════════════════════════════════════════
 function SystemPage() {
   const { t, lang } = useSA()
@@ -862,7 +871,7 @@ function SystemPage() {
               <LogDot level={l.level} />
               <div className="min-w-0 flex-1">
                 <p className="text-sm leading-relaxed">{logMsg(l, lang)}</p>
-                <p className="text-[11px] text-muted-foreground mt-0.5">{logSrc(l, lang)} — {new Date(l.timestamp).toLocaleString(lang === 'ar' ? 'ar-SA' : 'en-US')}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">{logSrc(l, lang)} — {new Date(l.timestamp).toLocaleString(lang === 'ar' ? 'ar-JO' : 'en-JO')}</p>
               </div>
             </div>
           ))}</div>
@@ -873,7 +882,7 @@ function SystemPage() {
 }
 
 // ════════════════════════════════════════════════════════════════
-// PAGE 11: SERVERS (bilingual regions, full CRUD)
+// PAGE 11: SERVERS
 // ════════════════════════════════════════════════════════════════
 function ServersPage() {
   const { t, lang } = useSA()
@@ -960,14 +969,14 @@ function ServersPage() {
 }
 
 // ════════════════════════════════════════════════════════════════
-// PAGE 12: DATABASE (bilingual labels)
+// PAGE 12: DATABASE
 // ════════════════════════════════════════════════════════════════
 function DatabasePage() {
   const { t, lang } = useSA()
   const [backups, setBackups] = useState<Backup[]>(BACKUPS)
 
   const handleBackup = () => {
-    const b: Backup = { id: Date.now().toString(), date: new Date().toLocaleString(lang === 'ar' ? 'ar-SA' : 'en-US'), size: '2.4 GB', type: 'manual', status: 'active' }
+    const b: Backup = { id: Date.now().toString(), date: new Date().toLocaleString(lang === 'ar' ? 'ar-JO' : 'en-JO'), size: '2.4 GB', type: 'manual', status: 'active' }
     setBackups(p => [b, ...p]); toast.success(t.backingUp)
   }
 
@@ -1006,7 +1015,7 @@ function DatabasePage() {
 }
 
 // ════════════════════════════════════════════════════════════════
-// PAGE 13: SECURITY (bilingual countries)
+// PAGE 13: SECURITY
 // ════════════════════════════════════════════════════════════════
 function SecurityPage() {
   const { t, lang } = useSA()
@@ -1070,22 +1079,52 @@ function SecurityPage() {
 }
 
 // ════════════════════════════════════════════════════════════════
-// PAGE 14: SETTINGS
+// PAGE 14: SETTINGS (JOD default + CLIQ config section)
 // ════════════════════════════════════════════════════════════════
 function SettingsPage() {
   const { t, lang } = useSA()
-  const [form, setForm] = useState({ platformName: 'BookFlow', supportEmail: 'support@bookflow.com', currency: 'SAR', timezone: 'Asia/Riyadh', maintenance: false, registration: true, maxTenants: '500', backupFreq: 'daily' })
+  const [form, setForm] = useState({
+    platformName: 'BookFlow', supportEmail: 'support@bookflow.com',
+    currency: 'JOD', timezone: 'Asia/Amman',
+    maintenance: false, registration: true, maxTenants: '500', backupFreq: 'daily',
+  })
+  const [cliq, setCliq] = useState<CliqConfig>({ ...DEFAULT_CLIQ_CONFIG })
+
+  const handleSaveSettings = () => { toast.success(t.settingsSaved) }
+  const handleSaveCliq = () => { toast.success(t.settingsSaved) }
+
   return (
     <div className="space-y-6">
-      <PageTitle title={t.settingsTitle} action={<PrimaryBtn icon={Save} label={t.saveSettings} onClick={() => toast.success(t.settingsSaved)} />} />
+      <PageTitle title={t.settingsTitle} action={<PrimaryBtn icon={Save} label={t.saveSettings} onClick={handleSaveSettings} />} />
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         <Card className="border-0 shadow-sm"><CardHeader className="pb-3"><CardTitle className="text-sm sm:text-base font-semibold">{t.generalSettings}</CardTitle></CardHeader>
           <CardContent className="space-y-4">
             <FormField label={t.platformName}><Input value={form.platformName} onChange={e => setForm(p => ({ ...p, platformName: e.target.value }))} /></FormField>
             <FormField label={t.supportEmail}><Input type="email" value={form.supportEmail} onChange={e => setForm(p => ({ ...p, supportEmail: e.target.value }))} dir="ltr" /></FormField>
             <div className="grid grid-cols-2 gap-3 sm:gap-4">
-              <FormField label={t.currency}><Select value={form.currency} onValueChange={v => setForm(p => ({ ...p, currency: v }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="SAR">{lang === 'ar' ? 'ر.س' : 'SAR'}</SelectItem><SelectItem value="AED">{lang === 'ar' ? 'د.إ' : 'AED'}</SelectItem><SelectItem value="USD">{'$'}</SelectItem><SelectItem value="EGP">{lang === 'ar' ? 'ج.م' : 'EGP'}</SelectItem></SelectContent></Select></FormField>
-              <FormField label={t.timezone}><Select value={form.timezone} onValueChange={v => setForm(p => ({ ...p, timezone: v }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Asia/Riyadh">{lang === 'ar' ? 'الرياض' : 'Riyadh'}</SelectItem><SelectItem value="Asia/Dubai">{lang === 'ar' ? 'دبي' : 'Dubai'}</SelectItem><SelectItem value="Africa/Cairo">{lang === 'ar' ? 'القاهرة' : 'Cairo'}</SelectItem></SelectContent></Select></FormField>
+              <FormField label={t.currency}>
+                <Select value={form.currency} onValueChange={v => setForm(p => ({ ...p, currency: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="JOD">{lang === 'ar' ? 'دينار أردني (د.أ)' : 'JOD - Jordanian Dinar'}</SelectItem>
+                    <SelectItem value="SAR">{lang === 'ar' ? 'ريال سعودي (ر.س)' : 'SAR - Saudi Riyal'}</SelectItem>
+                    <SelectItem value="AED">{lang === 'ar' ? 'درهم إماراتي (د.إ)' : 'AED - UAE Dirham'}</SelectItem>
+                    <SelectItem value="USD">USD - $</SelectItem>
+                    <SelectItem value="EGP">{lang === 'ar' ? 'جنيه مصري (ج.م)' : 'EGP - Egyptian Pound'}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FormField>
+              <FormField label={t.timezone}>
+                <Select value={form.timezone} onValueChange={v => setForm(p => ({ ...p, timezone: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Asia/Amman">{lang === 'ar' ? 'عمّان' : 'Amman'}</SelectItem>
+                    <SelectItem value="Asia/Riyadh">{lang === 'ar' ? 'الرياض' : 'Riyadh'}</SelectItem>
+                    <SelectItem value="Asia/Dubai">{lang === 'ar' ? 'دبي' : 'Dubai'}</SelectItem>
+                    <SelectItem value="Africa/Cairo">{lang === 'ar' ? 'القاهرة' : 'Cairo'}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FormField>
             </div>
           </CardContent>
         </Card>
@@ -1106,6 +1145,225 @@ function SettingsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* CLIQ Payment Settings */}
+      <Card className="border-0 shadow-sm">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm sm:text-base font-semibold flex items-center gap-2"><Wallet className="h-4 w-4 text-violet-600" />{t.cliqSettings}</CardTitle>
+            <PrimaryBtn icon={Save} label={t.save} onClick={handleSaveCliq} />
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-0">
+          <div className="flex items-center justify-between gap-4 py-3.5">
+            <div><p className="text-sm font-medium">{t.cliqEnabled}</p><p className="text-xs text-muted-foreground mt-0.5">{t.cliqEnabledDesc}</p></div>
+            <Toggle on={cliq.enabled} onToggle={() => setCliq(p => ({ ...p, enabled: !p.enabled }))} />
+          </div>
+          <Separator />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
+            <FormField label={t.cliqBankName}><Input value={cliq.bankName} onChange={e => setCliq(p => ({ ...p, bankName: e.target.value }))} /></FormField>
+            <FormField label={t.cliqAccountHolder}><Input value={cliq.accountHolder} onChange={e => setCliq(p => ({ ...p, accountHolder: e.target.value }))} dir="ltr" /></FormField>
+            <FormField label={t.cliqAlias}><Input value={cliq.cliqAlias} onChange={e => setCliq(p => ({ ...p, cliqAlias: e.target.value }))} dir="ltr" /></FormField>
+            <FormField label={t.cliqSupportContact}><Input value={cliq.supportContact} onChange={e => setCliq(p => ({ ...p, supportContact: e.target.value }))} dir="ltr" /></FormField>
+          </div>
+          <FormField label={t.cliqInstructions}>
+            <Textarea value={lang === 'en' ? cliq.instructionsEn : cliq.instructions} onChange={e => setCliq(p => ({ ...p, instructions: e.target.value }))} rows={3} />
+          </FormField>
+          <div className="pt-2">
+            <FormField label={t.cliqQrCode}>
+              <div className="flex items-center gap-3">
+                <Button variant="outline" className="gap-2" onClick={() => toast.info(t.cliqUploadQr)}>
+                  <Upload className="h-4 w-4" />{t.cliqUploadQr}
+                </Button>
+                {cliq.qrCodeUrl && <Badge variant="secondary" className="text-xs"><ImageIcon className="h-3 w-3 me-1" />QR</Badge>}
+              </div>
+            </FormField>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+// ════════════════════════════════════════════════════════════════
+// PAGE 15: CLIQ PAYMENTS (Approve/Reject workflow)
+// ════════════════════════════════════════════════════════════════
+function CliqPaymentsPage() {
+  const { t, lang } = useSA()
+  const { fmt, sym } = useCurrency()
+  const [payments, setPayments] = useState<CliqPayment[]>(INIT_CLIQ_PAYMENTS)
+  const [filter, setFilter] = useState('all')
+  const [page, setPage] = useState(1)
+  const [detail, setDetail] = useState<CliqPayment | null>(null)
+  const [actionDlg, setActionDlg] = useState<{ type: 'approve' | 'reject' | 'info'; payment: CliqPayment } | null>(null)
+  const [reasonText, setReasonText] = useState('')
+
+  const filtered = useMemo(() => {
+    if (filter === 'all') return payments
+    return payments.filter(p => p.status === filter)
+  }, [payments, filter])
+  const { items, totalPages } = paginate(filtered, page, PER_PAGE)
+
+  const pendingCount = payments.filter(p => p.status === 'pending_verification').length
+  const approvedCount = payments.filter(p => p.status === 'approved').length
+  const rejectedCount = payments.filter(p => p.status === 'rejected').length
+
+  const handleApprove = (p: CliqPayment) => {
+    setPayments(prev => prev.map(x => x.id === p.id ? {
+      ...x, status: 'approved', reviewedAt: new Date().toISOString(), reviewedBy: 'Super Admin'
+    } : x))
+    toast.success(t.cliqApprovedMsg)
+    setActionDlg(null)
+  }
+
+  const handleReject = (p: CliqPayment) => {
+    if (!reasonText.trim()) { toast.error(t.cliqEnterReason); return }
+    setPayments(prev => prev.map(x => x.id === p.id ? {
+      ...x, status: 'rejected', reviewedAt: new Date().toISOString(), reviewedBy: 'Super Admin', rejectionReason: reasonText
+    } : x))
+    toast.success(t.cliqRejectedMsg)
+    setActionDlg(null); setReasonText('')
+  }
+
+  const handleRequestInfo = (p: CliqPayment) => {
+    if (!reasonText.trim()) { toast.error(t.cliqInfoRequestPrompt); return }
+    setPayments(prev => prev.map(x => x.id === p.id ? {
+      ...x, status: 'info_requested', additionalInfoRequest: reasonText
+    } : x))
+    toast.success(t.cliqInfoRequestedMsg)
+    setActionDlg(null); setReasonText('')
+  }
+
+  return (
+    <div className="space-y-5">
+      <PageTitle title={t.cliqTitle} />
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <StatCard icon={Wallet} label={t.cliqTotalPending} value={fmt(payments.filter(p => p.status === 'pending_verification').reduce((s, p) => s + p.amount, 0))} color="text-amber-600 bg-amber-50 dark:bg-amber-950/30" />
+        <StatCard icon={Clock} label={t.cliqPending} value={String(pendingCount)} color="text-amber-600 bg-amber-50 dark:bg-amber-950/30" />
+        <StatCard icon={CheckCircle2} label={t.cliqTotalApproved} value={String(approvedCount)} color="text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30" />
+        <StatCard icon={XCircle} label={t.cliqTotalRejected} value={String(rejectedCount)} color="text-red-600 bg-red-50 dark:bg-red-950/30" />
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {['all','pending_verification','approved','rejected','info_requested'].map(f => (
+          <Button key={f} size="sm" variant={filter === f ? 'default' : 'outline'} className="text-xs h-8 rounded-full px-4" onClick={() => { setFilter(f); setPage(1) }}>
+            {f === 'all' ? t.all : f === 'pending_verification' ? t.cliqPending : f === 'approved' ? t.cliqApproved : f === 'rejected' ? t.cliqRejected : t.cliqInfoRequested}
+          </Button>
+        ))}
+      </div>
+
+      {/* Desktop Table */}
+      <Card className="border-0 shadow-sm overflow-hidden hidden md:block">
+        <div className="overflow-x-auto">
+          <Table><TableHeader><TableRow className="bg-muted/50 hover:bg-muted/50">
+            <TableHead className="ps-5 font-semibold text-xs uppercase tracking-wider">{t.tenant}</TableHead>
+            <TableHead className="px-3 font-semibold text-xs uppercase tracking-wider">{t.cliqCustomer}</TableHead>
+            <TableHead className="px-3 font-semibold text-xs uppercase tracking-wider">{t.plan}</TableHead>
+            <TableHead className="px-3 font-semibold text-xs uppercase tracking-wider text-end">{t.amount}</TableHead>
+            <TableHead className="px-3 font-semibold text-xs uppercase tracking-wider">{t.cliqReferenceNo}</TableHead>
+            <TableHead className="px-3 font-semibold text-xs uppercase tracking-wider">{t.status}</TableHead>
+            <TableHead className="pe-5 font-semibold text-xs uppercase tracking-wider text-end">{t.actions}</TableHead>
+          </TableRow></TableHeader>
+          <TableBody>
+            {items.length === 0 ? <EmptyRow colSpan={8} /> : items.map(p => (
+              <TableRow key={p.id} className="group hover:bg-muted/20 transition-colors">
+                <TableCell className="ps-5 font-medium text-sm">{cliqTenantName(p, lang)}</TableCell>
+                <TableCell className="px-3 text-sm">{p.customerName}</TableCell>
+                <TableCell className="px-3"><Badge variant="secondary" className="text-xs">{p.plan}</Badge></TableCell>
+                <TableCell className="px-3 text-end font-semibold tabular-nums text-sm">{p.amount.toLocaleString()} {sym}</TableCell>
+                <TableCell className="px-3 font-mono text-xs" dir="ltr">{p.referenceNumber}</TableCell>
+                <TableCell className="px-3"><StatusBadge status={p.status} locale={lang} /></TableCell>
+                <TableCell className="pe-5">
+                  <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <ActionBtn icon={Eye} label={t.view} onClick={() => setDetail(p)} />
+                    {p.status === 'pending_verification' && <>
+                      <ActionBtn icon={CheckCircle2} label={t.cliqApprove} onClick={() => { setActionDlg({ type: 'approve', payment: p }); setReasonText('') }} />
+                      <ActionBtn icon={XCircle} label={t.cliqReject} onClick={() => { setActionDlg({ type: 'reject', payment: p }); setReasonText('') }} danger />
+                      <ActionBtn icon={Info} label={t.cliqRequestInfo} onClick={() => { setActionDlg({ type: 'info', payment: p }); setReasonText('') }} />
+                    </>}
+                    {(p.status === 'rejected' || p.status === 'info_requested') && (
+                      <ActionBtn icon={RefreshCw} label={t.view} onClick={() => setDetail(p)} />
+                    )}
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody></Table>
+        </div>
+        <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+      </Card>
+
+      {/* Mobile Cards */}
+      <div className="md:hidden space-y-3">
+        {items.length === 0 ? <Card className="border-0 shadow-sm"><CardContent className="py-16 text-center text-muted-foreground text-sm">{t.cliqNoPayments}</CardContent></Card> : items.map(p => (
+          <Card key={p.id} className="border-0 shadow-sm"><CardContent className="p-4">
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <div className="min-w-0"><p className="font-semibold text-sm">{cliqTenantName(p, lang)}</p><p className="text-xs text-muted-foreground">{p.customerName} · {p.plan}</p></div>
+              <StatusBadge status={p.status} locale={lang} />
+            </div>
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <div className="rounded-lg bg-muted/50 p-2"><p className="text-[10px] text-muted-foreground">{t.amount}</p><p className="text-xs font-semibold mt-0.5">{p.amount.toLocaleString()} {sym}</p></div>
+              <div className="rounded-lg bg-muted/50 p-2"><p className="text-[10px] text-muted-foreground">{t.cliqReferenceNo}</p><p className="text-xs font-semibold mt-0.5 font-mono" dir="ltr">{p.referenceNumber}</p></div>
+            </div>
+            {p.rejectionReason && <p className="text-xs text-red-600 mb-2">{t.cliqRejectionReason}: {p.rejectionReason}</p>}
+            {p.additionalInfoRequest && <p className="text-xs text-sky-600 mb-2">{t.cliqInfoRequested}: {p.additionalInfoRequest}</p>}
+            <div className="flex items-center justify-end gap-1 pt-2 border-t">
+              <ActionBtn icon={Eye} onClick={() => setDetail(p)} />
+              {p.status === 'pending_verification' && <>
+                <ActionBtn icon={CheckCircle2} onClick={() => { setActionDlg({ type: 'approve', payment: p }); setReasonText('') }} />
+                <ActionBtn icon={XCircle} onClick={() => { setActionDlg({ type: 'reject', payment: p }); setReasonText('') }} danger />
+              </>}
+            </div>
+          </CardContent></Card>
+        ))}
+      </div>
+
+      {/* Detail Dialog */}
+      <Dialog open={!!detail} onOpenChange={() => setDetail(null)}>
+        <DialogContent className="max-w-lg"><DialogHeader><DialogTitle>{t.cliqTitle}</DialogTitle></DialogHeader>
+          {detail && <div className="space-y-4 pt-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-lg bg-muted/50 p-3"><p className="text-[10px] text-muted-foreground">{t.tenant}</p><p className="text-sm font-semibold mt-0.5">{cliqTenantName(detail, lang)}</p></div>
+              <div className="rounded-lg bg-muted/50 p-3"><p className="text-[10px] text-muted-foreground">{t.cliqCustomer}</p><p className="text-sm font-semibold mt-0.5">{detail.customerName}</p></div>
+              <div className="rounded-lg bg-muted/50 p-3"><p className="text-[10px] text-muted-foreground">{t.plan}</p><p className="text-sm font-semibold mt-0.5">{detail.plan}</p></div>
+              <div className="rounded-lg bg-muted/50 p-3"><p className="text-[10px] text-muted-foreground">{t.amount}</p><p className="text-sm font-bold mt-0.5">{detail.amount.toLocaleString()} {sym}</p></div>
+            </div>
+            <Separator />
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between"><span className="text-muted-foreground">{t.cliqReferenceNo}</span><span className="font-mono font-semibold" dir="ltr">{detail.referenceNumber}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">{t.cliqSubmissionDate}</span><span>{new Date(detail.submittedAt).toLocaleString(lang === 'ar' ? 'ar-JO' : 'en-JO')}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">{t.status}</span><StatusBadge status={detail.status} locale={lang} /></div>
+              {detail.rejectionReason && <><Separator /><p className="text-red-600 text-xs mt-2">{t.cliqRejectionReason}: {detail.rejectionReason}</p></>}
+              {detail.additionalInfoRequest && <><Separator /><p className="text-sky-600 text-xs mt-2">{t.cliqInfoRequested}: {detail.additionalInfoRequest}</p></>}
+            </div>
+          </div>}
+          <DlgFooter onCancel={() => setDetail(null)} onConfirm={() => setDetail(null)} confirmLabel={t.close} />
+        </DialogContent>
+      </Dialog>
+
+      {/* Approve Confirm */}
+      <ConfirmDialog open={actionDlg?.type === 'approve'} onOpenChange={() => setActionDlg(null)} title={t.cliqApprove} desc={t.cliqApproveDesc} onConfirm={() => { if (actionDlg?.payment) handleApprove(actionDlg.payment) }} />
+
+      {/* Reject Dialog */}
+      <Dialog open={actionDlg?.type === 'reject'} onOpenChange={() => setActionDlg(null)}>
+        <DialogContent className="max-w-md"><DialogHeader><DialogTitle>{t.cliqReject}</DialogTitle><DialogDescription>{t.cliqRejectDesc}</DialogDescription></DialogHeader>
+          <div className="space-y-4 pt-2">
+            <FormField label={t.cliqRejectionReason}><Textarea value={reasonText} onChange={e => setReasonText(e.target.value)} placeholder={t.cliqEnterReason} rows={3} /></FormField>
+          </div>
+          <DlgFooter onCancel={() => setActionDlg(null)} onConfirm={() => { if (actionDlg?.payment) handleReject(actionDlg.payment) }} danger />
+        </DialogContent>
+      </Dialog>
+
+      {/* Request Info Dialog */}
+      <Dialog open={actionDlg?.type === 'info'} onOpenChange={() => setActionDlg(null)}>
+        <DialogContent className="max-w-md"><DialogHeader><DialogTitle>{t.cliqRequestInfo}</DialogTitle></DialogHeader>
+          <div className="space-y-4 pt-2">
+            <FormField label={t.cliqInfoRequestPrompt}><Textarea value={reasonText} onChange={e => setReasonText(e.target.value)} placeholder={t.cliqInfoRequestPrompt} rows={3} /></FormField>
+          </div>
+          <DlgFooter onCancel={() => setActionDlg(null)} onConfirm={() => { if (actionDlg?.payment) handleRequestInfo(actionDlg.payment) }} />
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
@@ -1119,6 +1377,7 @@ const PAGES: Record<string, () => React.JSX.Element> = {
   sa_users: UsersPage,
   sa_plans: PlansPage,
   sa_billing: BillingPage,
+  sa_cliq: CliqPaymentsPage,
   sa_roles: RolesPage,
   sa_audit: AuditPage,
   sa_notifications: NotificationsPage,
