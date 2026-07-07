@@ -1,0 +1,502 @@
+   315→      setTenants(p => p.map(t => t.id === dlg.tenant!.id ? { ...t, ...form } : t)); toast.success('تم التحديث')
+   316→    }
+   317→    setDlg(null)
+   318→  }, [form, dlg])
+   319→
+   320→  return (
+   321→    <div className="space-y-6">
+   322→      <PageTitle title="إدارة المستأجرين" action={<Button className="gap-2 bg-violet-600 hover:bg-violet-700" onClick={() => { setForm({ name: '', nameEn: '', email: '', country: '', plan: 'Starter' }); setDlg({ type: 'add' }) }}><Plus className="h-4 w-4" />إضافة مستأجر</Button>} />
+   323→
+   324→      {/* Filters */}
+   325→      <div className="flex flex-col sm:flex-row gap-3">
+   326→        <div className="relative flex-1 max-w-md">
+   327→          <Search className="absolute start-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+   328→          <Input placeholder="بحث بالاسم أو البريد الإلكتروني..." value={search} onChange={e => setSearch(e.target.value)} className="ps-10 h-10" />
+   329→        </div>
+   330→        <Select value={filter} onValueChange={setFilter}>
+   331→          <SelectTrigger className="w-full sm:w-44 h-10"><SelectValue placeholder="الحالة" /></SelectTrigger>
+   332→          <SelectContent><SelectItem value="all">جميع الحالات</SelectItem><SelectItem value="active">نشط</SelectItem><SelectItem value="trial">تجريبي</SelectItem><SelectItem value="suspended">معلق</SelectItem></SelectContent>
+   333→        </Select>
+   334→      </div>
+   335→
+   336→      {/* Table */}
+   337→      <Card className="overflow-hidden">
+   338→        <div className="overflow-x-auto">
+   339→          <Table>
+   340→            <TableHeader>
+   341→              <TableRow className="bg-muted/40 hover:bg-muted/40">
+   342→                <TableHead className="ps-5 pe-3 font-semibold">المستأجر</TableHead>
+   343→                <TableHead className="pe-3 font-semibold hidden md:table-cell">الباقة</TableHead>
+   344→                <TableHead className="pe-3 font-semibold text-end hidden lg:table-cell">الحجوزات</TableHead>
+   345→                <TableHead className="pe-3 font-semibold text-end">الإيرادات</TableHead>
+   346→                <TableHead className="pe-3 font-semibold hidden sm:table-cell">الحالة</TableHead>
+   347→                <TableHead className="pe-5 font-semibold text-end">إجراءات</TableHead>
+   348→              </TableRow>
+   349→            </TableHeader>
+   350→            <TableBody>
+   351→              {filtered.length === 0 ? (
+   352→                <TableRow><TableCell colSpan={6} className="text-center py-12 text-muted-foreground">لا توجد نتائج</TableCell></TableRow>
+   353→              ) : filtered.map(t => (
+   354→                <TableRow key={t.id} className="group hover:bg-muted/20">
+   355→                  <TableCell className="ps-5 pe-3">
+   356→                    <div className="flex items-center gap-3">
+   357→                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-900/30 text-violet-600 font-bold text-xs">{t.name.charAt(0)}</div>
+   358→                      <div className="min-w-0">
+   359→                        <p className="font-medium text-sm truncate max-w-[180px]">{t.name}</p>
+   360→                        <p className="text-xs text-muted-foreground truncate max-w-[180px]" dir="ltr">{t.email}</p>
+   361→                      </div>
+   362→                    </div>
+   363→                  </TableCell>
+   364→                  <TableCell className="pe-3 hidden md:table-cell"><Badge variant="secondary" className="font-medium">{t.plan}</Badge></TableCell>
+   365→                  <TableCell className="pe-3 text-end hidden lg:table-cell tabular-nums text-sm">{t.bookings.toLocaleString()}</TableCell>
+   366→                  <TableCell className="pe-3 text-end font-semibold tabular-nums text-sm">{t.revenue.toLocaleString()} <span className="text-xs font-normal text-muted-foreground">ر.س</span></TableCell>
+   367→                  <TableCell className="pe-3 hidden sm:table-cell"><StatusBadge status={t.status} /></TableCell>
+   368→                  <TableCell className="pe-5">
+   369→                    <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+   370→                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setDlg({ type: 'detail', tenant: t })}><Eye className="h-4 w-4" /></Button>
+   371→                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => { setForm({ name: t.name, nameEn: t.nameEn, email: t.email, country: t.country, plan: t.plan }); setDlg({ type: 'edit', tenant: t }) }}><Edit className="h-4 w-4" /></Button>
+   372→                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setDlg({ type: 'suspend', tenant: t })}>{t.status === 'suspended' ? <Power className="h-4 w-4 text-emerald-600" /> : <PowerOff className="h-4 w-4 text-amber-600" />}</Button>
+   373→                      <Button size="icon" variant="ghost" className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30" onClick={() => setDlg({ type: 'delete', tenant: t })}><Trash2 className="h-4 w-4" /></Button>
+   374→                    </div>
+   375→                  </TableCell>
+   376→                </TableRow>
+   377→              ))}
+   378→            </TableBody>
+   379→          </Table>
+   380→        </div>
+   381→        <div className="border-t px-5 py-3 text-xs text-muted-foreground">عرض {filtered.length} من {tenants.length} مستأجر</div>
+   382→      </Card>
+   383→
+   384→      {/* Add/Edit Dialog */}
+   385→      <Dialog open={dlg?.type === 'add' || dlg?.type === 'edit'} onOpenChange={() => setDlg(null)}>
+   386→        <DialogContent className="max-w-md"><DialogHeader><DialogTitle>{dlg?.type === 'add' ? 'إضافة مستأجر جديد' : 'تعديل المستأجر'}</DialogTitle><DialogDescription>أدخل بيانات المستأجر</DialogDescription></DialogHeader>
+   387→          <div className="space-y-4 pt-2">
+   388→            <FormField label="الاسم (عربي)"><Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="مركز النور الطبي" /></FormField>
+   389→            <FormField label="الاسم (إنجليزي)"><Input value={form.nameEn} onChange={e => setForm(p => ({ ...p, nameEn: e.target.value }))} placeholder="Al Noor Medical" dir="ltr" /></FormField>
+   390→            <FormField label="البريد الإلكتروني"><Input type="email" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} placeholder="info@example.com" dir="ltr" /></FormField>
+   391→            <FormField label="البلد"><Input value={form.country} onChange={e => setForm(p => ({ ...p, country: e.target.value }))} placeholder="السعودية" /></FormField>
+   392→            <FormField label="الباقة"><Select value={form.plan} onValueChange={v => setForm(p => ({ ...p, plan: v }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{['Starter','Professional','Business','Enterprise'].map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent></Select></FormField>
+   393→          </div>
+   394→          <DialogFooter className="pt-4"><Button variant="outline" onClick={() => setDlg(null)}>إلغاء</Button><Button className="bg-violet-600 hover:bg-violet-700" onClick={handleSave}>حفظ</Button></DialogFooter>
+   395→        </DialogContent>
+   396→      </Dialog>
+   397→
+   398→      {/* Detail Dialog */}
+   399→      <Dialog open={dlg?.type === 'detail'} onOpenChange={() => setDlg(null)}>
+   400→        <DialogContent className="max-w-md"><DialogHeader><DialogTitle>{dlg?.tenant?.name}</DialogTitle></DialogHeader>
+   401→          {dlg?.tenant && (
+   402→            <div className="space-y-4 pt-2">
+   403→              <div className="grid grid-cols-2 gap-3">
+   404→                {[{ l: 'الباقة', v: dlg.tenant.plan }, { l: 'البلد', v: dlg.tenant.country }, { l: 'الحجوزات', v: dlg.tenant.bookings.toLocaleString() }, { l: 'الإيرادات', v: `${dlg.tenant.revenue.toLocaleString()} ر.س` }, { l: 'المستخدمين', v: `${dlg.tenant.users}` }, { l: 'التاريخ', v: dlg.tenant.createdAt }].map((item, i) => (
+   405→                  <div key={i} className="rounded-lg bg-muted/50 p-3"><p className="text-[11px] text-muted-foreground mb-0.5">{item.l}</p><p className="font-semibold text-sm">{item.v}</p></div>
+   406→                ))}
+   407→              </div>
+   408→              <div className="flex items-center gap-2"><span className="text-sm text-muted-foreground">الحالة:</span><StatusBadge status={dlg.tenant.status} /></div>
+   409→            </div>
+   410→          )}
+   411→          <DialogFooter><Button variant="outline" onClick={() => setDlg(null)}>إغلاق</Button></DialogFooter>
+   412→        </DialogContent>
+   413→      </Dialog>
+   414→
+   415→      <ConfirmDialog open={dlg?.type === 'delete'} onOpenChange={() => setDlg(null)} title="حذف المستأجر" desc={`هل أنت متأكد من حذف "${dlg?.tenant?.name}"؟`} onConfirm={() => { setTenants(p => p.filter(t => t.id !== dlg?.tenant!.id)); toast.success('تم الحذف') }} danger />
+   416→      <ConfirmDialog open={dlg?.type === 'suspend'} onOpenChange={() => setDlg(null)} title={dlg?.tenant?.status === 'suspended' ? 'تفعيل المستأجر' : 'تعليق المستأجر'} desc={`${dlg?.tenant?.status === 'suspended' ? 'تفعيل' : 'تعليق'} "${dlg?.tenant?.name}"`} onConfirm={() => { setTenants(p => p.map(t => t.id === dlg?.tenant!.id ? { ...t, status: t.status === 'suspended' ? 'active' : 'suspended' } : t)); toast.success('تم التحديث') }} />
+   417→    </div>
+   418→  )
+   419→}
+   420→
+   421→// ─── PAGE 3: USERS ────────────────────────────────────────────
+   422→function UsersPage() {
+   423→  const [users, setUsers] = useState<PlatformUser[]>(ALL_USERS)
+   424→  const [search, setSearch] = useState('')
+   425→  const [filter, setFilter] = useState('all')
+   426→  const [dlg, setDlg] = useState<{ type: string; user?: PlatformUser } | null>(null)
+   427→  const [form, setForm] = useState({ name: '', email: '', tenant: '', role: 'موظف' })
+   428→
+   429→  const filtered = useMemo(() => {
+   430→    let list = [...users]
+   431→    if (filter !== 'all') list = list.filter(u => u.status === filter)
+   432→    if (search) { const q = search.toLowerCase(); list = list.filter(u => u.name.includes(q) || u.email.toLowerCase().includes(q) || u.tenant.includes(q)) }
+   433→    return list
+   434→  }, [users, search, filter])
+   435→
+   436→  const handleSave = useCallback(() => {
+   437→    if (!form.name.trim() || !form.email.trim()) { toast.error('يرجى إدخال الاسم والبريد'); return }
+   438→    if (dlg?.type === 'add') {
+   439→      setUsers(p => [{ id: Date.now().toString(), ...form, status: 'active', lastLogin: new Date().toISOString() }, ...p]); toast.success(`تم إضافة: ${form.name}`)
+   440→    } else if (dlg?.user) {
+   441→      setUsers(p => p.map(u => u.id === dlg.user!.id ? { ...u, ...form } : u)); toast.success('تم التحديث')
+   442→    }
+   443→    setDlg(null)
+   444→  }, [form, dlg])
+   445→
+   446→  return (
+   447→    <div className="space-y-6">
+   448→      <PageTitle title="إدارة المستخدمين" action={<Button className="gap-2 bg-violet-600 hover:bg-violet-700" onClick={() => { setForm({ name: '', email: '', tenant: '', role: 'موظف' }); setDlg({ type: 'add' }) }}><UserPlus className="h-4 w-4" />إضافة مستخدم</Button>} />
+   449→
+   450→      <div className="flex flex-col sm:flex-row gap-3">
+   451→        <div className="relative flex-1 max-w-md">
+   452→          <Search className="absolute start-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+   453→          <Input placeholder="بحث بالاسم أو البريد..." value={search} onChange={e => setSearch(e.target.value)} className="ps-10 h-10" />
+   454→        </div>
+   455→        <Select value={filter} onValueChange={setFilter}>
+   456→          <SelectTrigger className="w-full sm:w-44 h-10"><SelectValue /></SelectTrigger>
+   457→          <SelectContent><SelectItem value="all">الكل</SelectItem><SelectItem value="active">نشط</SelectItem><SelectItem value="suspended">معلق</SelectItem></SelectContent>
+   458→        </Select>
+   459→      </div>
+   460→
+   461→      <Card className="overflow-hidden">
+   462→        <div className="overflow-x-auto">
+   463→          <Table>
+   464→            <TableHeader><TableRow className="bg-muted/40 hover:bg-muted/40">
+   465→              <TableHead className="ps-5 font-semibold">المستخدم</TableHead>
+   466→              <TableHead className="pe-3 font-semibold hidden md:table-cell">البريد</TableHead>
+   467→              <TableHead className="pe-3 font-semibold hidden sm:table-cell">المستأجر</TableHead>
+   468→              <TableHead className="pe-3 font-semibold hidden lg:table-cell">الدور</TableHead>
+   469→              <TableHead className="pe-3 font-semibold">الحالة</TableHead>
+   470→              <TableHead className="pe-5 font-semibold text-end">إجراءات</TableHead>
+   471→            </TableRow></TableHeader>
+   472→            <TableBody>
+   473→              {filtered.map(u => (
+   474→                <TableRow key={u.id} className="group hover:bg-muted/20">
+   475→                  <TableCell className="ps-5">
+   476→                    <div className="flex items-center gap-3">
+   477→                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky-100 dark:bg-sky-900/30 text-sky-600 font-bold text-xs">{u.name.charAt(0)}</div>
+   478→                      <span className="font-medium text-sm">{u.name}</span>
+   479→                    </div>
+   480→                  </TableCell>
+   481→                  <TableCell className="pe-3 text-sm text-muted-foreground hidden md:table-cell" dir="ltr">{u.email}</TableCell>
+   482→                  <TableCell className="pe-3 text-sm hidden sm:table-cell">{u.tenant}</TableCell>
+   483→                  <TableCell className="pe-3 hidden lg:table-cell"><Badge variant="secondary" className="text-xs">{u.role}</Badge></TableCell>
+   484→                  <TableCell className="pe-3"><StatusBadge status={u.status} /></TableCell>
+   485→                  <TableCell className="pe-5">
+   486→                    <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+   487→                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => { setForm({ name: u.name, email: u.email, tenant: u.tenant, role: u.role }); setDlg({ type: 'edit', user: u }) }}><Edit className="h-4 w-4" /></Button>
+   488→                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setDlg({ type: 'suspend', user: u })}>{u.status === 'suspended' ? <Power className="h-4 w-4 text-emerald-600" /> : <PowerOff className="h-4 w-4 text-amber-600" />}</Button>
+   489→                      <Button size="icon" variant="ghost" className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30" onClick={() => setDlg({ type: 'delete', user: u })}><Trash2 className="h-4 w-4" /></Button>
+   490→                    </div>
+   491→                  </TableCell>
+   492→                </TableRow>
+   493→              ))}
+   494→            </TableBody>
+   495→          </Table>
+   496→        </div>
+   497→        <div className="border-t px-5 py-3 text-xs text-muted-foreground">عرض {filtered.length} من {users.length} مستخدم</div>
+   498→      </Card>
+   499→
+   500→      <Dialog open={dlg?.type === 'add' || dlg?.type === 'edit'} onOpenChange={() => setDlg(null)}>
+   501→        <DialogContent className="max-w-md"><DialogHeader><DialogTitle>{dlg?.type === 'add' ? 'إضافة مستخدم' : 'تعديل المستخدم'}</DialogTitle></DialogHeader>
+   502→          <div className="space-y-4 pt-2">
+   503→            <FormField label="الاسم"><Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} /></FormField>
+   504→            <FormField label="البريد الإلكتروني"><Input type="email" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} dir="ltr" /></FormField>
+   505→            <FormField label="المستأجر"><Input value={form.tenant} onChange={e => setForm(p => ({ ...p, tenant: e.target.value }))} /></FormField>
+   506→            <FormField label="الدور"><Select value={form.role} onValueChange={v => setForm(p => ({ ...p, role: v }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{['مالك','مدير','موظف استقبال','محاسب'].map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent></Select></FormField>
+   507→          </div>
+   508→          <DialogFooter className="pt-4"><Button variant="outline" onClick={() => setDlg(null)}>إلغاء</Button><Button className="bg-violet-600 hover:bg-violet-700" onClick={handleSave}>حفظ</Button></DialogFooter>
+   509→        </DialogContent>
+   510→      </Dialog>
+   511→      <ConfirmDialog open={dlg?.type === 'delete'} onOpenChange={() => setDlg(null)} title="حذف المستخدم" desc={`حذف "${dlg?.user?.name}"؟`} onConfirm={() => { setUsers(p => p.filter(u => u.id !== dlg?.user!.id)); toast.success('تم الحذف') }} danger />
+   512→      <ConfirmDialog open={dlg?.type === 'suspend'} onOpenChange={() => setDlg(null)} title="تغيير الحالة" desc={`${dlg?.user?.status === 'suspended' ? 'تفعيل' : 'تعليق'} "${dlg?.user?.name}"`} onConfirm={() => { setUsers(p => p.map(u => u.id === dlg?.user!.id ? { ...u, status: u.status === 'suspended' ? 'active' : 'suspended' } : u)); toast.success('تم التحديث') }} />
+   513→    </div>
+   514→  )
+   515→}
+   516→
+   517→// ─── PAGE 4: PLANS ─────────────────────────────────────────────
+   518→function PlansPage() {
+   519→  const [detailPlan, setDetailPlan] = useState<typeof PLANS[0] | null>(null)
+   520→  return (
+   521→    <div className="space-y-6">
+   522→      <PageTitle title="الباقات والاشتراكات" action={<Button className="gap-2 bg-violet-600 hover:bg-violet-700" onClick={() => toast.success('سيتم فتح نموذج إنشاء باقة جديدة')}><Plus className="h-4 w-4" />إنشاء باقة</Button>} />
+   523→      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5">
+   524→        {PLANS.map((p, i) => (
+   525→          <motion.div key={p.id} variants={fade} initial="hidden" animate="visible" transition={{ delay: i * 0.04 }}>
+   526→            <Card className={`h-full flex flex-col transition-all hover:shadow-lg cursor-pointer ${p.popular ? 'border-violet-500 border-2 shadow-violet-500/10' : ''}`} onClick={() => setDetailPlan(p)}>
+   527→              <CardContent className="flex-1 flex flex-col items-center p-6 pt-8">
+   528→                {p.popular && <Badge className="bg-violet-600 text-white mb-4 -mt-2">الأكثر شعبية</Badge>}
+   529→                <div className={`h-12 w-12 rounded-2xl ${p.color} flex items-center justify-center mb-4`}><CreditCard className="h-6 w-6 text-white" /></div>
+   530→                <h3 className="font-bold text-lg">{p.name}</h3>
+   531→                <p className="text-3xl font-extrabold mt-3 mb-1">{p.price > 0 ? p.price : 'مجاني'}</p>
+   532→                <p className="text-xs text-muted-foreground mb-5">{p.price > 0 ? 'ر.س / شهر' : ''} · {p.tenants} مستأجر</p>
+   533→                <Separator className="w-full mb-5" />
+   534→                <ul className="space-y-2.5 w-full text-start flex-1">{p.features.map((f, j) => (
+   535→                  <li key={j} className="flex items-start gap-2 text-sm"><CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" /><span>{f}</span></li>
+   536→                ))}</ul>
+   537→                <Button className={`w-full mt-6 ${p.popular ? 'bg-violet-600 hover:bg-violet-700' : ''}`} variant={p.popular ? 'default' : 'outline'}>إدارة الباقة</Button>
+   538→              </CardContent>
+   539→            </Card>
+   540→          </motion.div>
+   541→        ))}
+   542→      </div>
+   543→      <Dialog open={!!detailPlan} onOpenChange={() => setDetailPlan(null)}>
+   544→        <DialogContent className="max-w-sm"><DialogHeader><DialogTitle>{detailPlan?.name}</DialogTitle></DialogHeader>
+   545→          {detailPlan && <div className="space-y-4 pt-2">
+   546→            <div className="text-center"><p className="text-3xl font-extrabold">{detailPlan.price > 0 ? `${detailPlan.price} ر.س` : 'مجاني'}</p><p className="text-sm text-muted-foreground mt-1">شهرياً · {detailPlan.tenants} مستأجر</p></div>
+   547→            <Separator />
+   548→            <ul className="space-y-2">{detailPlan.features.map((f, i) => (<li key={i} className="flex items-center gap-2 text-sm"><CheckCircle2 className="h-4 w-4 text-emerald-500" />{f}</li>))}</ul>
+   549→          </div>}
+   550→          <DialogFooter><Button variant="outline" onClick={() => setDetailPlan(null)}>إغلاق</Button><Button className="bg-violet-600 hover:bg-violet-700" onClick={() => { toast.success('سيتم فتح تعديل الباقة'); setDetailPlan(null) }}>تعديل</Button></DialogFooter>
+   551→        </DialogContent>
+   552→      </Dialog>
+   553→    </div>
+   554→  )
+   555→}
+   556→
+   557→// ─── PAGE 5: BILLING ───────────────────────────────────────────
+   558→function BillingPage() {
+   559→  const [filter, setFilter] = useState('all')
+   560→  const filtered = useMemo(() => filter === 'all' ? INVOICES : INVOICES.filter(i => i.status === filter), [filter])
+   561→  const totalPaid = INVOICES.filter(i => i.status === 'paid').reduce((s, i) => s + i.amount, 0)
+   562→  const totalPending = INVOICES.filter(i => i.status === 'pending' || i.status === 'overdue').reduce((s, i) => s + i.amount, 0)
+   563→
+   564→  const stats = [
+   565→    { label: 'المدفوعات', value: `${totalPaid.toLocaleString()} ر.س`, icon: CheckCircle2, color: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30' },
+   566→    { label: 'المعلقات', value: `${totalPending.toLocaleString()} ر.س`, icon: Clock, color: 'text-amber-600 bg-amber-50 dark:bg-amber-950/30' },
+   567→    { label: 'مدفوعة', value: `${INVOICES.filter(i => i.status === 'paid').length}`, icon: DollarSign, color: 'text-sky-600 bg-sky-50 dark:bg-sky-950/30' },
+   568→    { label: 'متأخرة', value: `${INVOICES.filter(i => i.status === 'overdue').length}`, icon: AlertTriangle, color: 'text-red-600 bg-red-50 dark:bg-red-950/30' },
+   569→  ]
+   570→
+   571→  return (
+   572→    <div className="space-y-6">
+   573→      <PageTitle title="الفواتير والمدفوعات" action={<Button className="gap-2 bg-violet-600 hover:bg-violet-700" onClick={() => toast.success('سيتم إنشاء فاتورة جديدة')}><Plus className="h-4 w-4" />إنشاء فاتورة</Button>} />
+   574→      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+   575→        {stats.map(s => (
+   576→          <Card key={s.label}><CardContent className="p-5">
+   577→            <div className="flex items-center gap-3">
+   578→              <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${s.color}`}><s.icon className="h-5 w-5" /></div>
+   579→              <div><p className="text-xs text-muted-foreground">{s.label}</p><p className="text-lg font-bold">{s.value}</p></div>
+   580→            </div>
+   581→          </CardContent></Card>
+   582→        ))}
+   583→      </div>
+   584→      <div className="flex gap-3">
+   585→        <Select value={filter} onValueChange={setFilter}><SelectTrigger className="w-44 h-10"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">الكل</SelectItem><SelectItem value="paid">مدفوع</SelectItem><SelectItem value="pending">معلق</SelectItem><SelectItem value="overdue">متأخر</SelectItem><SelectItem value="failed">فاشل</SelectItem></SelectContent></Select>
+   586→      </div>
+   587→      <Card className="overflow-hidden"><div className="overflow-x-auto">
+   588→        <Table><TableHeader><TableRow className="bg-muted/40 hover:bg-muted/40">
+   589→          <TableHead className="ps-5 font-semibold">رقم الفاتورة</TableHead><TableHead className="pe-3 font-semibold">المستأجر</TableHead><TableHead className="pe-3 font-semibold hidden sm:table-cell">الباقة</TableHead><TableHead className="pe-3 font-semibold text-end">المبلغ</TableHead><TableHead className="pe-3 font-semibold">الحالة</TableHead><TableHead className="pe-3 font-semibold hidden md:table-cell">التاريخ</TableHead><TableHead className="pe-5 font-semibold text-end">إجراءات</TableHead>
+   590→        </TableRow></TableHeader>
+   591→        <TableBody>{filtered.map(inv => (
+   592→          <TableRow key={inv.id} className="group hover:bg-muted/20">
+   593→            <TableCell className="ps-5 font-mono text-sm font-semibold">{inv.id}</TableCell>
+   594→            <TableCell className="pe-3 text-sm">{inv.tenant}</TableCell>
+   595→            <TableCell className="pe-3 hidden sm:table-cell"><Badge variant="secondary" className="text-xs">{inv.plan}</Badge></TableCell>
+   596→            <TableCell className="pe-3 text-end font-semibold tabular-nums text-sm">{inv.amount.toLocaleString()} <span className="text-xs font-normal text-muted-foreground">ر.س</span></TableCell>
+   597→            <TableCell className="pe-3"><StatusBadge status={inv.status} /></TableCell>
+   598→            <TableCell className="pe-3 text-xs text-muted-foreground hidden md:table-cell">{inv.date}</TableCell>
+   599→            <TableCell className="pe-5">
+   600→              <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+   601→                <Button size="sm" variant="ghost" className="h-8 text-xs gap-1" onClick={() => toast.info(`عرض ${inv.id}`)}><Eye className="h-3.5 w-3.5" /><span className="hidden sm:inline">عرض</span></Button>
+   602→                <Button size="sm" variant="ghost" className="h-8 text-xs gap-1" onClick={() => toast.success(`تنزيل ${inv.id}`)}><Download className="h-3.5 w-3.5" /></Button>
+   603→              </div>
+   604→            </TableCell>
+   605→          </TableRow>
+   606→        ))}</TableBody></Table>
+   607→      </div></Card>
+   608→    </div>
+   609→  )
+   610→}
+   611→
+   612→// ─── PAGE 6-9: ROLES / AUDIT / NOTIFICATIONS / REPORTS ─────────
+   613→function RolesPage() {
+   614→  const [addOpen, setAddOpen] = useState(false)
+   615→  const [form, setForm] = useState({ name: '', nameEn: '', desc: '' })
+   616→  return (
+   617→    <div className="space-y-6">
+   618→      <PageTitle title="الأدوار والصلاحيات" action={<Button className="gap-2 bg-violet-600 hover:bg-violet-700" onClick={() => setAddOpen(true)}><Plus className="h-4 w-4" />إضافة دور</Button>} />
+   619→      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+   620→        {ROLES.map(r => (
+   621→          <Card key={r.id} className="group transition-all hover:shadow-md">
+   622→            <CardContent className="p-6">
+   623→              <div className="flex items-start justify-between mb-4">
+   624→                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-100 dark:bg-violet-900/30"><Shield className="h-5 w-5 text-violet-600" /></div>
+   625→                <Badge variant="secondary" className="text-xs">{r.permissions} صلاحية</Badge>
+   626→              </div>
+   627→              <h3 className="font-bold text-base">{r.name}</h3>
+   628→              <p className="text-xs text-muted-foreground mb-2">{r.nameEn}</p>
+   629→              <p className="text-sm text-muted-foreground mb-4 leading-relaxed">{r.description}</p>
+   630→              <div className="flex items-center justify-between pt-3 border-t">
+   631→                <span className="text-xs text-muted-foreground">{r.users} مستخدم</span>
+   632→                <div className="flex gap-1">
+   633→                  <Button size="sm" variant="ghost" className="h-8 text-xs gap-1" onClick={() => toast.info('تعديل الدور')}><Edit className="h-3.5 w-3.5" />تعديل</Button>
+   634→                  <Button size="sm" variant="ghost" className="h-8 text-xs text-red-500" onClick={() => toast.success('تم حذف الدور')}><Trash2 className="h-3.5 w-3.5" /></Button>
+   635→                </div>
+   636→              </div>
+   637→            </CardContent>
+   638→          </Card>
+   639→        ))}
+   640→      </div>
+   641→      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+   642→        <DialogContent className="max-w-md"><DialogHeader><DialogTitle>إضافة دور جديد</DialogTitle></DialogHeader>
+   643→          <div className="space-y-4 pt-2">
+   644→            <FormField label="اسم الدور"><Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} /></FormField>
+   645→            <FormField label="الاسم (إنجليزي)"><Input value={form.nameEn} onChange={e => setForm(p => ({ ...p, nameEn: e.target.value }))} dir="ltr" /></FormField>
+   646→            <FormField label="الوصف"><Input value={form.desc} onChange={e => setForm(p => ({ ...p, desc: e.target.value }))} /></FormField>
+   647→          </div>
+   648→          <DialogFooter className="pt-4"><Button variant="outline" onClick={() => setAddOpen(false)}>إلغاء</Button><Button className="bg-violet-600 hover:bg-violet-700" onClick={() => { toast.success('تم إنشاء الدور'); setAddOpen(false) }}>إنشاء</Button></DialogFooter>
+   649→        </DialogContent>
+   650→      </Dialog>
+   651→    </div>
+   652→  )
+   653→}
+   654→
+   655→function AuditPage() {
+   656→  const [filter, setFilter] = useState('all')
+   657→  const filtered = useMemo(() => filter === 'all' ? LOGS : LOGS.filter(l => l.level === filter), [filter])
+   658→  return (
+   659→    <div className="space-y-6">
+   660→      <PageTitle title="سجل العمليات" action={<Button className="gap-2" variant="outline" onClick={() => toast.success('تم تصدير السجل')}><Download className="h-4 w-4" />تصدير</Button>} />
+   661→      <div className="flex flex-wrap gap-2">
+   662→        {['all','info','success','warn','error'].map(f => (
+   663→          <Button key={f} size="sm" variant={filter === f ? 'default' : 'outline'} className="text-xs h-8 rounded-full px-4" onClick={() => setFilter(f)}>
+   664→            {f === 'all' ? 'الكل' : f.toUpperCase()}
+   665→          </Button>
+   666→        ))}
+   667→      </div>
+   668→      <Card className="overflow-hidden"><div className="overflow-x-auto">
+   669→        <Table><TableHeader><TableRow className="bg-muted/40 hover:bg-muted/40">
+   670→          <TableHead className="ps-5 font-semibold w-20">المستوى</TableHead><TableHead className="pe-3 font-semibold">الرسالة</TableHead><TableHead className="pe-3 font-semibold hidden sm:table-cell">المصدر</TableHead><TableHead className="pe-5 font-semibold">التاريخ</TableHead>
+   671→        </TableRow></TableHeader>
+   672→        <TableBody>{filtered.map(l => (
+   673→          <TableRow key={l.id} className="hover:bg-muted/20">
+   674→            <TableCell className="ps-5"><span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${LOG_COLORS[l.level] || ''}`}>{l.level.toUpperCase()}</span></TableCell>
+   675→            <TableCell className="pe-3 text-sm max-w-[400px]">{l.message}</TableCell>
+   676→            <TableCell className="pe-3 text-xs text-muted-foreground hidden sm:table-cell">{l.source}</TableCell>
+   677→            <TableCell className="pe-5 text-xs text-muted-foreground whitespace-nowrap">{new Date(l.timestamp).toLocaleString('ar-SA')}</TableCell>
+   678→          </TableRow>
+   679→        ))}</TableBody></Table>
+   680→      </div></Card>
+   681→    </div>
+   682→  )
+   683→}
+   684→
+   685→function NotificationsPage() {
+   686→  const [sendOpen, setSendOpen] = useState(false)
+   687→  const [msg, setMsg] = useState({ title: '', body: '', target: 'all' })
+   688→  const templates = [
+   689→    { id: '1', name: 'ترحيب مستأجر جديد', type: 'بريد إلكتروني', status: 'active', sent: 156 },
+   690→    { id: '2', name: 'تذكير بالدفع', type: 'بريد + SMS', status: 'active', sent: 89 },
+   691→    { id: '3', name: 'إشعار تعليق الحساب', type: 'بريد إلكتروني', status: 'active', sent: 12 },
+   692→    { id: '4', name: 'تقرير أسبوعي', type: 'بريد إلكتروني', status: 'inactive', sent: 0 },
+   693→  ]
+   694→  return (
+   695→    <div className="space-y-6">
+   696→      <PageTitle title="الإشعارات" action={<Button className="gap-2 bg-violet-600 hover:bg-violet-700" onClick={() => setSendOpen(true)}><Bell className="h-4 w-4" />إرسال إشعار</Button>} />
+   697→      <Card className="overflow-hidden"><div className="overflow-x-auto">
+   698→        <Table><TableHeader><TableRow className="bg-muted/40 hover:bg-muted/40">
+   699→          <TableHead className="ps-5 font-semibold">القالب</TableHead><TableHead className="pe-3 font-semibold hidden sm:table-cell">النوع</TableHead><TableHead className="pe-3 font-semibold">الحالة</TableHead><TableHead className="pe-3 font-semibold hidden md:table-cell text-end">مرات الإرسال</TableHead><TableHead className="pe-5 font-semibold text-end">إجراءات</TableHead>
+   700→        </TableRow></TableHeader>
+   701→        <TableBody>{templates.map(t => (
+   702→          <TableRow key={t.id} className="group hover:bg-muted/20">
+   703→            <TableCell className="ps-5 font-medium text-sm">{t.name}</TableCell>
+   704→            <TableCell className="pe-3 text-sm hidden sm:table-cell">{t.type}</TableCell>
+   705→            <TableCell className="pe-3"><StatusBadge status={t.status} /></TableCell>
+   706→            <TableCell className="pe-3 tabular-nums text-sm hidden md:table-cell text-end">{t.sent}</TableCell>
+   707→            <TableCell className="pe-5">
+   708→              <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+   709→                <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => toast.info('تعديل القالب')}><Edit className="h-3.5 w-3.5" /></Button>
+   710→                <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => toast.success('تم إرسال اختبار')}><Mail className="h-3.5 w-3.5" /></Button>
+   711→              </div>
+   712→            </TableCell>
+   713→          </TableRow>
+   714→        ))}</TableBody></Table>
+   715→      </div></Card>
+   716→      <Dialog open={sendOpen} onOpenChange={setSendOpen}>
+   717→        <DialogContent className="max-w-md"><DialogHeader><DialogTitle>إرسال إشعار</DialogTitle></DialogHeader>
+   718→          <div className="space-y-4 pt-2">
+   719→            <FormField label="العنوان"><Input value={msg.title} onChange={e => setMsg(p => ({ ...p, title: e.target.value }))} /></FormField>
+   720→            <FormField label="المحتوى"><Input value={msg.body} onChange={e => setMsg(p => ({ ...p, body: e.target.value }))} /></FormField>
+   721→            <FormField label="الفئة"><Select value={msg.target} onValueChange={v => setMsg(p => ({ ...p, target: v }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">الجميع</SelectItem><SelectItem value="active">النشطون</SelectItem><SelectItem value="trial">التجريبية</SelectItem></SelectContent></Select></FormField>
+   722→          </div>
+   723→          <DialogFooter className="pt-4"><Button variant="outline" onClick={() => setSendOpen(false)}>إلغاء</Button><Button className="bg-violet-600 hover:bg-violet-700" onClick={() => { toast.success('تم الإرسال'); setSendOpen(false) }}>إرسال</Button></DialogFooter>
+   724→        </DialogContent>
+   725→      </Dialog>
+   726→    </div>
+   727→  )
+   728→}
+   729→
+   730→function ReportsPage() {
+   731→  const reports = [
+   732→    { id: '1', name: 'تقرير الإيرادات الشهري', desc: 'ملخص شامل للإيرادات حسب المستأجر والباقة', type: 'مالي', last: '2025-06-18' },
+   733→    { id: '2', name: 'تقرير النمو', desc: 'معدلات النمو في المستأجرين والحجوزات', type: 'تشغيلي', last: '2025-06-17' },
+   734→    { id: '3', name: 'تقرير الأمان', desc: 'محاولات الدخول والتهديدات الأمنية', type: 'أمني', last: '2025-06-18' },
+   735→    { id: '4', name: 'تقرير الأداء', desc: 'أداء الخوادم وAPI واستجابة النظام', type: 'تقني', last: '2025-06-16' },
+   736→    { id: '5', name: 'تقرير المستخدمين', desc: 'نشاط المستخدمين وتوزيع الأدوار', type: 'تشغيلي', last: '2025-06-15' },
+   737→    { id: '6', name: 'تقرير الفواتير', desc: 'ملخص الفواتير والمدفوعات المتأخرة', type: 'مالي', last: '2025-06-14' },
+   738→  ]
+   739→  return (
+   740→    <div className="space-y-6">
+   741→      <PageTitle title="التقارير" />
+   742→      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+   743→        {reports.map(r => (
+   744→          <Card key={r.id} className="group transition-all hover:shadow-md">
+   745→            <CardContent className="p-6">
+   746→              <div className="flex items-start justify-between mb-4">
+   747→                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-sky-100 dark:bg-sky-900/30"><BarChart3 className="h-5 w-5 text-sky-600" /></div>
+   748→                <Badge variant="outline" className="text-xs">{r.type}</Badge>
+   749→              </div>
+   750→              <h3 className="font-bold text-sm mb-1">{r.name}</h3>
+   751→              <p className="text-xs text-muted-foreground mb-5 leading-relaxed">{r.desc}</p>
+   752→              <div className="flex items-center justify-between pt-3 border-t">
+   753→                <span className="text-[11px] text-muted-foreground">آخر توليد: {r.last}</span>
+   754→                <div className="flex gap-1">
+   755→                  <Button size="sm" variant="outline" className="h-8 text-xs gap-1" onClick={() => toast.success('جاري التوليد...')}><RefreshCw className="h-3 w-3" />توليد</Button>
+   756→                  <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => toast.success('جاري التنزيل...')}><Download className="h-3.5 w-3.5" /></Button>
+   757→                </div>
+   758→              </div>
+   759→            </CardContent>
+   760→          </Card>
+   761→        ))}
+   762→      </div>
+   763→    </div>
+   764→  )
+   765→}
+   766→
+   767→// ─── PAGE 10-14: SYSTEM / SERVERS / DB / SECURITY / SETTINGS ──
+   768→function SystemPage() {
+   769→  const gauges = [
+   770→    { label: 'API', value: 99, icon: Server },
+   771→    { label: 'قاعدة البيانات', value: 85, icon: Database },
+   772→    { label: 'الذاكرة', value: 78, icon: Monitor },
+   773→    { label: 'القرص', value: 62, icon: HardDrive },
+   774→    { label: 'CDN', value: 100, icon: Globe },
+   775→    { label: 'Worker', value: 95, icon: RefreshCw },
+   776→  ]
+   777→  return (
+   778→    <div className="space-y-6">
+   779→      <PageTitle title="صحة النظام" action={<Button className="gap-2" variant="outline" onClick={() => toast.success('تم التحديث')}><RefreshCw className="h-4 w-4" />تحديث</Button>} />
+   780→      <div className="grid grid-cols-3 sm:grid-cols-6 gap-4">
+   781→        {gauges.map((g, i) => (
+   782→          <motion.div key={g.label} variants={fade} initial="hidden" animate="visible" transition={{ delay: i * 0.04 }}>
+   783→            <Card className="text-center">
+   784→              <CardContent className="p-4">
+   785→                <div className="relative mx-auto h-16 w-16 mb-2">
+   786→                  <svg className={`h-16 w-16 -rotate-90 ${g.value > 80 ? 'text-red-500' : g.value > 60 ? 'text-amber-500' : 'text-emerald-500'}`} viewBox="0 0 64 64">
+   787→                    <circle cx="32" cy="32" r="28" fill="none" stroke="currentColor" strokeWidth="4" className="opacity-15" />
+   788→                    <circle cx="32" cy="32" r="28" fill="none" stroke="currentColor" strokeWidth="4" strokeDasharray={`${2 * Math.PI * 28 * g.value / 100} ${2 * Math.PI * 28}`} strokeLinecap="round" />
+   789→                  </svg>
+   790→                  <span className="absolute inset-0 flex items-center justify-center text-sm font-bold">{g.value}%</span>
+   791→                </div>
+   792→                <div className="flex items-center justify-center gap-1.5 text-muted-foreground"><g.icon className="h-3.5 w-3.5" /><span className="text-xs font-medium">{g.label}</span></div>
+   793→              </CardContent>
+   794→            </Card>
+   795→          </motion.div>
+   796→        ))}
+   797→      </div>
+   798→      <Card><CardHeader className="pb-4"><CardTitle className="text-base font-semibold">سجل النظام</CardTitle></CardHeader>
+   799→        <CardContent><div className="space-y-1">{LOGS.map(l => (
+   800→          <div key={l.id} className="flex items-start gap-3 rounded-lg px-3 py-2.5 hover:bg-muted/50">
+   801→            <LogDot level={l.level} />
+   802→            <div className="min-w-0 flex-1"><p className="text-sm leading-relaxed">{l.message}</p><p className="text-[11px] text-muted-foreground mt-0.5">{l.source} — {new Date(l.timestamp).toLocaleString('ar-SA')}</p></div>
+   803→          </div>
+   804→        ))}</div></CardContent>
+   805→      </Card>
+   806→    </div>
+   807→  )
+   808→}
+   809→
+   810→function ServersPage() {
+   811→  const [addOpen, setAddOpen] = useState(false)
+   812→  return (
+   813→    <div className="space-y-6">
+   814→      <PageTitle title="الخوادم" action={<Button className="gap-2 bg-violet-600 hover:bg-violet-700" onClick={() => setAddOpen(true)}><Plus className="h-4 w-4" />إضافة خادم</Button>} />
+
+[showing lines 315-814 of 1036; use offset=815 with limit to continue reading]
