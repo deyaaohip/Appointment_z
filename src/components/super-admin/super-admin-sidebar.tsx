@@ -133,7 +133,7 @@ function SidebarContent({ collapsed, onNavigate }: { collapsed: boolean; onNavig
             <button className="flex items-center gap-2.5 w-full rounded-lg p-2 hover:bg-muted transition-colors">
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-indigo-500 text-white font-bold text-xs">{currentUser?.name?.charAt(0) || 'SA'}</div>
               {!collapsed && (
-                <div className="flex-1 min-w-0 text-start">
+                <div className={`flex-1 min-w-0 ${isRTL ? 'text-right' : 'text-left'}`}>
                   <p className="text-sm font-semibold truncate">{currentUser?.name || (isRTL ? 'مدير النظام' : 'Super Admin')}</p>
                   <p className="text-[10px] text-muted-foreground truncate">{currentUser?.email || 'admin@bookflow.com'}</p>
                 </div>

@@ -159,7 +159,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   setBrandSettings: (settings) => set({ brandSettings: settings }),
   customCurrency: 'JOD',
   setCustomCurrency: (currency) => set({ customCurrency: currency }),
-  customTimezone: 'Asia/Riyadh',
+  customTimezone: 'Asia/Amman',
   setCustomTimezone: (tz) => set({ customTimezone: tz }),
   themeMode: 'light',
   setThemeMode: (mode) => set({ themeMode: mode }),

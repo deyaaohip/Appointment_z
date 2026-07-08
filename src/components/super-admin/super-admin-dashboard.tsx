@@ -169,6 +169,9 @@ function TenantsPage() {
   const [sort, setSort] = useState<SortState>({ key: 'name', dir: 'asc' })
   const [dlg, setDlg] = useState<{ type: string; tenant?: Tenant } | null>(null)
   const [form, setForm] = useState({ name: '', nameEn: '', email: '', country: '', plan: 'Starter' })
+  const [extendDlg, setExtendDlg] = useState<Tenant | null>(null)
+  const [extendMonths, setExtendMonths] = useState(12)
+  const [extendPlan, setExtendPlan] = useState('')
 
   const filtered = useMemo(() => {
     let list = [...tenants]
@@ -203,6 +206,22 @@ function TenantsPage() {
     setPage(1)
   }
 
+  const openExtend = (tn: Tenant) => { setExtendDlg(tn); setExtendPlan(tn.plan); setExtendMonths(12) }
+  const handleExtend = () => {
+    if (!extendDlg) return
+    const startDate = extendDlg.subscriptionEndDate && extendDlg.subscriptionEndDate > new Date().toISOString().split('T')[0]
+      ? new Date(extendDlg.subscriptionEndDate) : new Date()
+    const newEnd = new Date(startDate)
+    newEnd.setMonth(newEnd.getMonth() + extendMonths)
+    setTenants(p => p.map(x => x.id === extendDlg.id ? {
+      ...x, plan: extendPlan || x.plan,
+      subscriptionStatus: 'active', status: 'active',
+      subscriptionEndDate: newEnd.toISOString().split('T')[0]
+    } : x))
+    toast.success(t.subscriptionExtended)
+    setExtendDlg(null)
+  }
+
   const tnName = (tn: Tenant) => bField(tn, 'name', lang)
 
   return (
@@ -230,10 +249,11 @@ function TenantsPage() {
               <SortableTH label={t.bookings} sortKey="bookings" currentSort={sort} onSort={handleSort} align="end" />
               <SortableTH label={t.tenantRevenue} sortKey="revenue" currentSort={sort} onSort={handleSort} align="end" />
               <SortableTH label={t.status} sortKey="status" currentSort={sort} onSort={handleSort} />
+              <TableHead className="px-3 font-semibold text-xs uppercase tracking-wider">{t.subscriptionStatus}</TableHead>
               <TableHead className="pe-5 font-semibold text-xs uppercase tracking-wider text-end">{t.actions}</TableHead>
             </TableRow></TableHeader>
             <TableBody>
-              {items.length === 0 ? <EmptyRow colSpan={6} /> : items.map(tn => (
+              {items.length === 0 ? <EmptyRow colSpan={7} /> : items.map(tn => (
                 <TableRow key={tn.id} className="group hover:bg-muted/20 transition-colors">
                   <TableCell className="ps-5">
                     <div className="flex items-center gap-3">
@@ -245,10 +265,17 @@ function TenantsPage() {
                   <TableCell className="px-3 text-end tabular-nums text-sm">{tn.bookings.toLocaleString()}</TableCell>
                   <TableCell className="px-3 text-end font-semibold tabular-nums text-sm">{tn.revenue.toLocaleString()} <span className="text-xs font-normal text-muted-foreground">{sym}</span></TableCell>
                   <TableCell className="px-3"><StatusBadge status={tn.status} locale={lang} /></TableCell>
+                  <TableCell className="px-3">
+                    <div className="space-y-0.5">
+                      <StatusBadge status={tn.subscriptionStatus} locale={lang} />
+                      {tn.subscriptionEndDate && <p className="text-[10px] text-muted-foreground">{t.subscriptionEnd}: {tn.subscriptionEndDate}</p>}
+                    </div>
+                  </TableCell>
                   <TableCell className="pe-5">
                     <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <ActionBtn icon={Eye} label={t.view} onClick={() => toast.info(t.details.replace('{name}', tnName(tn)))} />
                       <ActionBtn icon={Edit} label={t.edit} onClick={() => openEdit(tn)} />
+                      <ActionBtn icon={CalendarDays} label={t.extendSubscription} onClick={() => openExtend(tn)} />
                       <ActionBtn icon={tn.status === 'suspended' ? Power : PowerOff} label={tn.status === 'suspended' ? t.active : t.suspended} onClick={() => handleToggleStatus(tn)} />
                       <ActionBtn icon={Trash2} onClick={() => setDlg({ type: 'delete', tenant: tn })} danger />
                     </div>
@@ -277,7 +304,12 @@ function TenantsPage() {
               <div className="rounded-lg bg-muted/50 p-2"><p className="text-[10px] text-muted-foreground">{t.bookings}</p><p className="text-xs font-semibold mt-0.5 tabular-nums">{tn.bookings.toLocaleString()}</p></div>
               <div className="rounded-lg bg-muted/50 p-2"><p className="text-[10px] text-muted-foreground">{t.tenantRevenue}</p><p className="text-xs font-semibold mt-0.5 tabular-nums">{tn.revenue.toLocaleString()} {sym}</p></div>
             </div>
+            <div className="flex items-center gap-2 mb-3">
+              <StatusBadge status={tn.subscriptionStatus} locale={lang} />
+              {tn.subscriptionEndDate && <span className="text-[10px] text-muted-foreground">{t.subscriptionEnd}: {tn.subscriptionEndDate}</span>}
+            </div>
             <div className="flex items-center justify-end gap-1 pt-2 border-t">
+              <ActionBtn icon={CalendarDays} label={t.extendSubscription} onClick={() => openExtend(tn)} />
               <ActionBtn icon={Edit} label={t.edit} onClick={() => openEdit(tn)} />
               <ActionBtn icon={tn.status === 'suspended' ? Power : PowerOff} label={tn.status === 'suspended' ? t.active : t.suspended} onClick={() => handleToggleStatus(tn)} />
               <ActionBtn icon={Trash2} onClick={() => setDlg({ type: 'delete', tenant: tn })} danger />
@@ -301,6 +333,39 @@ function TenantsPage() {
         </DialogContent>
       </Dialog>
       <ConfirmDialog open={dlg?.type === 'delete'} onOpenChange={() => setDlg(null)} title={t.deleteTenantDlg} desc={t.deleteTenantDesc.replace('{name}', dlg?.tenant?.name || '')} onConfirm={() => { if (dlg?.tenant) handleDelete(dlg.tenant) }} danger />
+
+      {/* Extend Subscription Dialog */}
+      <Dialog open={!!extendDlg} onOpenChange={() => setExtendDlg(null)}>
+        <DialogContent className="max-w-md" dir={isRTL ? 'rtl' : 'ltr'}>
+          <DialogHeader><DialogTitle>{t.extendSubscriptionDlg}</DialogTitle></DialogHeader>
+          <div className="space-y-4 pt-2">
+            {extendDlg && <>
+              <div className="rounded-lg bg-muted/50 p-3 space-y-1">
+                <p className="font-semibold text-sm">{tnName(extendDlg)}</p>
+                <div className="flex items-center gap-2">
+                  <StatusBadge status={extendDlg.subscriptionStatus} locale={lang} />
+                  {extendDlg.subscriptionEndDate && <span className="text-[11px] text-muted-foreground">{t.subscriptionEnd}: {extendDlg.subscriptionEndDate}</span>}
+                </div>
+              </div>
+              <FormField label={t.plan}>
+                <Select value={extendPlan} onValueChange={setExtendPlan}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{PLANS.filter(p => p.price > 0).map(p => <SelectItem key={p.id} value={p.name}>{p.name} — {p.price} {sym}/{t.perMonth}</SelectItem>)}</SelectContent>
+                </Select>
+              </FormField>
+              <FormField label={t.durationMonths}>
+                <Select value={String(extendMonths)} onValueChange={v => setExtendMonths(Number(v))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {[1, 3, 6, 12, 24].map(m => <SelectItem key={m} value={String(m)}>{m} {t.months}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </FormField>
+            </>}
+          </div>
+          <DlgFooter onCancel={() => setExtendDlg(null)} onConfirm={handleExtend} />
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
@@ -506,8 +571,8 @@ function PlansPage() {
                 ))}</ul>
                 <div className="flex gap-2 w-full mt-6">
                   <Button className={`flex-1 ${p.popular ? 'bg-violet-600 hover:bg-violet-700 text-white' : ''}`} variant={p.popular ? 'default' : 'outline'} onClick={() => setDetailPlan(p)}>{t.view}</Button>
-                  <ActionBtn icon={Edit} label={t.edit} onClick={(e: React.MouseEvent) => { e.stopPropagation(); openEdit(p) }} />
-                  <ActionBtn icon={Trash2} onClick={(e: React.MouseEvent) => { e.stopPropagation(); setDlg({ type: 'delete', plan: p }) }} danger />
+                  <ActionBtn icon={Edit} label={t.edit} onClick={() => openEdit(p)} />
+                  <ActionBtn icon={Trash2} onClick={() => setDlg({ type: 'delete', plan: p })} danger />
                 </div>
               </CardContent>
             </Card>
@@ -622,22 +687,25 @@ function BillingPage() {
     setInvForm({ tenant: '', tenantEn: '', plan: 'Starter', amount: 0, status: 'pending' })
   }
 
-  const handleExportCSV = () => {
+  const handleExportExcel = () => {
+    const statusLabels: Record<string, string> = { paid: isRTL ? 'مدفوع' : 'Paid', pending: isRTL ? 'معلق' : 'Pending', overdue: isRTL ? 'متأخر' : 'Overdue', failed: isRTL ? 'فاشل' : 'Failed' }
     const headers = isRTL
       ? ['رقم الفاتورة', 'المستأجر', 'الباقة', 'المبلغ', 'العملة', 'الحالة', 'التاريخ']
       : ['Invoice No.', 'Tenant', 'Plan', 'Amount', 'Currency', 'Status', 'Date']
     const rows = filtered.map(inv => [
       inv.id, isRTL ? inv.tenant : (inv.tenantEn || inv.tenant), inv.plan,
-      inv.amount, inv.currency, inv.status, inv.date,
+      inv.amount, inv.currency, statusLabels[inv.status] || inv.status, inv.date,
     ])
-    const csv = [headers, ...rows].map(r => r.join(',')).join('\n')
-    const BOM = '\uFEFF'
-    const blob = new Blob([BOM + csv], { type: 'text/csv;charset=utf-8;' })
+    let html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8"><style>td,th{padding:6px 10px;border:1px solid #ddd;font-size:12px}th{background:#7c3aed;color:white;font-weight:bold}tr:nth-child(even){background:#f9f5ff}</style></head><body><table dir="' + (isRTL ? 'rtl' : 'ltr') + '">'
+    html += '<tr>' + headers.map(h => `<th>${h}</th>`).join('') + '</tr>'
+    rows.forEach(r => { html += '<tr>' + r.map(c => `<td>${c}</td>`).join('') + '</tr>' })
+    html += '</table></body></html>'
+    const blob = new Blob(['\ufeff' + html], { type: 'application/vnd.ms-excel' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
-    a.href = url; a.download = `invoices_${new Date().toISOString().split('T')[0]}.csv`
+    a.href = url; a.download = `invoices_${new Date().toISOString().split('T')[0]}.xlsx`
     document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url)
-    toast.success(isRTL ? 'تم تصدير الفواتير بنجاح' : 'Invoices exported successfully')
+    toast.success(isRTL ? 'تم تصدير الفواتير إلى Excel بنجاح' : 'Invoices exported to Excel successfully')
   }
 
   const handleDeleteInvoice = (inv: Invoice) => {
@@ -648,7 +716,7 @@ function BillingPage() {
     <div className="space-y-5">
       <PageTitle title={t.billingTitle} action={
         <div className="flex gap-2">
-          <Button variant="outline" className="gap-2 h-9" onClick={handleExportCSV}><Download className="h-4 w-4" />{t.export} CSV</Button>
+          <Button variant="outline" className="gap-2 h-9" onClick={handleExportExcel}><Download className="h-4 w-4" />{t.exportExcel}</Button>
           <PrimaryBtn icon={Plus} label={t.createInvoice} onClick={() => setAddOpen(true)} />
         </div>
       } />
@@ -687,7 +755,7 @@ function BillingPage() {
                 <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <ActionBtn icon={Eye} label={t.view} onClick={() => toast.info(t.viewingInvoice.replace('{id}', inv.id))} />
                   {inv.status !== 'paid' && <ActionBtn icon={CheckCircle2} label={t.paid} onClick={() => handleMarkPaid(inv)} />}
-                  <ActionBtn icon={Download} onClick={() => handleExportCSV()} />
+                  <ActionBtn icon={Download} onClick={() => handleExportExcel()} />
                   <ActionBtn icon={Trash2} onClick={() => handleDeleteInvoice(inv)} danger />
                 </div>
               </TableCell>
@@ -710,7 +778,7 @@ function BillingPage() {
               <span className="font-bold text-sm">{inv.amount.toLocaleString()} <span className="text-xs font-normal text-muted-foreground">{sym}</span></span>
               <div className="flex gap-1">
                 {inv.status !== 'paid' && <ActionBtn icon={CheckCircle2} onClick={() => handleMarkPaid(inv)} />}
-                <ActionBtn icon={Download} onClick={() => handleExportCSV()} />
+                <ActionBtn icon={Download} onClick={() => handleExportExcel()} />
                 <ActionBtn icon={Trash2} onClick={() => handleDeleteInvoice(inv)} danger />
               </div>
             </div>
@@ -1382,7 +1450,7 @@ function SettingsPage() {
 // PAGE 15: CLIQ PAYMENTS (Approve/Reject workflow)
 // ════════════════════════════════════════════════════════════════
 function CliqPaymentsPage() {
-  const { t, lang } = useSA()
+  const { t, lang, isRTL } = useSA()
   const { fmt, sym } = useCurrency()
   const [payments, setPayments] = useState<CliqPayment[]>(INIT_CLIQ_PAYMENTS)
   const [filter, setFilter] = useState('all')
@@ -1390,6 +1458,8 @@ function CliqPaymentsPage() {
   const [detail, setDetail] = useState<CliqPayment | null>(null)
   const [actionDlg, setActionDlg] = useState<{ type: 'approve' | 'reject' | 'info'; payment: CliqPayment } | null>(null)
   const [reasonText, setReasonText] = useState('')
+  const [newPayOpen, setNewPayOpen] = useState(false)
+  const [newPay, setNewPay] = useState({ tenantName: '', tenantNameEn: '', customerName: '', customerEmail: '', plan: 'Starter', amount: 0, referenceNumber: '', notes: '' })
 
   const filtered = useMemo(() => {
     if (filter === 'all') return payments
@@ -1407,8 +1477,28 @@ function CliqPaymentsPage() {
     } : x))
     toast.success(t.cliqApprovedMsg)
     setActionDlg(null)
-    // Log the approval action
-    console.log(`[CLIQ Audit] Payment ${p.id} approved for ${p.tenantName} - Plan: ${p.plan} - Amount: ${p.amount} JOD - Reviewed by: Super Admin`)
+  }
+
+  const handleSubmitNewPayment = () => {
+    if (!newPay.tenantName.trim()) { toast.error(isRTL ? 'يرجى اختيار المستأجر' : 'Please select a tenant'); return }
+    if (!newPay.customerName.trim()) { toast.error(isRTL ? 'يرجى إدخال اسم العميل' : 'Please enter customer name'); return }
+    if (!newPay.referenceNumber.trim()) { toast.error(t.cliqReferenceRequired); return }
+    if (newPay.amount <= 0) { toast.error(isRTL ? 'يرجى إدخال مبلغ صحيح' : 'Please enter a valid amount'); return }
+    const np: CliqPayment = {
+      id: `CLIQ-${String(payments.length + 1).padStart(3, '0')}`,
+      tenantName: newPay.tenantName, tenantNameEn: newPay.tenantNameEn,
+      customerName: newPay.customerName, customerEmail: newPay.customerEmail,
+      plan: newPay.plan, amount: newPay.amount, currency: 'JOD',
+      referenceNumber: newPay.referenceNumber, notes: newPay.notes,
+      screenshotUrl: null, status: 'pending_verification',
+      submittedAt: new Date().toISOString(), reviewedAt: null, reviewedBy: null,
+      rejectionReason: null, additionalInfoRequest: null,
+    }
+    setPayments(prev => [np, ...prev])
+    toast.success(t.cliqNewPaymentSuccess)
+    setNewPayOpen(false)
+    setNewPay({ tenantName: '', tenantNameEn: '', customerName: '', customerEmail: '', plan: 'Starter', amount: 0, referenceNumber: '', notes: '' })
+    setPage(1)
   }
 
   const handleReject = (p: CliqPayment) => {
@@ -1417,7 +1507,6 @@ function CliqPaymentsPage() {
       ...x, status: 'rejected', reviewedAt: new Date().toISOString(), reviewedBy: 'Super Admin', rejectionReason: reasonText
     } : x))
     toast.success(t.cliqRejectedMsg)
-    console.log(`[CLIQ Audit] Payment ${p.id} rejected for ${p.tenantName} - Reason: ${reasonText} - Reviewed by: Super Admin`)
     setActionDlg(null); setReasonText('')
   }
 
@@ -1427,13 +1516,12 @@ function CliqPaymentsPage() {
       ...x, status: 'info_requested', additionalInfoRequest: reasonText
     } : x))
     toast.success(t.cliqInfoRequestedMsg)
-    console.log(`[CLIQ Audit] Payment ${p.id} info requested for ${p.tenantName} - Request: ${reasonText} - By: Super Admin`)
     setActionDlg(null); setReasonText('')
   }
 
   return (
     <div className="space-y-5">
-      <PageTitle title={t.cliqTitle} />
+      <PageTitle title={t.cliqTitle} action={<PrimaryBtn icon={Plus} label={t.newCliqPayment} onClick={() => setNewPayOpen(true)} />} />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <StatCard icon={Wallet} label={t.cliqTotalPending} value={fmt(payments.filter(p => p.status === 'pending_verification').reduce((s, p) => s + p.amount, 0))} color="text-amber-600 bg-amber-50 dark:bg-amber-950/30" />
@@ -1559,6 +1647,42 @@ function CliqPaymentsPage() {
             <FormField label={t.cliqInfoRequestPrompt}><Textarea value={reasonText} onChange={e => setReasonText(e.target.value)} placeholder={t.cliqInfoRequestPrompt} rows={3} /></FormField>
           </div>
           <DlgFooter onCancel={() => setActionDlg(null)} onConfirm={() => { if (actionDlg?.payment) handleRequestInfo(actionDlg.payment) }} />
+        </DialogContent>
+      </Dialog>
+
+      {/* New Payment Dialog */}
+      <Dialog open={newPayOpen} onOpenChange={setNewPayOpen}>
+        <DialogContent className="max-w-md" dir={isRTL ? 'rtl' : 'ltr'}>
+          <DialogHeader><DialogTitle>{t.newCliqPaymentDlg}</DialogTitle></DialogHeader>
+          <div className="space-y-4 pt-2">
+            <FormField label={t.tenant}>
+              <Select value={newPay.tenantName} onValueChange={v => {
+                const tn = INIT_TENANTS.find(t => t.name === v || t.nameEn === v)
+                setNewPay(p => ({ ...p, tenantName: tn?.name || v, tenantNameEn: tn?.nameEn || v }))
+              }}>
+                <SelectTrigger><SelectValue placeholder={isRTL ? 'اختر المستأجر' : 'Select tenant'} /></SelectTrigger>
+                <SelectContent>{INIT_TENANTS.map(tn => <SelectItem key={tn.id} value={lang === 'en' ? tn.nameEn : tn.name}>{lang === 'en' ? tn.nameEn : tn.name}</SelectItem>)}</SelectContent>
+              </Select>
+            </FormField>
+            <FormField label={t.customerName}><Input value={newPay.customerName} onChange={e => setNewPay(p => ({ ...p, customerName: e.target.value }))} /></FormField>
+            <FormField label={t.customerEmail}><Input type="email" value={newPay.customerEmail} onChange={e => setNewPay(p => ({ ...p, customerEmail: e.target.value }))} dir="ltr" /></FormField>
+            <div className="grid grid-cols-2 gap-3">
+              <FormField label={t.plan}>
+                <Select value={newPay.plan} onValueChange={v => {
+                  setNewPay(p => ({ ...p, plan: v }))
+                  const plan = PLANS.find(pl => pl.name === v)
+                  if (plan) setNewPay(p => ({ ...p, amount: plan.price }))
+                }}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{PLANS.map(p => <SelectItem key={p.id} value={p.name}>{p.name} ({p.price} {sym})</SelectItem>)}</SelectContent>
+                </Select>
+              </FormField>
+              <FormField label={t.amount}><Input type="number" value={newPay.amount || ''} onChange={e => setNewPay(p => ({ ...p, amount: Number(e.target.value) }))} /></FormField>
+            </div>
+            <FormField label={t.referenceNumber}><Input value={newPay.referenceNumber} onChange={e => setNewPay(p => ({ ...p, referenceNumber: e.target.value }))} placeholder={isRTL ? 'مثال: TXN-2025-XXXXXX' : 'e.g. TXN-2025-XXXXXX'} dir="ltr" /></FormField>
+            <FormField label={t.notes}><Textarea value={newPay.notes} onChange={e => setNewPay(p => ({ ...p, notes: e.target.value }))} rows={2} /></FormField>
+          </div>
+          <DlgFooter onCancel={() => setNewPayOpen(false)} onConfirm={handleSubmitNewPayment} confirmLabel={t.cliqSubmitPayment} />
         </DialogContent>
       </Dialog>
     </div>

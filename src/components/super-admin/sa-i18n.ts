@@ -388,6 +388,29 @@ interface T {
   reportDownloaded: string
   planDetails: string
   editRoleDlg: string
+
+  // Excel export
+  exportExcel: string
+
+  // Subscription management
+  extendSubscription: string
+  extendSubscriptionDlg: string
+  durationMonths: string
+  subscriptionExtended: string
+  subscriptionActivated: string
+  subscriptionStatus: string
+  subscriptionEnd: string
+  months: string
+
+  // CLIQ new payment
+  newCliqPayment: string
+  newCliqPaymentDlg: string
+  customerName: string
+  customerEmail: string
+  referenceNumber: string
+  notes: string
+  cliqNewPaymentSuccess: string
+  cliqInfoRequested2: string
 }
 
 const ar: T = {
@@ -748,6 +771,29 @@ const ar: T = {
   confirmDeleteServer: 'هل أنت متأكد من حذف هذا الخادم؟',
   confirmDeleteRole: 'هل أنت متأكد من حذف هذا الدور؟',
   confirmDeleteTemplate: 'هل أنت متأكد من حذف هذا القالب؟',
+
+  // Excel export
+  exportExcel: 'تصدير Excel',
+
+  // Subscription management
+  extendSubscription: 'تمديد الاشتراك',
+  extendSubscriptionDlg: 'تمديد اشتراك المستأجر',
+  durationMonths: 'مدة الاشتراك (أشهر)',
+  subscriptionExtended: 'تم تمديد الاشتراك بنجاح',
+  subscriptionActivated: 'تم تفعيل الاشتراك',
+  subscriptionStatus: 'حالة الاشتراك',
+  subscriptionEnd: 'ينتهي في',
+  months: 'أشهر',
+
+  // CLIQ new payment
+  newCliqPayment: 'طلب دفع جديد',
+  newCliqPaymentDlg: 'إرسال طلب دفع CLIQ',
+  customerName: 'اسم العميل',
+  customerEmail: 'البريد الإلكتروني',
+  referenceNumber: 'رقم المرجع',
+  notes: 'ملاحظات',
+  cliqNewPaymentSuccess: 'تم إرسال طلب الدفع بنجاح',
+  cliqInfoRequested2: 'طلب معلومات',
 }
 
 const en: T = {
@@ -1086,6 +1132,29 @@ const en: T = {
   confirmDeleteServer: 'Are you sure you want to delete this server?',
   confirmDeleteRole: 'Are you sure you want to delete this role?',
   confirmDeleteTemplate: 'Are you sure you want to delete this template?',
+
+  // Excel export
+  exportExcel: 'Export Excel',
+
+  // Subscription management
+  extendSubscription: 'Extend Subscription',
+  extendSubscriptionDlg: 'Extend Tenant Subscription',
+  durationMonths: 'Duration (Months)',
+  subscriptionExtended: 'Subscription extended successfully',
+  subscriptionActivated: 'Subscription activated',
+  subscriptionStatus: 'Subscription Status',
+  subscriptionEnd: 'Expires on',
+  months: 'months',
+
+  // CLIQ new payment
+  newCliqPayment: 'New Payment',
+  newCliqPaymentDlg: 'Submit CLIQ Payment Request',
+  customerName: 'Customer Name',
+  customerEmail: 'Customer Email',
+  referenceNumber: 'Reference Number',
+  notes: 'Notes',
+  cliqNewPaymentSuccess: 'Payment request submitted successfully',
+  cliqInfoRequested2: 'Request Info',
 }
 
 const translations: Record<Lang, T> = { ar, en }
