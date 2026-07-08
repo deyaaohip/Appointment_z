@@ -51,11 +51,17 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet'
 
-// ─── Navigation Item Definition ──────────────────────────────────────
+// ─── Navigation Item Definition (subscription-driven) ─────────────
+// ALL navigation items are defined here with their module/feature keys.
+// Visibility is controlled by the active subscription plan.
 interface NavItemDef {
   key: string
   icon: LucideIcon
   permission?: PermissionResource
+  /** Module ID — page is visible only if plan includes this module */
+  module?: string
+  /** Feature ID — button/item is shown only if plan has this feature */
+  feature?: string
 }
 
 interface NavSection {
@@ -63,38 +69,39 @@ interface NavSection {
   items: NavItemDef[]
 }
 
-const navSections: NavSection[] = [
+// Master navigation definition — nothing hardcoded, all driven by subscription
+const ALL_NAV_ITEMS: NavSection[] = [
   {
     labelKey: 'sectionMain',
     items: [
-      { key: 'dashboard', icon: LayoutDashboard, permission: 'dashboard' },
-      { key: 'calendar', icon: CalendarDays },
-      { key: 'bookings', icon: CalendarCheck, permission: 'bookings' },
-      { key: 'customers', icon: Users, permission: 'customers' },
-      { key: 'employees', icon: UserCog, permission: 'employees' },
-      { key: 'services', icon: Package, permission: 'services' },
-      { key: 'resources', icon: Box },
-      { key: 'invoices', icon: FileText },
-      { key: 'payments', icon: CreditCard, permission: 'payments' },
-      { key: 'subscriptions', icon: Crown, permission: 'subscriptions' as PermissionResource },
-      { key: 'reports', icon: Monitor, permission: 'reports' },
+      { key: 'dashboard', icon: LayoutDashboard, permission: 'dashboard', module: 'dashboard' },
+      { key: 'calendar', icon: CalendarDays, module: 'calendar' },
+      { key: 'bookings', icon: CalendarCheck, permission: 'bookings', module: 'bookings' },
+      { key: 'customers', icon: Users, permission: 'customers', module: 'customers' },
+      { key: 'employees', icon: UserCog, permission: 'employees', module: 'employees' },
+      { key: 'services', icon: Package, permission: 'services', module: 'services' },
+      { key: 'resources', icon: Box, module: 'resources' },
+      { key: 'invoices', icon: FileText, module: 'invoices' },
+      { key: 'payments', icon: CreditCard, permission: 'payments', module: 'payments' },
+      { key: 'subscriptions', icon: Crown, permission: 'subscriptions' as PermissionResource, module: 'subscriptions' },
+      { key: 'reports', icon: Monitor, permission: 'reports', module: 'reports' },
     ],
   },
   {
     labelKey: 'sectionManagement',
     items: [
-      { key: 'notifications', icon: Bell, permission: 'notifications' },
-      { key: 'audit_logs', icon: ScrollText, permission: 'audit_logs' },
-      { key: 'branches', icon: Building2, permission: 'branches' },
-      { key: 'coupons', icon: Tag, permission: 'coupons' },
-      { key: 'roles', icon: Shield, permission: 'roles' },
-      { key: 'whatsapp', icon: MessageCircle, permission: 'whatsapp' as PermissionResource },
+      { key: 'notifications', icon: Bell, permission: 'notifications', module: 'notifications' },
+      { key: 'audit_logs', icon: ScrollText, permission: 'audit_logs', module: 'audit_logs' },
+      { key: 'branches', icon: Building2, permission: 'branches', module: 'branches' },
+      { key: 'coupons', icon: Tag, permission: 'coupons', module: 'coupons' },
+      { key: 'roles', icon: Shield, permission: 'roles', module: 'roles' },
+      { key: 'whatsapp', icon: MessageCircle, permission: 'whatsapp' as PermissionResource, module: 'whatsapp' },
     ],
   },
   {
     labelKey: 'sectionSettings',
     items: [
-      { key: 'settings', icon: Settings, permission: 'settings' },
+      { key: 'settings', icon: Settings, permission: 'settings', module: 'settings' },
       { key: 'admin_panel', icon: Monitor },
       { key: 'super_admin', icon: Shield },
       { key: 'white_label', icon: Palette },
@@ -126,13 +133,27 @@ function SidebarContent({ collapsed }: { collapsed: boolean }) {
     setTheme(theme === 'dark' ? 'light' : 'dark')
   }, [theme, setTheme])
 
-  const canView = (resource?: PermissionResource): boolean => {
-    if (!resource) return true
+  // ─── Subscription-driven visibility ─────────────────────────
+  // Checks BOTH RBAC permissions AND plan modules.
+  // If no permissions are loaded (demo/offline mode), falls back to plan modules.
+  const canView = (item: NavItemDef): boolean => {
+    // Always show admin/super_admin/white_label (special pages)
+    if (['admin_panel', 'super_admin', 'white_label'].includes(item.key)) return true
+
     const perms = userPermissions as Record<string, Record<string, boolean>> | null
-    // If no permissions loaded, show all items (demo/offline mode)
-    if (!perms || typeof perms !== 'object' || Object.keys(perms).length === 0) return true
-    if (perms[resource] === undefined) return true
-    return hasPermission(perms, resource, 'view')
+    const hasPerms = perms && typeof perms === 'object' && Object.keys(perms).length > 0
+
+    if (hasPerms) {
+      // Use RBAC permissions from store (generated from plan)
+      if (item.permission) {
+        if (perms[item.permission] === undefined) return false
+        return hasPermission(perms, item.permission, 'view')
+      }
+      return true
+    }
+
+    // No permissions loaded — show all items (backward compatible)
+    return true
   }
 
   const userName = currentUser?.name || (isRTL ? 'أحمد محمد' : 'Ahmed Mohamed')
@@ -176,9 +197,9 @@ function SidebarContent({ collapsed }: { collapsed: boolean }) {
       {/* ── Navigation Items ────────────────────────────────────── */}
       <ScrollArea className="flex-1 px-2.5 py-2" dir={dir}>
         <nav dir={dir} className="flex flex-col gap-0.5">
-          {navSections.map((section, sIdx) => {
+          {ALL_NAV_ITEMS.map((section, sIdx) => {
             const visibleItems = section.items.filter((item) =>
-              canView(item.permission)
+              canView(item)
             )
             if (visibleItems.length === 0) return null
 

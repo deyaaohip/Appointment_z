@@ -1,0 +1,934 @@
+     1→import { useAppStore } from '@/stores/app-store'
+     2→
+     3→export type Lang = 'ar' | 'en'
+     4→
+     5→// ─── Comprehensive translations for all 14 dashboard pages ───
+     6→interface T {
+     7→  // Shared
+     8→  noResults: string
+     9→  save: string
+    10→  cancel: string
+    11→  confirm: string
+    12→  actions: string
+    13→  status: string
+    14→  search: string
+    15→  filter: string
+    16→  all: string
+    17→  view: string
+    18→  edit: string
+    19→  delete: string
+    20→  close: string
+    21→  loading: string
+    22→  showingOf: string
+    23→
+    24→  // Overview
+    25→  overviewTitle: string
+    26→  totalTenants: string
+    27→  totalUsers: string
+    28→  revenue: string
+    29→  totalBookings: string
+    30→  active: string
+    31→  thisMonth: string
+    32→  last30Days: string
+    33→  comparedToLastMonth: string
+    34→  revenueByPlan: string
+    35→  recentActivity: string
+    36→  activeTenants: string
+    37→  details: string
+    38→  perMonth: string
+    39→
+    40→  // Tenants
+    41→  tenantMgmt: string
+    42→  addTenant: string
+    43→  tenantSearch: string
+    44→  allStatuses: string
+    45→  trial: string
+    46→  suspended: string
+    47→  tenant: string
+    48→  plan: string
+    49→  bookings: string
+    50→  tenantRevenue: string
+    51→  addTenantDlg: string
+    52→  editTenantDlg: string
+    53→  deleteTenantDlg: string
+    54→  deleteTenantDesc: string
+    55→  nameAr: string
+    56→  nameEn: string
+    57→  email: string
+    58→  country: string
+    59→  added: string
+    60→  updated: string
+    61→  deleted: string
+    62→  enterTenantName: string
+    63→  enterValidEmail: string
+    64→  tenantDetails: string
+    65→  tenantSuspended: string
+    66→  tenantActivated: string
+    67→  confirmSuspend: string
+    68→  confirmActivate: string
+    69→
+    70→  // Users
+    71→  userMgmt: string
+    72→  addUser: string
+    73→  userSearch: string
+    74→  user: string
+    75→  role: string
+    76→  addUserDlg: string
+    77→  editUserDlg: string
+    78→  deleteUserDlg: string
+    79→  name: string
+    80→  enterNameAndEmail: string
+    81→  userSuspended: string
+    82→  userActivated: string
+    83→  changeStatus: string
+    84→  suspendUser: string
+    85→  activateUser: string
+    86→  owner: string
+    87→  manager: string
+    88→  receptionist: string
+    89→  accountant: string
+    90→
+    91→  // Plans
+    92→  plansTitle: string
+    93→  createPlan: string
+    94→  mostPopular: string
+    95→  free: string
+    96→  tenants: string
+    97→  managePlan: string
+    98→  monthly: string
+    99→  editPlanDlg: string
+   100→  willOpenPlanEditor: string
+   101→  willOpenCreatePlan: string
+   102→
+   103→  // Billing
+   104→  billingTitle: string
+   105→  createInvoice: string
+   106→  payments: string
+   107→  pending: string
+   108→  paid: string
+   109→  overdue: string
+   110→  failed: string
+   111→  invoiceNo: string
+   112→  amount: string
+   113→  date: string
+   114→  download: string
+   115→  willCreateInvoice: string
+   116→  downloadingInvoice: string
+   117→  viewingInvoice: string
+   118→
+   119→  // Roles
+   120→  rolesTitle: string
+   121→  addRole: string
+   122→  permissions: string
+   123→  users: string
+   124→  addRoleDlg: string
+   125→  roleName: string
+   126→  roleNameEn: string
+   127→  description: string
+   128→  create: string
+   129→  roleCreated: string
+   130→
+   131→  // Audit
+   132→  auditTitle: string
+   133→  export: string
+   134→  info: string
+   135→  success: string
+   136→  warning: string
+   137→  error: string
+   138→  level: string
+   139→  message: string
+   140→  source: string
+   141→  logExported: string
+   142→
+   143→  // Notifications
+   144→  notificationsTitle: string
+   145→  sendNotif: string
+   146→  template: string
+   147→  type: string
+   148→  sent: string
+   149→  send: string
+   150→  sendNotifDlg: string
+   151→  title: string
+   152→  content: string
+   153→  target: string
+   154→  everyone: string
+   155→  activeUsers: string
+   156→  trialUsers: string
+   157→  notifSent: string
+   158→  editTemplate: string
+   159→  testSent: string
+   160→
+   161→  // Reports
+   162→  reportsTitle: string
+   163→  generate: string
+   164→  lastGenerated: string
+   165→  generating: string
+   166→  downloading: string
+   167→
+   168→  // System
+   169→  systemTitle: string
+   170→  refresh: string
+   171→  systemLog: string
+   172→  refreshed: string
+   173→
+   174→  // Servers
+   175→  serversTitle: string
+   176→  addServer: string
+   177→  restart: string
+   178→  details: string
+   179→  requests: string
+   180→  addServerDlg: string
+   181→  serverName: string
+   182→  region: string
+   183→  serverAdded: string
+   184→  restarting: string
+   185→  serverDetails: string
+   186→
+   187→  // Database
+   188→  dbTitle: string
+   189→  backup: string
+   190→  dbSize: string
+   191→  tables: string
+   192→  avgResponse: string
+   193→  backups: string
+   194→  resourceUsage: string
+   195→  backupList: string
+   196→  automatic: string
+   197→  manual: string
+   198→  backingUp: string
+   199→  downloadingBackup: string
+   200→
+   201→  // Security
+   202→  securityTitle: string
+   203→  securitySettings: string
+   204→  twoFactor: string
+   205→  twoFactorDesc: string
+   206→  ipWhitelist: string
+   207→  ipWhitelistDesc: string
+   208→  bruteForce: string
+   209→  bruteForceDesc: string
+   210→  sessionTimeout: string
+   211→  sessionTimeoutDesc: string
+   212→  auditLogging: string
+   213→  auditLoggingDesc: string
+   214→  dataEncryption: string
+   215→  dataEncryptionDesc: string
+   216→  suspiciousAttempts: string
+   217→  ipAddress: string
+   218→  time: string
+   219→  location: string
+   220→  unknown: string
+   221→  settingUpdated: string
+   222→
+   223→  // Settings
+   224→  settingsTitle: string
+   225→  saveSettings: string
+   226→  generalSettings: string
+   227→  platformName: string
+   228→  supportEmail: string
+   229→  currency: string
+   230→  timezone: string
+   231→  advancedSettings: string
+   232→  maxTenants: string
+   233→  backupFreq: string
+   234→  maintenanceMode: string
+   235→  maintenanceModeDesc: string
+   236→  openRegistration: string
+   237→  openRegistrationDesc: string
+   238→  hourly: string
+   239→  daily: string
+   240→  weekly: string
+   241→  settingsSaved: string
+   242→
+   243→  // Pagination
+   244→  prev: string
+   245→  next: string
+   246→  page: string
+   247→
+   248→  // Sort
+   249→  sortAsc: string
+   250→  sortDesc: string
+   251→
+   252→  // Super Admin labels
+   253→  superAdmin: string
+   254→  superAdminDashboard: string
+   255→  profile: string
+   256→  preferences: string
+   257→  signOut: string
+   258→
+   259→  // Sidebar sections
+   260→  mainSection: string
+   261→  managementSection: string
+   262→  systemSection: string
+   263→
+   264→  // Sidebar nav items
+   265→  navOverview: string
+   266→  navTenants: string
+   267→  navUsers: string
+   268→  navPlans: string
+   269→  navBilling: string
+   270→  navRoles: string
+   271→  navAudit: string
+   272→  navNotifications: string
+   273→  navReports: string
+   274→  navSystem: string
+   275→  navServers: string
+   276→  navDatabase: string
+   277→  navSecurity: string
+   278→  navSettings: string
+   279→
+   280→  // Report names
+   281→  reportRevenue: string
+   282→  reportRevenueDesc: string
+   283→  reportGrowth: string
+   284→  reportGrowthDesc: string
+   285→  reportSecurity: string
+   286→  reportSecurityDesc: string
+   287→  reportPerformance: string
+   288→  reportPerformanceDesc: string
+   289→  reportUsers: string
+   290→  reportUsersDesc: string
+   291→  reportBilling: string
+   292→  reportBillingDesc: string
+   293→  reportTypeFinancial: string
+   294→  reportTypeOperational: string
+   295→  reportTypeSecurity: string
+   296→  reportTypeTechnical: string
+   297→
+   298→  // Notification templates
+   299→  notifWelcome: string
+   300→  notifPayment: string
+   301→  notifSuspend: string
+   302→  notifWeekly: string
+   303→  notifTypeEmail: string
+   304→  notifTypeEmailSms: string
+   305→
+   306→  // System gauge labels
+   307→  gaugeApi: string
+   308→  gaugeDatabase: string
+   309→  gaugeMemory: string
+   310→  gaugeDisk: string
+   311→  gaugeCdn: string
+   312→  gaugeWorker: string
+   313→  gaugeConnections: string
+   314→  gaugeCpu: string
+   315→  gaugeUptime: string
+   316→
+   317→  // Confirm dialog descriptions
+   318→  confirmDeleteUser: string
+   319→  confirmDeleteServer: string
+   320→  confirmDeleteRole: string
+   321→  confirmDeleteTemplate: string
+   322→
+   323→  // Actions
+   324→  serverRestarted: string
+   325→  serverDeleted: string
+   326→  roleDeleted: string
+   327→  roleUpdated: string
+   328→  userDeleted: string
+   329→  reportGenerated: string
+   330→  reportDownloaded: string
+   331→  planDetails: string
+   332→  editRoleDlg: string
+   333→}
+   334→
+   335→const ar: T = {
+   336→  // Shared
+   337→  noResults: 'لا توجد نتائج',
+   338→  save: 'حفظ',
+   339→  cancel: 'إلغاء',
+   340→  confirm: 'تأكيد',
+   341→  actions: 'إجراءات',
+   342→  status: 'الحالة',
+   343→  search: 'بحث',
+   344→  filter: 'تصفية',
+   345→  all: 'الكل',
+   346→  view: 'عرض',
+   347→  edit: 'تعديل',
+   348→  delete: 'حذف',
+   349→  close: 'إغلاق',
+   350→  loading: 'جاري التحميل...',
+   351→  showingOf: 'عرض {current} من {total} {entity}',
+   352→  // Overview
+   353→  overviewTitle: 'نظرة عامة على المنصة',
+   354→  totalTenants: 'إجمالي المستأجرين',
+   355→  totalUsers: 'إجمالي المستخدمين',
+   356→  revenue: 'الإيرادات (ر.س)',
+   357→  totalBookings: 'إجمالي الحجوزات',
+   358→  active: 'نشط',
+   359→  thisMonth: 'هذا الشهر',
+   360→  last30Days: 'آخر 30 يوم',
+   361→  comparedToLastMonth: 'مقارنة بالشهر السابق',
+   362→  revenueByPlan: 'الإيرادات حسب الباقة',
+   363→  recentActivity: 'آخر النشاطات',
+   364→  activeTenants: 'المستأجرون النشطون',
+   365→  details: 'تفاصيل',
+   366→  perMonth: 'ر.س / شهر',
+   367→  // Tenants
+   368→  tenantMgmt: 'إدارة المستأجرين',
+   369→  addTenant: 'إضافة مستأجر',
+   370→  tenantSearch: 'بحث بالاسم أو البريد الإلكتروني...',
+   371→  allStatuses: 'جميع الحالات',
+   372→  trial: 'تجريبي',
+   373→  suspended: 'معلق',
+   374→  tenant: 'المستأجر',
+   375→  plan: 'الباقة',
+   376→  bookings: 'الحجوزات',
+   377→  tenantRevenue: 'الإيرادات',
+   378→  addTenantDlg: 'إضافة مستأجر',
+   379→  editTenantDlg: 'تعديل المستأجر',
+   380→  deleteTenantDlg: 'حذف المستأجر',
+   381→  deleteTenantDesc: 'هل أنت متأكد من حذف "{name}"؟ لا يمكن التراجع عن هذا الإجراء.',
+   382→  nameAr: 'الاسم (عربي)',
+   383→  nameEn: 'الاسم (إنجليزي)',
+   384→  email: 'البريد الإلكتروني',
+   385→  country: 'البلد',
+   386→  added: 'تم إضافة: {name}',
+   387→  updated: 'تم التحديث',
+   388→  deleted: 'تم الحذف',
+   389→  enterTenantName: 'يرجى إدخال اسم المستأجر',
+   390→  enterValidEmail: 'يرجى إدخال بريد إلكتروني صالح',
+   391→  tenantDetails: 'تفاصيل: {name}',
+   392→  tenantSuspended: 'تم تعليق المستأجر',
+   393→  tenantActivated: 'تم تفعيل المستأجر',
+   394→  confirmSuspend: 'تعليق "{name}"؟',
+   395→  confirmActivate: 'تفعيل "{name}"؟',
+   396→  // Users
+   397→  userMgmt: 'إدارة المستخدمين',
+   398→  addUser: 'إضافة مستخدم',
+   399→  userSearch: 'بحث بالاسم أو البريد...',
+   400→  user: 'المستخدم',
+   401→  role: 'الدور',
+   402→  addUserDlg: 'إضافة مستخدم',
+   403→  editUserDlg: 'تعديل المستخدم',
+   404→  deleteUserDlg: 'حذف المستخدم',
+   405→  name: 'الاسم',
+   406→  enterNameAndEmail: 'يرجى إدخال الاسم والبريد',
+   407→  userSuspended: 'تم تعليق المستخدم',
+   408→  userActivated: 'تم تفعيل المستخدم',
+   409→  changeStatus: 'تغيير الحالة',
+   410→  suspendUser: 'تعليق "{name}"',
+   411→  activateUser: 'تفعيل "{name}"',
+   412→  owner: 'مالك',
+   413→  manager: 'مدير',
+   414→  receptionist: 'موظف استقبال',
+   415→  accountant: 'محاسب',
+   416→  // Plans
+   417→  plansTitle: 'الباقات والاشتراكات',
+   418→  createPlan: 'إنشاء باقة',
+   419→  mostPopular: 'الأكثر شعبية',
+   420→  free: 'مجاني',
+   421→  tenants: 'مستأجر',
+   422→  managePlan: 'إدارة الباقة',
+   423→  monthly: 'شهرياً',
+   424→  editPlanDlg: 'تعديل الباقة',
+   425→  editRoleDlg: 'تعديل الدور',
+   426→  roleUpdated: 'تم تحديث الدور',
+   427→  roleDeleted: 'تم حذف الدور',
+   428→  userDeleted: 'تم حذف المستخدم',
+   429→  willOpenPlanEditor: 'سيتم فتح تعديل الباقة',
+   430→  willOpenCreatePlan: 'سيتم فتح نموذج إنشاء باقة جديدة',
+   431→  // Billing
+   432→  billingTitle: 'الفواتير والمدفوعات',
+   433→  createInvoice: 'إنشاء فاتورة',
+   434→  payments: 'المدفوعات',
+   435→  pending: 'معلق',
+   436→  paid: 'مدفوع',
+   437→  overdue: 'متأخر',
+   438→  failed: 'فاشل',
+   439→  invoiceNo: 'رقم الفاتورة',
+   440→  amount: 'المبلغ',
+   441→  date: 'التاريخ',
+   442→  download: 'تنزيل',
+   443→  willCreateInvoice: 'سيتم إنشاء فاتورة جديدة',
+   444→  downloadingInvoice: 'تنزيل {id}',
+   445→  viewingInvoice: 'عرض {id}',
+   446→  // Roles
+   447→  rolesTitle: 'الأدوار والصلاحيات',
+   448→  addRole: 'إضافة دور',
+   449→  permissions: 'صلاحية',
+   450→  users: 'مستخدم',
+   451→  addRoleDlg: 'إضافة دور جديد',
+   452→  roleName: 'اسم الدور',
+   453→  roleNameEn: 'الاسم (إنجليزي)',
+   454→  description: 'الوصف',
+   455→  create: 'إنشاء',
+   456→  roleCreated: 'تم إنشاء الدور',
+   457→  // Audit
+   458→  auditTitle: 'سجل العمليات',
+   459→  export: 'تصدير',
+   460→  info: 'معلومة',
+   461→  success: 'نجاح',
+   462→  warning: 'تحذير',
+   463→  error: 'خطأ',
+   464→  level: 'المستوى',
+   465→  message: 'الرسالة',
+   466→  source: 'المصدر',
+   467→  logExported: 'تم تصدير السجل',
+   468→  // Notifications
+   469→  notificationsTitle: 'الإشعارات',
+   470→  sendNotif: 'إرسال إشعار',
+   471→  template: 'القالب',
+   472→  type: 'النوع',
+   473→  sent: 'مرات الإرسال',
+   474→  send: 'إرسال',
+   475→  sendNotifDlg: 'إرسال إشعار',
+   476→  title: 'العنوان',
+   477→  content: 'المحتوى',
+   478→  target: 'الفئة',
+   479→  everyone: 'الجميع',
+   480→  activeUsers: 'النشطون',
+   481→  trialUsers: 'التجريبية',
+   482→  notifSent: 'تم الإرسال',
+   483→  editTemplate: 'تعديل القالب',
+   484→  testSent: 'تم إرسال اختبار',
+   485→  // Reports
+   486→  reportsTitle: 'التقارير',
+   487→  generate: 'توليد',
+   488→  lastGenerated: 'آخر توليد:',
+   489→  generating: 'جاري التوليد...',
+   490→  downloading: 'جاري التنزيل...',
+   491→  // System
+   492→  systemTitle: 'صحة النظام',
+   493→  refresh: 'تحديث',
+   494→  systemLog: 'سجل النظام',
+   495→  refreshed: 'تم التحديث',
+   496→  // Servers
+   497→  serversTitle: 'الخوادم',
+   498→  addServer: 'إضافة خادم',
+   499→  restart: 'إعادة تشغيل',
+   500→  details: 'تفاصيل',
+   501→  requests: 'الطلبات',
+   502→  addServerDlg: 'إضافة خادم',
+   503→  serverName: 'اسم الخادم',
+   504→  region: 'المنطقة',
+   505→  serverAdded: 'تم إضافة الخادم',
+   506→  restarting: 'إعادة تشغيل الخادم',
+   507→  serverDetails: 'تفاصيل الخادم',
+   508→  // Database
+   509→  dbTitle: 'قاعدة البيانات',
+   510→  backup: 'نسخ احتياطي',
+   511→  dbSize: 'حجم القاعدة',
+   512→  tables: 'عدد الجداول',
+   513→  avgResponse: 'متوسط الاستجابة',
+   514→  backups: 'النسخ الاحتياطية',
+   515→  resourceUsage: 'استخدام الموارد',
+   516→  backupList: 'النسخ الاحتياطية',
+   517→  automatic: 'تلقائي',
+   518→  manual: 'يدوي',
+   519→  backingUp: 'جاري النسخ الاحتياطي...',
+   520→  downloadingBackup: 'جاري التنزيل...',
+   521→  // Security
+   522→  securityTitle: 'الأمان',
+   523→  securitySettings: 'إعدادات الأمان',
+   524→  twoFactor: 'المصادقة الثنائية',
+   525→  twoFactorDesc: 'تطلب رمز تحقق إضافي عند تسجيل الدخول',
+   526→  ipWhitelist: 'القائمة البيضاء لـ IP',
+   527→  ipWhitelistDesc: 'السماح فقط بعناوين IP المعتمدة',
+   528→  bruteForce: 'حماية القوة الغاشمة',
+   529→  bruteForceDesc: 'حظر تلقائي بعد 5 محاولات فاشلة',
+   530→  sessionTimeout: 'انتهاء الجلسة',
+   531→  sessionTimeoutDesc: 'إنهاء الجلسة بعد 30 دقيقة من عدم النشاط',
+   532→  auditLogging: 'تسجيل العمليات',
+   533→  auditLoggingDesc: 'تسجيل جميع العمليات الحساسة',
+   534→  dataEncryption: 'تشفير البيانات',
+   535→  dataEncryptionDesc: 'تشفير البيانات الحساسة في التخزين',
+   536→  suspiciousAttempts: 'محاولات الدخول المشبوهة',
+   537→  ipAddress: 'عنوان IP',
+   538→  time: 'الوقت',
+   539→  location: 'الموقع',
+   540→  unknown: 'مجهول',
+   541→  settingUpdated: 'تم تحديث الإعداد',
+   542→  // Settings
+   543→  settingsTitle: 'إعدادات المنصة',
+   544→  saveSettings: 'حفظ الإعدادات',
+   545→  generalSettings: 'الإعدادات العامة',
+   546→  platformName: 'اسم المنصة',
+   547→  supportEmail: 'بريد الدعم',
+   548→  currency: 'العملة',
+   549→  timezone: 'المنطقة الزمنية',
+   550→  advancedSettings: 'إعدادات متقدمة',
+   551→  maxTenants: 'الحد الأقصى للمستأجرين',
+   552→  backupFreq: 'تكرار النسخ الاحتياطي',
+   553→  maintenanceMode: 'وضع الصيانة',
+   554→  maintenanceModeDesc: 'تعطيل الوصول مؤقتاً',
+   555→  openRegistration: 'التسجيل المفتوح',
+   556→  openRegistrationDesc: 'السماح بالتسجيل الذاتي',
+   557→  hourly: 'كل ساعة',
+   558→  daily: 'يومياً',
+   559→  weekly: 'أسبوعياً',
+   560→  settingsSaved: 'تم حفظ الإعدادات',
+   561→  // Pagination
+   562→  prev: 'السابق',
+   563→  next: 'التالي',
+   564→  page: 'صفحة',
+   565→  // Sort
+   566→  sortAsc: 'تصاعدي',
+   567→  sortDesc: 'تنازلي',
+   568→  // Super Admin labels
+   569→  superAdmin: 'مدير النظام',
+   570→  superAdminDashboard: 'لوحة تحكم مدير النظام',
+   571→  profile: 'الملف الشخصي',
+   572→  preferences: 'التفضيلات',
+   573→  signOut: 'تسجيل الخروج',
+   574→  // Sidebar sections
+   575→  mainSection: 'الرئيسية',
+   576→  managementSection: 'الإدارة',
+   577→  systemSection: 'النظام',
+   578→  // Sidebar nav items
+   579→  navOverview: 'نظرة عامة',
+   580→  navTenants: 'إدارة المستأجرين',
+   581→  navUsers: 'إدارة المستخدمين',
+   582→  navPlans: 'الباقات والاشتراكات',
+   583→  navBilling: 'الفواتير والمدفوعات',
+   584→  navRoles: 'الأدوار والصلاحيات',
+   585→  navAudit: 'سجل العمليات',
+   586→  navNotifications: 'الإشعارات',
+   587→  navReports: 'التقارير',
+   588→  navSystem: 'صحة النظام',
+   589→  navServers: 'الخوادم',
+   590→  navDatabase: 'قاعدة البيانات',
+   591→  navSecurity: 'الأمان',
+   592→  navSettings: 'إعدادات المنصة',
+   593→  // Reports
+   594→  reportRevenue: 'تقرير الإيرادات الشهري',
+   595→  reportRevenueDesc: 'ملخص شامل للإيرادات حسب المستأجر والباقة',
+   596→  reportGrowth: 'تقرير النمو',
+   597→  reportGrowthDesc: 'معدلات النمو في المستأجرين والحجوزات',
+   598→  reportSecurity: 'تقرير الأمان',
+   599→  reportSecurityDesc: 'محاولات الدخول والتهديدات الأمنية',
+   600→  reportPerformance: 'تقرير الأداء',
+   601→  reportPerformanceDesc: 'أداء الخوادم وAPI واستجابة النظام',
+   602→  reportUsers: 'تقرير المستخدمين',
+   603→  reportUsersDesc: 'نشاط المستخدمين وتوزيع الأدوار',
+   604→  reportBilling: 'تقرير الفواتير',
+   605→  reportBillingDesc: 'ملخص الفواتير والمدفوعات المتأخرة',
+   606→  reportTypeFinancial: 'مالي',
+   607→  reportTypeOperational: 'تشغيلي',
+   608→  reportTypeSecurity: 'أمني',
+   609→  reportTypeTechnical: 'تقني',
+   610→  // Notification templates
+   611→  notifWelcome: 'ترحيب مستأجر جديد',
+   612→  notifPayment: 'تذكير بالدفع',
+   613→  notifSuspend: 'إشعار تعليق الحساب',
+   614→  notifWeekly: 'تقرير أسبوعي',
+   615→  notifTypeEmail: 'بريد إلكتروني',
+   616→  notifTypeEmailSms: 'بريد + SMS',
+   617→  // System gauge labels
+   618→  gaugeApi: 'API',
+   619→  gaugeDatabase: 'قاعدة البيانات',
+   620→  gaugeMemory: 'الذاكرة',
+   621→  gaugeDisk: 'القرص',
+   622→  gaugeCdn: 'CDN',
+   623→  gaugeWorker: 'العامل',
+   624→  gaugeConnections: 'الاتصالات',
+   625→  gaugeCpu: 'المعالج',
+   626→  gaugeUptime: 'وقت التشغيل',
+   627→  // Confirm dialog descriptions
+   628→  confirmDeleteUser: 'هل أنت متأكد من حذف "{name}"؟',
+   629→  confirmDeleteServer: 'هل أنت متأكد من حذف هذا الخادم؟',
+   630→  confirmDeleteRole: 'هل أنت متأكد من حذف هذا الدور؟',
+   631→  confirmDeleteTemplate: 'هل أنت متأكد من حذف هذا القالب؟',
+   632→  // Actions
+   633→  serverRestarted: 'تم إعادة تشغيل الخادم',
+   634→  serverDeleted: 'تم حذف الخادم',
+   635→  roleDeleted: 'تم حذف الدور',
+   636→  roleUpdated: 'تم تحديث الدور',
+   637→  userDeleted: 'تم حذف المستخدم',
+   638→  reportGenerated: 'تم توليد التقرير',
+   639→  reportDownloaded: 'جاري تنزيل التقرير...',
+   640→  planDetails: 'تفاصيل الباقة',
+   641→}
+   642→
+   643→const en: T = {
+   644→  noResults: 'No results found',
+   645→  save: 'Save',
+   646→  cancel: 'Cancel',
+   647→  confirm: 'Confirm',
+   648→  actions: 'Actions',
+   649→  status: 'Status',
+   650→  search: 'Search',
+   651→  filter: 'Filter',
+   652→  all: 'All',
+   653→  view: 'View',
+   654→  edit: 'Edit',
+   655→  delete: 'Delete',
+   656→  close: 'Close',
+   657→  loading: 'Loading...',
+   658→  showingOf: 'Showing {current} of {total} {entity}',
+   659→  overviewTitle: 'Platform Overview',
+   660→  totalTenants: 'Total Tenants',
+   661→  totalUsers: 'Total Users',
+   662→  revenue: 'Revenue (SAR)',
+   663→  totalBookings: 'Total Bookings',
+   664→  active: 'Active',
+   665→  thisMonth: 'This Month',
+   666→  last30Days: 'Last 30 Days',
+   667→  comparedToLastMonth: 'vs. previous month',
+   668→  revenueByPlan: 'Revenue by Plan',
+   669→  recentActivity: 'Recent Activity',
+   670→  activeTenants: 'Active Tenants',
+   671→  details: 'Details',
+   672→  perMonth: 'SAR / month',
+   673→  tenantMgmt: 'Tenant Management',
+   674→  addTenant: 'Add Tenant',
+   675→  tenantSearch: 'Search by name or email...',
+   676→  allStatuses: 'All Statuses',
+   677→  trial: 'Trial',
+   678→  suspended: 'Suspended',
+   679→  tenant: 'Tenant',
+   680→  plan: 'Plan',
+   681→  bookings: 'Bookings',
+   682→  tenantRevenue: 'Revenue',
+   683→  addTenantDlg: 'Add Tenant',
+   684→  editTenantDlg: 'Edit Tenant',
+   685→  deleteTenantDlg: 'Delete Tenant',
+   686→  deleteTenantDesc: 'Are you sure you want to delete "{name}"? This action cannot be undone.',
+   687→  nameAr: 'Name (Arabic)',
+   688→  nameEn: 'Name (English)',
+   689→  email: 'Email',
+   690→  country: 'Country',
+   691→  added: 'Added: {name}',
+   692→  updated: 'Updated',
+   693→  deleted: 'Deleted',
+   694→  enterTenantName: 'Please enter a tenant name',
+   695→  enterValidEmail: 'Please enter a valid email',
+   696→  tenantDetails: 'Details: {name}',
+   697→  tenantSuspended: 'Tenant suspended',
+   698→  tenantActivated: 'Tenant activated',
+   699→  confirmSuspend: 'Suspend "{name}"?',
+   700→  confirmActivate: 'Activate "{name}"?',
+   701→  userMgmt: 'User Management',
+   702→  addUser: 'Add User',
+   703→  userSearch: 'Search by name or email...',
+   704→  user: 'User',
+   705→  role: 'Role',
+   706→  addUserDlg: 'Add User',
+   707→  editUserDlg: 'Edit User',
+   708→  deleteUserDlg: 'Delete User',
+   709→  name: 'Name',
+   710→  enterNameAndEmail: 'Please enter name and email',
+   711→  userSuspended: 'User suspended',
+   712→  userActivated: 'User activated',
+   713→  changeStatus: 'Change Status',
+   714→  suspendUser: 'Suspend "{name}"',
+   715→  activateUser: 'Activate "{name}"',
+   716→  owner: 'Owner',
+   717→  manager: 'Manager',
+   718→  receptionist: 'Receptionist',
+   719→  accountant: 'Accountant',
+   720→  plansTitle: 'Plans & Subscriptions',
+   721→  createPlan: 'Create Plan',
+   722→  mostPopular: 'Most Popular',
+   723→  free: 'Free',
+   724→  tenants: 'tenants',
+   725→  managePlan: 'Manage Plan',
+   726→  monthly: 'monthly',
+   727→  editPlanDlg: 'Edit Plan',
+   728→  editRoleDlg: 'Edit Role',
+   729→  roleUpdated: 'Role updated',
+   730→  roleDeleted: 'Role deleted',
+   731→  userDeleted: 'User deleted',
+   732→  willOpenPlanEditor: 'Plan editor will open',
+   733→  willOpenCreatePlan: 'Create plan form will open',
+   734→  billingTitle: 'Billing & Payments',
+   735→  createInvoice: 'Create Invoice',
+   736→  payments: 'Payments',
+   737→  pending: 'Pending',
+   738→  paid: 'Paid',
+   739→  overdue: 'Overdue',
+   740→  failed: 'Failed',
+   741→  invoiceNo: 'Invoice No.',
+   742→  amount: 'Amount',
+   743→  date: 'Date',
+   744→  download: 'Download',
+   745→  willCreateInvoice: 'New invoice form will open',
+   746→  downloadingInvoice: 'Downloading {id}',
+   747→  viewingInvoice: 'Viewing {id}',
+   748→  rolesTitle: 'Roles & Permissions',
+   749→  addRole: 'Add Role',
+   750→  permissions: 'permissions',
+   751→  users: 'users',
+   752→  addRoleDlg: 'Add New Role',
+   753→  roleName: 'Role Name',
+   754→  roleNameEn: 'Name (English)',
+   755→  description: 'Description',
+   756→  create: 'Create',
+   757→  roleCreated: 'Role created',
+   758→  auditTitle: 'Audit Logs',
+   759→  export: 'Export',
+   760→  info: 'Info',
+   761→  success: 'Success',
+   762→  warning: 'Warning',
+   763→  error: 'Error',
+   764→  level: 'Level',
+   765→  message: 'Message',
+   766→  source: 'Source',
+   767→  logExported: 'Log exported',
+   768→  notificationsTitle: 'Notifications',
+   769→  sendNotif: 'Send Notification',
+   770→  template: 'Template',
+   771→  type: 'Type',
+   772→  sent: 'Sent',
+   773→  send: 'Send',
+   774→  sendNotifDlg: 'Send Notification',
+   775→  title: 'Title',
+   776→  content: 'Content',
+   777→  target: 'Target',
+   778→  everyone: 'Everyone',
+   779→  activeUsers: 'Active',
+   780→  trialUsers: 'Trial',
+   781→  notifSent: 'Notification sent',
+   782→  editTemplate: 'Edit template',
+   783→  testSent: 'Test sent',
+   784→  reportsTitle: 'Reports',
+   785→  generate: 'Generate',
+   786→  lastGenerated: 'Last generated:',
+   787→  generating: 'Generating...',
+   788→  downloading: 'Downloading...',
+   789→  systemTitle: 'System Health',
+   790→  refresh: 'Refresh',
+   791→  systemLog: 'System Log',
+   792→  refreshed: 'Refreshed',
+   793→  serversTitle: 'Servers',
+   794→  addServer: 'Add Server',
+   795→  restart: 'Restart',
+   796→  details: 'Details',
+   797→  requests: 'Requests',
+   798→  addServerDlg: 'Add Server',
+   799→  serverName: 'Server Name',
+   800→  region: 'Region',
+   801→  serverAdded: 'Server added',
+   802→  restarting: 'Restarting server',
+   803→  serverDetails: 'Server details',
+   804→  dbTitle: 'Database',
+   805→  backup: 'Backup',
+   806→  dbSize: 'Database Size',
+   807→  tables: 'Tables',
+   808→  avgResponse: 'Avg Response',
+   809→  backups: 'Backups',
+   810→  resourceUsage: 'Resource Usage',
+   811→  backupList: 'Backups',
+   812→  automatic: 'Automatic',
+   813→  manual: 'Manual',
+   814→  backingUp: 'Backing up...',
+   815→  downloadingBackup: 'Downloading...',
+   816→  securityTitle: 'Security',
+   817→  securitySettings: 'Security Settings',
+   818→  twoFactor: 'Two-Factor Authentication',
+   819→  twoFactorDesc: 'Require an additional verification code on login',
+   820→  ipWhitelist: 'IP Whitelist',
+   821→  ipWhitelistDesc: 'Allow only approved IP addresses',
+   822→  bruteForce: 'Brute Force Protection',
+   823→  bruteForceDesc: 'Auto-block after 5 failed attempts',
+   824→  sessionTimeout: 'Session Timeout',
+   825→  sessionTimeoutDesc: 'End session after 30 minutes of inactivity',
+   826→  auditLogging: 'Audit Logging',
+   827→  auditLoggingDesc: 'Log all sensitive operations',
+   828→  dataEncryption: 'Data Encryption',
+   829→  dataEncryptionDesc: 'Encrypt sensitive data in storage',
+   830→  suspiciousAttempts: 'Suspicious Login Attempts',
+   831→  ipAddress: 'IP Address',
+   832→  time: 'Time',
+   833→  location: 'Location',
+   834→  unknown: 'Unknown',
+   835→  settingUpdated: 'Setting updated',
+   836→  settingsTitle: 'Platform Settings',
+   837→  saveSettings: 'Save Settings',
+   838→  generalSettings: 'General Settings',
+   839→  platformName: 'Platform Name',
+   840→  supportEmail: 'Support Email',
+   841→  currency: 'Currency',
+   842→  timezone: 'Timezone',
+   843→  advancedSettings: 'Advanced Settings',
+   844→  maxTenants: 'Max Tenants',
+   845→  backupFreq: 'Backup Frequency',
+   846→  maintenanceMode: 'Maintenance Mode',
+   847→  maintenanceModeDesc: 'Temporarily disable access',
+   848→  openRegistration: 'Open Registration',
+   849→  openRegistrationDesc: 'Allow self-registration',
+   850→  hourly: 'Hourly',
+   851→  daily: 'Daily',
+   852→  weekly: 'Weekly',
+   853→  settingsSaved: 'Settings saved',
+   854→  prev: 'Previous',
+   855→  next: 'Next',
+   856→  page: 'Page',
+   857→  sortAsc: 'Ascending',
+   858→  sortDesc: 'Descending',
+   859→  superAdmin: 'Super Admin',
+   860→  superAdminDashboard: 'Super Admin Dashboard',
+   861→  profile: 'Profile',
+   862→  preferences: 'Preferences',
+   863→  signOut: 'Sign Out',
+   864→  mainSection: 'Main',
+   865→  managementSection: 'Management',
+   866→  systemSection: 'System',
+   867→  navOverview: 'Overview',
+   868→  navTenants: 'Tenants',
+   869→  navUsers: 'Users',
+   870→  navPlans: 'Plans',
+   871→  navBilling: 'Billing',
+   872→  navRoles: 'Roles',
+   873→  navAudit: 'Audit Logs',
+   874→  navNotifications: 'Notifications',
+   875→  navReports: 'Reports',
+   876→  navSystem: 'System Health',
+   877→  navServers: 'Servers',
+   878→  navDatabase: 'Database',
+   879→  navSecurity: 'Security',
+   880→  navSettings: 'Settings',
+   881→  reportRevenue: 'Monthly Revenue Report',
+   882→  reportRevenueDesc: 'Comprehensive revenue summary by tenant and plan',
+   883→  reportGrowth: 'Growth Report',
+   884→  reportGrowthDesc: 'Growth rates in tenants and bookings',
+   885→  reportSecurity: 'Security Report',
+   886→  reportSecurityDesc: 'Login attempts and security threats',
+   887→  reportPerformance: 'Performance Report',
+   888→  reportPerformanceDesc: 'Server, API performance and system response',
+   889→  reportUsers: 'User Report',
+   890→  reportUsersDesc: 'User activity and role distribution',
+   891→  reportBilling: 'Billing Report',
+   892→  reportBillingDesc: 'Invoice and overdue payments summary',
+   893→  reportTypeFinancial: 'Financial',
+   894→  reportTypeOperational: 'Operational',
+   895→  reportTypeSecurity: 'Security',
+   896→  reportTypeTechnical: 'Technical',
+   897→  notifWelcome: 'New Tenant Welcome',
+   898→  notifPayment: 'Payment Reminder',
+   899→  notifSuspend: 'Account Suspension Notice',
+   900→  notifWeekly: 'Weekly Report',
+   901→  notifTypeEmail: 'Email',
+   902→  notifTypeEmailSms: 'Email + SMS',
+   903→  // System gauge labels
+   904→  gaugeApi: 'API',
+   905→  gaugeDatabase: 'Database',
+   906→  gaugeMemory: 'Memory',
+   907→  gaugeDisk: 'Disk',
+   908→  gaugeCdn: 'CDN',
+   909→  gaugeWorker: 'Worker',
+   910→  gaugeConnections: 'Connections',
+   911→  gaugeCpu: 'CPU',
+   912→  gaugeUptime: 'Uptime',
+   913→  // Confirm dialog descriptions
+   914→  confirmDeleteUser: 'Are you sure you want to delete "{name}"?',
+   915→  confirmDeleteServer: 'Are you sure you want to delete this server?',
+   916→  confirmDeleteRole: 'Are you sure you want to delete this role?',
+   917→  confirmDeleteTemplate: 'Are you sure you want to delete this template?',
+   918→  // Actions
+   919→  serverRestarted: 'Server restarted',
+   920→  serverDeleted: 'Server deleted',
+   921→  roleDeleted: 'Role deleted',
+   922→  roleUpdated: 'Role updated',
+   923→  userDeleted: 'User deleted',
+   924→  reportGenerated: 'Report generated',
+   925→  reportDownloaded: 'Downloading report...',
+   926→  planDetails: 'Plan Details',
+   927→}
+   928→
+   929→const translations: Record<Lang, T> = { ar, en }
+   930→
+   931→export function useT() {
+   932→  const { locale } = useAppStore()
+   933→  return translations[locale as Lang] || ar
+   934→}

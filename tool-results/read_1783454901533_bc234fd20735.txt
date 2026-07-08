@@ -1,0 +1,402 @@
+     1→   400→              <div className="rounded-lg bg-muted/50 p-2"><p className="text-[10px] text-muted-foreground">{t.tenant}</p><p className="text-xs font-semibold mt-0.5 truncate">{userTenant(u, lang)}</p></div>
+     2→   401→              <div className="rounded-lg bg-muted/50 p-2"><p className="text-[10px] text-muted-foreground">{t.role}</p><p className="text-xs font-semibold mt-0.5">{ROLE_MAP[u.role] || u.role}</p></div>
+     3→   402→            </div>
+     4→   403→            <div className="flex items-center justify-end gap-1 pt-2 border-t">
+     5→   404→              <ActionBtn icon={Edit} label={t.edit} onClick={() => openEdit(u)} />
+     6→   405→              <ActionBtn icon={u.status === 'suspended' ? Power : PowerOff} label={u.status === 'suspended' ? t.active : t.suspended} onClick={() => handleToggleStatus(u)} />
+     7→   406→              <ActionBtn icon={Trash2} onClick={() => setDlg({ type: 'delete', user: u })} danger />
+     8→   407→            </div>
+     9→   408→          </CardContent></Card>
+    10→   409→        ))}
+    11→   410→      </div>
+    12→   411→
+    13→   412→      <Dialog open={dlg?.type === 'add' || dlg?.type === 'edit'} onOpenChange={() => setDlg(null)}>
+    14→   413→        <DialogContent className="max-w-md"><DialogHeader><DialogTitle>{dlg?.type === 'add' ? t.addUserDlg : t.editUserDlg}</DialogTitle></DialogHeader>
+    15→   414→          <div className="space-y-4 pt-2">
+    16→   415→            <FormField label={t.name}><Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} /></FormField>
+    17→   416→            <FormField label={t.email}><Input type="email" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} dir="ltr" /></FormField>
+    18→   417→            <FormField label={t.tenant}><Input value={form.tenant} onChange={e => setForm(p => ({ ...p, tenant: e.target.value }))} /></FormField>
+    19→   418→            <FormField label={t.role}><Select value={form.role} onValueChange={v => setForm(p => ({ ...p, role: v }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>
+    20→   419→              <SelectItem value="owner">{t.owner}</SelectItem><SelectItem value="manager">{t.manager}</SelectItem>
+    21→   420→              <SelectItem value="receptionist">{t.receptionist}</SelectItem><SelectItem value="accountant">{t.accountant}</SelectItem>
+    22→   421→            </SelectContent></Select></FormField>
+    23→   422→          </div>
+    24→   423→          <DlgFooter onCancel={() => setDlg(null)} onConfirm={handleSave} />
+    25→   424→        </DialogContent>
+    26→   425→      </Dialog>
+    27→   426→      <ConfirmDialog open={dlg?.type === 'delete'} onOpenChange={() => setDlg(null)} title={t.deleteUserDlg} desc={t.confirmDeleteUser.replace('{name}', dlg?.user?.name || '')} onConfirm={() => { if (dlg?.user) handleDelete(dlg.user) }} danger />
+    28→   427→    </div>
+    29→   428→  )
+    30→   429→}
+    31→   430→
+    32→   431→// ════════════════════════════════════════════════════════════════
+    33→   432→// PAGE 4: PLANS
+    34→   433→// ════════════════════════════════════════════════════════════════
+    35→   434→function PlansPage() {
+    36→   435→  const { t, lang } = useSA()
+    37→   436→  const [detailPlan, setDetailPlan] = useState<Plan | null>(null)
+    38→   437→  return (
+    39→   438→    <div className="space-y-6">
+    40→   439→      <PageTitle title={t.plansTitle} action={<PrimaryBtn icon={Plus} label={t.createPlan} onClick={() => toast.info(t.willOpenCreatePlan)} />} />
+    41→   440→      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 sm:gap-5">
+    42→   441→        {PLANS.map((p, i) => (
+    43→   442→          <motion.div key={p.id} variants={fade} initial="hidden" animate="visible" transition={{ delay: i * 0.04 }}>
+    44→   443→            <Card className={`h-full flex flex-col transition-all hover:shadow-lg cursor-pointer border-0 shadow-sm ${p.popular ? 'ring-2 ring-violet-500 shadow-violet-500/10' : ''}`} onClick={() => setDetailPlan(p)}>
+    45→   444→              <CardContent className="flex-1 flex flex-col items-center p-5 sm:p-6 pt-7">
+    46→   445→                {p.popular && <Badge className="bg-violet-600 text-white mb-3 -mt-1 text-[10px]">{t.mostPopular}</Badge>}
+    47→   446→                <div className={`h-12 w-12 rounded-2xl ${p.color} flex items-center justify-center mb-4 shadow-lg`}><CreditCard className="h-6 w-6 text-white" /></div>
+    48→   447→                <h3 className="font-bold text-base">{p.name}</h3>
+    49→   448→                <p className="text-3xl font-extrabold mt-3 mb-1">{p.price > 0 ? `${p.price}` : t.free}</p>
+    50→   449→                <p className="text-xs text-muted-foreground mb-5">{p.price > 0 ? t.perMonth : ''} · {p.tenants} {t.tenants}</p>
+    51→   450→                <Separator className="w-full mb-5" />
+    52→   451→                <ul className="space-y-2.5 w-full text-start flex-1">{p.features.map((f, j) => (
+    53→   452→                  <li key={j} className="flex items-start gap-2 text-xs sm:text-sm"><CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" /><span>{lang === 'en' ? f.en : f.ar}</span></li>
+    54→   453→                ))}</ul>
+    55→   454→                <Button className={`w-full mt-6 ${p.popular ? 'bg-violet-600 hover:bg-violet-700 text-white' : ''}`} variant={p.popular ? 'default' : 'outline'}>{t.managePlan}</Button>
+    56→   455→              </CardContent>
+    57→   456→            </Card>
+    58→   457→          </motion.div>
+    59→   458→        ))}
+    60→   459→      </div>
+    61→   460→      <Dialog open={!!detailPlan} onOpenChange={() => setDetailPlan(null)}>
+    62→   461→        <DialogContent className="max-w-sm"><DialogHeader><DialogTitle>{t.planDetails}</DialogTitle></DialogHeader>
+    63→   462→          {detailPlan && <div className="space-y-4 pt-2">
+    64→   463→            <div className="text-center"><p className="text-3xl font-extrabold">{detailPlan.price > 0 ? `${detailPlan.price} ${lang === 'ar' ? 'ر.س' : 'SAR'}` : t.free}</p><p className="text-sm text-muted-foreground mt-1">{t.monthly} · {detailPlan.tenants} {t.tenants}</p></div>
+    65→   464→            <Separator />
+    66→   465→            <ul className="space-y-2">{detailPlan.features.map((f, i) => (<li key={i} className="flex items-center gap-2 text-sm"><CheckCircle2 className="h-4 w-4 text-emerald-500" />{lang === 'en' ? f.en : f.ar}</li>))}</ul>
+    67→   466→          </div>}
+    68→   467→          <DlgFooter onCancel={() => setDetailPlan(null)} onConfirm={() => { toast.info(t.willOpenPlanEditor); setDetailPlan(null) }} confirmLabel={t.edit} />
+    69→   468→        </DialogContent>
+    70→   469→      </Dialog>
+    71→   470→    </div>
+    72→   471→  )
+    73→   472→}
+    74→   473→
+    75→   474→// ════════════════════════════════════════════════════════════════
+    76→   475→// PAGE 5: BILLING
+    77→   476→// ════════════════════════════════════════════════════════════════
+    78→   477→function BillingPage() {
+    79→   478→  const { t, lang } = useSA()
+    80→   479→  const [invoices, setInvoices] = useState<Invoice[]>(INVOICES)
+    81→   480→  const [filter, setFilter] = useState('all')
+    82→   481→  const [page, setPage] = useState(1)
+    83→   482→  const [sort, setSort] = useState<SortState>({ key: 'date', dir: 'desc' })
+    84→   483→  const filtered = useMemo(() => {
+    85→   484→    let list = filter === 'all' ? [...invoices] : invoices.filter(i => i.status === filter)
+    86→   485→    return genericSort(list, sort.key, sort.dir, lang)
+    87→   486→  }, [invoices, filter, sort, lang])
+    88→   487→  const { items, totalPages } = paginate(filtered, page, PER_PAGE)
+    89→   488→  const handleSort = (key: string) => setSort(p => p.key === key ? { key, dir: p.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' })
+    90→   489→  const totalPaid = invoices.filter(i => i.status === 'paid').reduce((s, i) => s + i.amount, 0)
+    91→   490→  const totalPending = invoices.filter(i => i.status === 'pending' || i.status === 'overdue').reduce((s, i) => s + i.amount, 0)
+    92→   491→
+    93→   492→  const handleMarkPaid = (inv: Invoice) => {
+    94→   493→    setInvoices(p => p.map(i => i.id === inv.id ? { ...i, status: 'paid' } : i))
+    95→   494→    toast.success(t.paid)
+    96→   495→  }
+    97→   496→
+    98→   497→  return (
+    99→   498→    <div className="space-y-5">
+   100→   499→      <PageTitle title={t.billingTitle} action={<PrimaryBtn icon={Plus} label={t.createInvoice} onClick={() => toast.info(t.willCreateInvoice)} />} />
+   101→   500→      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+   102→   501→        <StatCard icon={CheckCircle2} label={t.payments} value={`${totalPaid.toLocaleString()} ${lang === 'ar' ? 'ر.س' : 'SAR'}`} color="text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30" />
+   103→   502→        <StatCard icon={Clock} label={t.pending} value={`${totalPending.toLocaleString()} ${lang === 'ar' ? 'ر.س' : 'SAR'}`} color="text-amber-600 bg-amber-50 dark:bg-amber-950/30" />
+   104→   503→        <StatCard icon={DollarSign} label={t.paid} value={`${invoices.filter(i => i.status === 'paid').length}`} color="text-sky-600 bg-sky-50 dark:bg-sky-950/30" />
+   105→   504→        <StatCard icon={AlertTriangle} label={t.overdue} value={`${invoices.filter(i => i.status === 'overdue').length}`} color="text-red-600 bg-red-50 dark:bg-red-950/30" />
+   106→   505→      </div>
+   107→   506→      <div className="flex gap-3">
+   108→   507→        <Select value={filter} onValueChange={v => { setFilter(v); setPage(1) }}>
+   109→   508→          <SelectTrigger className="w-44 h-10"><SelectValue /></SelectTrigger>
+   110→   509→          <SelectContent><SelectItem value="all">{t.all}</SelectItem><SelectItem value="paid">{t.paid}</SelectItem><SelectItem value="pending">{t.pending}</SelectItem><SelectItem value="overdue">{t.overdue}</SelectItem><SelectItem value="failed">{t.failed}</SelectItem></SelectContent>
+   111→   510→        </Select>
+   112→   511→      </div>
+   113→   512→
+   114→   513→      {/* Desktop Table */}
+   115→   514→      <Card className="border-0 shadow-sm overflow-hidden hidden md:block">
+   116→   515→        <div className="overflow-x-auto">
+   117→   516→          <Table><TableHeader><TableRow className="bg-muted/50 hover:bg-muted/50">
+   118→   517→            <SortableTH label={t.invoiceNo} sortKey="id" currentSort={sort} onSort={handleSort} className="ps-5" />
+   119→   518→            <SortableTH label={t.tenant} sortKey="tenant" currentSort={sort} onSort={handleSort} />
+   120→   519→            <SortableTH label={t.plan} sortKey="plan" currentSort={sort} onSort={handleSort} className="hidden lg:table-cell" />
+   121→   520→            <SortableTH label={t.amount} sortKey="amount" currentSort={sort} onSort={handleSort} align="end" />
+   122→   521→            <SortableTH label={t.status} sortKey="status" currentSort={sort} onSort={handleSort} />
+   123→   522→            <TableHead className="pe-5 font-semibold text-xs uppercase tracking-wider text-end">{t.actions}</TableHead>
+   124→   523→          </TableRow></TableHeader>
+   125→   524→          <TableBody>
+   126→   525→            {items.length === 0 ? <EmptyRow colSpan={6} /> : items.map(inv => (
+   127→   526→            <TableRow key={inv.id} className="group hover:bg-muted/20 transition-colors">
+   128→   527→              <TableCell className="ps-5 font-mono text-sm font-semibold">{inv.id}</TableCell>
+   129→   528→              <TableCell className="px-3 text-sm">{invTenant(inv, lang)}</TableCell>
+   130→   529→              <TableCell className="px-3 hidden lg:table-cell"><Badge variant="secondary" className="text-xs">{inv.plan}</Badge></TableCell>
+   131→   530→              <TableCell className="px-3 text-end font-semibold tabular-nums text-sm">{inv.amount.toLocaleString()} <span className="text-xs font-normal text-muted-foreground">{lang === 'ar' ? 'ر.س' : 'SAR'}</span></TableCell>
+   132→   531→              <TableCell className="px-3"><StatusBadge status={inv.status} locale={lang} /></TableCell>
+   133→   532→              <TableCell className="pe-5">
+   134→   533→                <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+   135→   534→                  <ActionBtn icon={Eye} label={t.view} onClick={() => toast.info(t.viewingInvoice.replace('{id}', inv.id))} />
+   136→   535→                  {inv.status !== 'paid' && <ActionBtn icon={CheckCircle2} label={t.paid} onClick={() => handleMarkPaid(inv)} />}
+   137→   536→                  <ActionBtn icon={Download} onClick={() => toast.success(t.downloadingInvoice.replace('{id}', inv.id))} />
+   138→   537→                </div>
+   139→   538→              </TableCell>
+   140→   539→            </TableRow>
+   141→   540→          ))}
+   142→   541→          </TableBody></Table>
+   143→   542→        </div>
+   144→   543→        <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+   145→   544→      </Card>
+   146→   545→
+   147→   546→      {/* Mobile Cards */}
+   148→   547→      <div className="md:hidden space-y-3">
+   149→   548→        {items.length === 0 ? <Card className="border-0 shadow-sm"><CardContent className="py-16 text-center text-muted-foreground text-sm">{t.noResults}</CardContent></Card> : items.map(inv => (
+   150→   549→          <Card key={inv.id} className="border-0 shadow-sm"><CardContent className="p-4">
+   151→   550→            <div className="flex items-start justify-between gap-3 mb-3">
+   152→   551→              <div className="min-w-0"><p className="font-mono text-sm font-bold">{inv.id}</p><p className="text-xs text-muted-foreground mt-0.5">{invTenant(inv, lang)}</p></div>
+   153→   552→              <StatusBadge status={inv.status} locale={lang} />
+   154→   553→            </div>
+   155→   554→            <div className="flex items-center justify-between pt-2 border-t">
+   156→   555→              <span className="font-bold text-sm">{inv.amount.toLocaleString()} <span className="text-xs font-normal text-muted-foreground">{lang === 'ar' ? 'ر.س' : 'SAR'}</span></span>
+   157→   556→              <div className="flex gap-1">
+   158→   557→                <ActionBtn icon={Eye} onClick={() => toast.info(t.viewingInvoice.replace('{id}', inv.id))} />
+   159→   558→                {inv.status !== 'paid' && <ActionBtn icon={CheckCircle2} onClick={() => handleMarkPaid(inv)} />}
+   160→   559→                <ActionBtn icon={Download} onClick={() => toast.success(t.downloadingInvoice.replace('{id}', inv.id))} />
+   161→   560→              </div>
+   162→   561→            </div>
+   163→   562→          </CardContent></Card>
+   164→   563→        ))}
+   165→   564→      </div>
+   166→   565→    </div>
+   167→   566→  )
+   168→   567→}
+   169→   568→
+   170→   569→// ════════════════════════════════════════════════════════════════
+   171→   570→// PAGE 6: ROLES (full CRUD)
+   172→   571→// ════════════════════════════════════════════════════════════════
+   173→   572→function RolesPage() {
+   174→   573→  const { t, lang } = useSA()
+   175→   574→  const [roles, setRoles] = useState<Role[]>(INIT_ROLES)
+   176→   575→  const [addOpen, setAddOpen] = useState(false)
+   177→   576→  const [editRole, setEditRole] = useState<Role | null>(null)
+   178→   577→  const [form, setForm] = useState({ name: '', nameEn: '', desc: '', descEn: '' })
+   179→   578→
+   180→   579→  const openAdd = () => { setForm({ name: '', nameEn: '', desc: '', descEn: '' }); setAddOpen(true) }
+   181→   580→  const openEdit = (r: Role) => { setForm({ name: r.name, nameEn: r.nameEn, desc: r.description, descEn: r.descriptionEn }); setEditRole(r) }
+   182→   581→
+   183→   582→  const rName = (r: Role) => lang === 'en' ? r.nameEn : r.name
+   184→   583→  const rDesc = (r: Role) => lang === 'en' ? r.descriptionEn : r.description
+   185→   584→
+   186→   585→  const handleCreate = () => {
+   187→   586→    if (!form.name.trim()) return
+   188→   587→    const r: Role = { id: Date.now().toString(), name: form.name, nameEn: form.nameEn, users: 0, permissions: 0, description: form.desc, descriptionEn: form.descEn }
+   189→   588→    setRoles(p => [r, ...p]); toast.success(t.roleCreated); setAddOpen(false)
+   190→   589→  }
+   191→   590→
+   192→   591→  const handleUpdate = () => {
+   193→   592→    if (!editRole || !form.name.trim()) return
+   194→   593→    setRoles(p => p.map(r => r.id === editRole.id ? { ...r, name: form.name, nameEn: form.nameEn, description: form.desc, descriptionEn: form.descEn } : r))
+   195→   594→    toast.success(t.roleUpdated); setEditRole(null)
+   196→   595→  }
+   197→   596→
+   198→   597→  const handleDelete = (r: Role) => { setRoles(p => p.filter(x => x.id !== r.id)); toast.success(t.roleDeleted) }
+   199→   598→
+   200→   599→  return (
+   201→   600→    <div className="space-y-6">
+   202→   601→      <PageTitle title={t.rolesTitle} action={<PrimaryBtn icon={Plus} label={t.addRole} onClick={openAdd} />} />
+   203→   602→      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+   204→   603→        {roles.map((r, i) => (
+   205→   604→          <motion.div key={r.id} variants={fade} initial="hidden" animate="visible" transition={{ delay: i * 0.04 }}>
+   206→   605→            <Card className="group transition-all hover:shadow-lg border-0 shadow-sm h-full">
+   207→   606→              <CardContent className="p-5 sm:p-6">
+   208→   607→                <div className="flex items-start justify-between mb-4">
+   209→   608→                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-100 dark:bg-violet-900/30"><Shield className="h-5 w-5 text-violet-600" /></div>
+   210→   609→                  <Badge variant="secondary" className="text-xs">{r.permissions} {t.permissions}</Badge>
+   211→   610→                </div>
+   212→   611→                <h3 className="font-bold text-base">{rName(r)}</h3>
+   213→   612→                <p className="text-xs text-muted-foreground mb-2">{lang === 'ar' ? r.nameEn : r.name}</p>
+   214→   613→                <p className="text-sm text-muted-foreground mb-4 leading-relaxed">{rDesc(r)}</p>
+   215→   614→                <div className="flex items-center justify-between pt-3 border-t">
+   216→   615→                  <span className="text-xs text-muted-foreground">{r.users} {t.users}</span>
+   217→   616→                  <div className="flex gap-1">
+   218→   617→                    <ActionBtn icon={Edit} label={t.edit} onClick={() => openEdit(r)} />
+   219→   618→                    <ActionBtn icon={Trash2} onClick={() => handleDelete(r)} danger />
+   220→   619→                  </div>
+   221→   620→                </div>
+   222→   621→              </CardContent>
+   223→   622→            </Card>
+   224→   623→          </motion.div>
+   225→   624→        ))}
+   226→   625→      </div>
+   227→   626→
+   228→   627→      {/* Add Dialog */}
+   229→   628→      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+   230→   629→        <DialogContent className="max-w-md"><DialogHeader><DialogTitle>{t.addRoleDlg}</DialogTitle></DialogHeader>
+   231→   630→          <div className="space-y-4 pt-2">
+   232→   631→            <FormField label={t.roleName}><Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} /></FormField>
+   233→   632→            <FormField label={t.roleNameEn}><Input value={form.nameEn} onChange={e => setForm(p => ({ ...p, nameEn: e.target.value }))} dir="ltr" /></FormField>
+   234→   633→            <FormField label={t.description}><Input value={form.desc} onChange={e => setForm(p => ({ ...p, desc: e.target.value }))} /></FormField>
+   235→   634→          </div>
+   236→   635→          <DlgFooter onCancel={() => setAddOpen(false)} onConfirm={handleCreate} confirmLabel={t.create} />
+   237→   636→        </DialogContent>
+   238→   637→      </Dialog>
+   239→   638→
+   240→   639→      {/* Edit Dialog */}
+   241→   640→      <Dialog open={!!editRole} onOpenChange={() => setEditRole(null)}>
+   242→   641→        <DialogContent className="max-w-md"><DialogHeader><DialogTitle>{t.editRoleDlg}</DialogTitle></DialogHeader>
+   243→   642→          <div className="space-y-4 pt-2">
+   244→   643→            <FormField label={t.roleName}><Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} /></FormField>
+   245→   644→            <FormField label={t.roleNameEn}><Input value={form.nameEn} onChange={e => setForm(p => ({ ...p, nameEn: e.target.value }))} dir="ltr" /></FormField>
+   246→   645→            <FormField label={t.description}><Input value={form.desc} onChange={e => setForm(p => ({ ...p, desc: e.target.value }))} /></FormField>
+   247→   646→          </div>
+   248→   647→          <DlgFooter onCancel={() => setEditRole(null)} onConfirm={handleUpdate} />
+   249→   648→        </DialogContent>
+   250→   649→      </Dialog>
+   251→   650→    </div>
+   252→   651→  )
+   253→   652→}
+   254→   653→
+   255→   654→// ════════════════════════════════════════════════════════════════
+   256→   655→// PAGE 7: AUDIT LOGS (bilingual)
+   257→   656→// ════════════════════════════════════════════════════════════════
+   258→   657→function AuditPage() {
+   259→   658→  const { t, lang } = useSA()
+   260→   659→  const [logs] = useState<SysLog[]>(INIT_LOGS)
+   261→   660→  const [filter, setFilter] = useState('all')
+   262→   661→  const [page, setPage] = useState(1)
+   263→   662→  const filtered = useMemo(() => filter === 'all' ? logs : logs.filter(l => l.level === filter), [logs, filter])
+   264→   663→  const { items, totalPages } = paginate(filtered, page, 8)
+   265→   664→
+   266→   665→  return (
+   267→   666→    <div className="space-y-5">
+   268→   667→      <PageTitle title={t.auditTitle} action={<Button className="gap-2" variant="outline" onClick={() => toast.success(t.logExported)}><Download className="h-4 w-4" />{t.export}</Button>} />
+   269→   668→      <div className="flex flex-wrap gap-2">
+   270→   669→        {['all','info','success','warn','error'].map(f => (
+   271→   670→          <Button key={f} size="sm" variant={filter === f ? 'default' : 'outline'} className="text-xs h-8 rounded-full px-4" onClick={() => { setFilter(f); setPage(1) }}>
+   272→   671→            {f === 'all' ? t.all : getLogLabel(f, t)}
+   273→   672→          </Button>
+   274→   673→        ))}
+   275→   674→      </div>
+   276→   675→      <Card className="border-0 shadow-sm overflow-hidden hidden sm:block">
+   277→   676→        <div className="overflow-x-auto">
+   278→   677→          <Table><TableHeader><TableRow className="bg-muted/50 hover:bg-muted/50">
+   279→   678→            <TableHead className="ps-5 font-semibold text-xs uppercase tracking-wider w-24">{t.level}</TableHead>
+   280→   679→            <TableHead className="px-3 font-semibold text-xs uppercase tracking-wider">{t.message}</TableHead>
+   281→   680→            <TableHead className="px-3 font-semibold text-xs uppercase tracking-wider hidden md:table-cell">{t.source}</TableHead>
+   282→   681→            <TableHead className="pe-5 font-semibold text-xs uppercase tracking-wider text-end">{t.date}</TableHead>
+   283→   682→          </TableRow></TableHeader>
+   284→   683→          <TableBody>{items.map(l => (
+   285→   684→            <TableRow key={l.id} className="hover:bg-muted/20 transition-colors">
+   286→   685→              <TableCell className="ps-5"><span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${l.level === 'info' ? 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-400' : l.level === 'warn' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400' : l.level === 'error' ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400'}`}>{getLogLabel(l.level, t)}</span></TableCell>
+   287→   686→              <TableCell className="px-3 text-sm max-w-[400px]">{logMsg(l, lang)}</TableCell>
+   288→   687→              <TableCell className="px-3 text-xs text-muted-foreground hidden md:table-cell">{logSrc(l, lang)}</TableCell>
+   289→   688→              <TableCell className="pe-5 text-xs text-muted-foreground whitespace-nowrap text-end">{new Date(l.timestamp).toLocaleString(lang === 'ar' ? 'ar-SA' : 'en-US')}</TableCell>
+   290→   689→            </TableRow>
+   291→   690→          ))}</TableBody></Table>
+   292→   691→        </div>
+   293→   692→        <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+   294→   693→      </Card>
+   295→   694→      <div className="sm:hidden space-y-2">
+   296→   695→        {items.map(l => (
+   297→   696→          <Card key={l.id} className="border-0 shadow-sm"><CardContent className="p-3">
+   298→   697→            <div className="flex items-start gap-3"><LogDot level={l.level} />
+   299→   698→              <div className="min-w-0 flex-1">
+   300→   699→                <div className="flex items-center gap-2 mb-1"><span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${l.level === 'info' ? 'bg-sky-100 text-sky-700' : l.level === 'warn' ? 'bg-amber-100 text-amber-700' : l.level === 'error' ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>{getLogLabel(l.level, t)}</span><span className="text-[10px] text-muted-foreground">{logSrc(l, lang)}</span></div>
+   301→   700→                <p className="text-xs leading-relaxed">{logMsg(l, lang)}</p>
+   302→   701→                <p className="text-[10px] text-muted-foreground mt-1">{new Date(l.timestamp).toLocaleString(lang === 'ar' ? 'ar-SA' : 'en-US')}</p>
+   303→   702→              </div>
+   304→   703→            </div>
+   305→   704→          </CardContent></Card>
+   306→   705→        ))}
+   307→   706→      </div>
+   308→   707→    </div>
+   309→   708→  )
+   310→   709→}
+   311→   710→
+   312→   711→// ════════════════════════════════════════════════════════════════
+   313→   712→// PAGE 8: NOTIFICATIONS (full CRUD on templates)
+   314→   713→// ════════════════════════════════════════════════════════════════
+   315→   714→function NotificationsPage() {
+   316→   715→  const { t, lang } = useSA()
+   317→   716→  const [templates, setTemplates] = useState<NotificationTemplate[]>(NOTIF_TEMPLATES)
+   318→   717→  const [sendOpen, setSendOpen] = useState(false)
+   319→   718→  const [msg, setMsg] = useState({ title: '', body: '', target: 'all' })
+   320→   719→  const [delTarget, setDelTarget] = useState<NotificationTemplate | null>(null)
+   321→   720→
+   322→   721→  const handleDelete = (tmpl: NotificationTemplate) => { setTemplates(p => p.filter(x => x.id !== tmpl.id)); toast.success(t.deleted); setDelTarget(null) }
+   323→   722→
+   324→   723→  return (
+   325→   724→    <div className="space-y-5">
+   326→   725→      <PageTitle title={t.notificationsTitle} action={<PrimaryBtn icon={Bell} label={t.sendNotif} onClick={() => setSendOpen(true)} />} />
+   327→   726→
+   328→   727→      <Card className="border-0 shadow-sm overflow-hidden hidden sm:block">
+   329→   728→        <div className="overflow-x-auto">
+   330→   729→          <Table><TableHeader><TableRow className="bg-muted/50 hover:bg-muted/50">
+   331→   730→            <TableHead className="ps-5 font-semibold text-xs uppercase tracking-wider">{t.template}</TableHead>
+   332→   731→            <TableHead className="px-3 font-semibold text-xs uppercase tracking-wider hidden md:table-cell">{t.type}</TableHead>
+   333→   732→            <TableHead className="px-3 font-semibold text-xs uppercase tracking-wider">{t.status}</TableHead>
+   334→   733→            <TableHead className="px-3 font-semibold text-xs uppercase tracking-wider text-end hidden lg:table-cell">{t.sent}</TableHead>
+   335→   734→            <TableHead className="pe-5 font-semibold text-xs uppercase tracking-wider text-end">{t.actions}</TableHead>
+   336→   735→          </TableRow></TableHeader>
+   337→   736→          <TableBody>{templates.map(tmpl => (
+   338→   737→            <TableRow key={tmpl.id} className="group hover:bg-muted/20 transition-colors">
+   339→   738→              <TableCell className="ps-5 font-medium text-sm">{lang === 'en' ? tmpl.nameEn : tmpl.name}</TableCell>
+   340→   739→              <TableCell className="px-3 text-sm hidden md:table-cell">{lang === 'en' ? tmpl.typeEn : tmpl.type}</TableCell>
+   341→   740→              <TableCell className="px-3"><StatusBadge status={tmpl.status} locale={lang} /></TableCell>
+   342→   741→              <TableCell className="px-3 tabular-nums text-sm hidden lg:table-cell text-end">{tmpl.sent}</TableCell>
+   343→   742→              <TableCell className="pe-5">
+   344→   743→                <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+   345→   744→                  <ActionBtn icon={Edit} label={t.edit} onClick={() => toast.info(t.editTemplate)} />
+   346→   745→                  <ActionBtn icon={Mail} onClick={() => toast.success(t.testSent)} />
+   347→   746→                  <ActionBtn icon={Trash2} onClick={() => setDelTarget(tmpl)} danger />
+   348→   747→                </div>
+   349→   748→              </TableCell>
+   350→   749→            </TableRow>
+   351→   750→          ))}</TableBody></Table>
+   352→   751→        </div>
+   353→   752→      </Card>
+   354→   753→
+   355→   754→      <div className="sm:hidden space-y-3">
+   356→   755→        {templates.map(tmpl => (
+   357→   756→          <Card key={tmpl.id} className="border-0 shadow-sm"><CardContent className="p-4">
+   358→   757→            <div className="flex items-start justify-between gap-3 mb-2">
+   359→   758→              <div className="min-w-0"><p className="font-medium text-sm">{lang === 'en' ? tmpl.nameEn : tmpl.name}</p><p className="text-xs text-muted-foreground mt-0.5">{lang === 'en' ? tmpl.typeEn : tmpl.type} · {tmpl.sent} {t.sent}</p></div>
+   360→   759→              <StatusBadge status={tmpl.status} locale={lang} />
+   361→   760→            </div>
+   362→   761→            <div className="flex items-center justify-end gap-1 pt-2 border-t">
+   363→   762→              <ActionBtn icon={Edit} label={t.edit} onClick={() => toast.info(t.editTemplate)} />
+   364→   763→              <ActionBtn icon={Mail} onClick={() => toast.success(t.testSent)} />
+   365→   764→              <ActionBtn icon={Trash2} onClick={() => setDelTarget(tmpl)} danger />
+   366→   765→            </div>
+   367→   766→          </CardContent></Card>
+   368→   767→        ))}
+   369→   768→      </div>
+   370→   769→
+   371→   770→      <Dialog open={sendOpen} onOpenChange={setSendOpen}>
+   372→   771→        <DialogContent className="max-w-md"><DialogHeader><DialogTitle>{t.sendNotifDlg}</DialogTitle></DialogHeader>
+   373→   772→          <div className="space-y-4 pt-2">
+   374→   773→            <FormField label={t.title}><Input value={msg.title} onChange={e => setMsg(p => ({ ...p, title: e.target.value }))} /></FormField>
+   375→   774→            <FormField label={t.content}><Input value={msg.body} onChange={e => setMsg(p => ({ ...p, body: e.target.value }))} /></FormField>
+   376→   775→            <FormField label={t.target}><Select value={msg.target} onValueChange={v => setMsg(p => ({ ...p, target: v }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">{t.everyone}</SelectItem><SelectItem value="active">{t.activeUsers}</SelectItem><SelectItem value="trial">{t.trialUsers}</SelectItem></SelectContent></Select></FormField>
+   377→   776→          </div>
+   378→   777→          <DlgFooter onCancel={() => setSendOpen(false)} onConfirm={() => { toast.success(t.notifSent); setSendOpen(false); setMsg({ title: '', body: '', target: 'all' }) }} confirmLabel={t.send} />
+   379→   778→        </DialogContent>
+   380→   779→      </Dialog>
+   381→   780→
+   382→   781→      <ConfirmDialog open={!!delTarget} onOpenChange={() => setDelTarget(null)} title={t.delete} desc={t.confirmDeleteTemplate} onConfirm={() => { if (delTarget) handleDelete(delTarget) }} danger />
+   383→   782→    </div>
+   384→   783→  )
+   385→   784→}
+   386→   785→
+   387→   786→// ════════════════════════════════════════════════════════════════
+   388→   787→// PAGE 9: REPORTS
+   389→   788→// ════════════════════════════════════════════════════════════════
+   390→   789→function ReportsPage() {
+   391→   790→  const { t, lang } = useSA()
+   392→   791→  return (
+   393→   792→    <div className="space-y-6">
+   394→   793→      <PageTitle title={t.reportsTitle} />
+   395→   794→      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+   396→   795→        {REPORTS.map((r, i) => (
+   397→   796→          <motion.div key={r.id} variants={fade} initial="hidden" animate="visible" transition={{ delay: i * 0.04 }}>
+   398→   797→            <Card className="group transition-all hover:shadow-lg border-0 shadow-sm h-full">
+   399→   798→              <CardContent className="p-5 sm:p-6">
+   400→   799→                <div className="flex items-start justify-between mb-4">
+   401→
+   402→[showing lines 400-799 of 1156; use offset=800 with limit to continue reading]

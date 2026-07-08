@@ -1,0 +1,738 @@
+     1→// ============================================================
+     2→// Subscription Plan Definitions — Single Source of Truth
+     3→// ============================================================
+     4→// Every module, feature, limit, and integration is defined here.
+     5→// NOTHING should be hardcoded elsewhere.
+     6→// ============================================================
+     7→
+     8→// ─── Feature IDs ────────────────────────────────────────────
+     9→// Every toggleable feature in the app has a unique ID.
+    10→export const FEATURE_IDS = {
+    11→  // Core
+    12→  BASIC_BOOKINGS: 'basic_bookings',
+    13→  RECURRING_BOOKINGS: 'recurring_bookings',
+    14→  GROUP_BOOKINGS: 'group_bookings',
+    15→  WAITLIST: 'waitlist',
+    16→  DEPOSITS: 'deposits',
+    17→
+    18→  // Data
+    19→  EXPORT_REPORTS: 'export_reports',
+    20→  IMPORT_DATA: 'import_data',
+    21→  ADVANCED_REPORTS: 'advanced_reports',
+    22→
+    23→  // Communication
+    24→  WHATSAPP_REMINDERS: 'whatsapp_reminders',
+    25→  EMAIL_CAMPAIGNS: 'email_campaigns',
+    26→  EMAIL_REMINDERS: 'email_reminders',
+    27→  SMS_NOTIFICATIONS: 'sms_notifications',
+    28→
+    29→  // Operations
+    30→  MULTIPLE_BRANCHES: 'multiple_branches',
+    31→  EMPLOYEE_MANAGEMENT: 'employee_management',
+    32→  RESOURCE_MANAGEMENT: 'resource_management',
+    33→  COUPON_MANAGEMENT: 'coupon_management',
+    34→  INVOICE_MANAGEMENT: 'invoice_management',
+    35→
+    36→  // Admin
+    37→  ROLE_MANAGEMENT: 'role_management',
+    38→  AUDIT_LOGS: 'audit_logs',
+    39→  API_ACCESS: 'api_access',
+    40→  CUSTOM_BRANDING: 'custom_branding',
+    41→  BACKUP_RESTORE: 'backup_restore',
+    42→  CALENDAR_SYNC: 'calendar_sync',
+    43→  CUSTOM_DOMAIN: 'custom_domain',
+    44→  WHITE_LABEL: 'white_label',
+    45→  PRIORITY_SUPPORT: 'priority_support',
+    46→  DEDICATED_MANAGER: 'dedicated_manager',
+    47→  CUSTOM_SLA: 'custom_sla',
+    48→  PRIVATE_DEPLOYMENT: 'private_deployment',
+    49→} as const
+    50→
+    51→export type FeatureId = (typeof FEATURE_IDS)[keyof typeof FEATURE_IDS]
+    52→
+    53→// ─── Module IDs (pages) ────────────────────────────────────
+    54→export const MODULE_IDS = {
+    55→  DASHBOARD: 'dashboard',
+    56→  CALENDAR: 'calendar',
+    57→  BOOKINGS: 'bookings',
+    58→  CUSTOMERS: 'customers',
+    59→  EMPLOYEES: 'employees',
+    60→  SERVICES: 'services',
+    61→  RESOURCES: 'resources',
+    62→  INVOICES: 'invoices',
+    63→  PAYMENTS: 'payments',
+    64→  SUBSCRIPTIONS: 'subscriptions',
+    65→  REPORTS: 'reports',
+    66→  NOTIFICATIONS: 'notifications',
+    67→  AUDIT_LOGS: 'audit_logs',
+    68→  BRANCHES: 'branches',
+    69→  COUPONS: 'coupons',
+    70→  ROLES: 'roles',
+    71→  WHATSAPP: 'whatsapp',
+    72→  SETTINGS: 'settings',
+    73→} as const
+    74→
+    75→export type ModuleId = (typeof MODULE_IDS)[keyof typeof MODULE_IDS]
+    76→
+    77→// ─── Integration IDs ───────────────────────────────────────
+    78→export const INTEGRATION_IDS = {
+    79→  WHATSAPP: 'whatsapp_integration',
+    80→  EMAIL: 'email_integration',
+    81→  SMS: 'sms_integration',
+    82→  GOOGLE_CALENDAR: 'google_calendar',
+    83→  PAYMENT_GATEWAY: 'payment_gateway',
+    84→  STRIPE: 'stripe',
+    85→  APPLE_PAY: 'apple_pay',
+    86→  MADA: 'mada',
+    87→  STC_PAY: 'stc_pay',
+    88→} as const
+    89→
+    90→export type IntegrationId = (typeof INTEGRATION_IDS)[keyof typeof INTEGRATION_IDS]
+    91→
+    92→// ─── Usage Limits ──────────────────────────────────────────
+    93→export interface PlanLimits {
+    94→  maxCustomers: number        // -1 = unlimited
+    95→  maxEmployees: number
+    96→  maxServices: number
+    97→  maxBookingsPerMonth: number
+    98→  maxBranches: number
+    99→  maxUsers: number
+   100→  maxStorage: number          // MB, -1 = unlimited
+   101→  maxWhatsappMessages: number // per month
+   102→  maxEmailMessages: number    // per month
+   103→}
+   104→
+   105→export const DEFAULT_LIMITS: PlanLimits = {
+   106→  maxCustomers: -1,
+   107→  maxEmployees: -1,
+   108→  maxServices: -1,
+   109→  maxBookingsPerMonth: -1,
+   110→  maxBranches: -1,
+   111→  maxUsers: -1,
+   112→  maxStorage: -1,
+   113→  maxWhatsappMessages: -1,
+   114→  maxEmailMessages: -1,
+   115→}
+   116→
+   117→// ─── Bilingual Label ──────────────────────────────────────
+   118→export interface Bilingual {
+   119→  ar: string
+   120→  en: string
+   121→}
+   122→
+   123→// ─── Plan Definition ───────────────────────────────────────
+   124→export interface PlanDefinition {
+   125→  slug: string
+   126→  name: Bilingual
+   127→  description: Bilingual
+   128→  price: number           // monthly SAR
+   129→  priceYearly: number     // yearly SAR (0 = no yearly discount)
+   130→  color: string           // tailwind color class
+   131→  popular: boolean
+   132→
+   133→  // Which pages are visible
+   134→  modules: ModuleId[]
+   135→
+   136→  // Feature flags
+   137→  features: Record<FeatureId, boolean>
+   138→
+   139→  // Usage limits
+   140→  limits: PlanLimits
+   141→
+   142→  // Allowed integrations
+   143→  integrations: IntegrationId[]
+   144→
+   145→  // RBAC permissions (resource → actions)
+   146→  permissions: Record<string, Record<string, boolean>>
+   147→}
+   148→
+   149→// ─── Free Plan ──────────────────────────────────────────────
+   150→const FREE_PLAN: PlanDefinition = {
+   151→  slug: 'free',
+   152→  name: { ar: 'مجاني', en: 'Free' },
+   153→  description: {
+   154→    ar: 'للأعمال الناشئة — ميزات أساسية مجانية',
+   155→    en: 'For startups — essential features, free forever',
+   156→  },
+   157→  price: 0,
+   158→  priceYearly: 0,
+   159→  color: 'bg-gray-500',
+   160→  popular: false,
+   161→
+   162→  modules: [
+   163→    MODULE_IDS.DASHBOARD,
+   164→    MODULE_IDS.BOOKINGS,
+   165→    MODULE_IDS.CUSTOMERS,
+   166→    MODULE_IDS.NOTIFICATIONS,
+   167→  ],
+   168→
+   169→  features: {
+   170→    [FEATURE_IDS.BASIC_BOOKINGS]: true,
+   171→    [FEATURE_IDS.RECURRING_BOOKINGS]: false,
+   172→    [FEATURE_IDS.GROUP_BOOKINGS]: false,
+   173→    [FEATURE_IDS.WAITLIST]: false,
+   174→    [FEATURE_IDS.DEPOSITS]: false,
+   175→    [FEATURE_IDS.EXPORT_REPORTS]: false,
+   176→    [FEATURE_IDS.IMPORT_DATA]: false,
+   177→    [FEATURE_IDS.ADVANCED_REPORTS]: false,
+   178→    [FEATURE_IDS.WHATSAPP_REMINDERS]: false,
+   179→    [FEATURE_IDS.EMAIL_CAMPAIGNS]: false,
+   180→    [FEATURE_IDS.EMAIL_REMINDERS]: false,
+   181→    [FEATURE_IDS.SMS_NOTIFICATIONS]: false,
+   182→    [FEATURE_IDS.MULTIPLE_BRANCHES]: false,
+   183→    [FEATURE_IDS.EMPLOYEE_MANAGEMENT]: false,
+   184→    [FEATURE_IDS.RESOURCE_MANAGEMENT]: false,
+   185→    [FEATURE_IDS.COUPON_MANAGEMENT]: false,
+   186→    [FEATURE_IDS.INVOICE_MANAGEMENT]: false,
+   187→    [FEATURE_IDS.ROLE_MANAGEMENT]: false,
+   188→    [FEATURE_IDS.AUDIT_LOGS]: false,
+   189→    [FEATURE_IDS.API_ACCESS]: false,
+   190→    [FEATURE_IDS.CUSTOM_BRANDING]: false,
+   191→    [FEATURE_IDS.BACKUP_RESTORE]: false,
+   192→    [FEATURE_IDS.CALENDAR_SYNC]: false,
+   193→    [FEATURE_IDS.CUSTOM_DOMAIN]: false,
+   194→    [FEATURE_IDS.WHITE_LABEL]: false,
+   195→    [FEATURE_IDS.PRIORITY_SUPPORT]: false,
+   196→    [FEATURE_IDS.DEDICATED_MANAGER]: false,
+   197→    [FEATURE_IDS.CUSTOM_SLA]: false,
+   198→    [FEATURE_IDS.PRIVATE_DEPLOYMENT]: false,
+   199→  },
+   200→
+   201→  limits: {
+   202→    maxCustomers: 50,
+   203→    maxEmployees: 1,
+   204→    maxServices: 5,
+   205→    maxBookingsPerMonth: 30,
+   206→    maxBranches: 1,
+   207→    maxUsers: 1,
+   208→    maxStorage: 100,
+   209→    maxWhatsappMessages: 0,
+   210→    maxEmailMessages: 50,
+   211→  },
+   212→
+   213→  integrations: [
+   214→    INTEGRATION_IDS.EMAIL,
+   215→  ],
+   216→
+   217→  permissions: {
+   218→    dashboard: { view: true },
+   219→    bookings: { view: true, create: true },
+   220→    customers: { view: true },
+   221→    notifications: { view: true },
+   222→  },
+   223→}
+   224→
+   225→// ─── Starter Plan ──────────────────────────────────────────
+   226→const STARTER_PLAN: PlanDefinition = {
+   227→  slug: 'starter',
+   228→  name: { ar: 'أساسي', en: 'Starter' },
+   229→  description: {
+   230→    ar: 'للأعمال الصغيرة — ميزات إضافية للموظفين والخدمات',
+   231→    en: 'For small businesses — employee & service features',
+   232→  },
+   233→  price: 99,
+   234→  priceYearly: 950,
+   235→  color: 'bg-sky-500',
+   236→  popular: false,
+   237→
+   238→  modules: [
+   239→    MODULE_IDS.DASHBOARD,
+   240→    MODULE_IDS.CALENDAR,
+   241→    MODULE_IDS.BOOKINGS,
+   242→    MODULE_IDS.CUSTOMERS,
+   243→    MODULE_IDS.EMPLOYEES,
+   244→    MODULE_IDS.SERVICES,
+   245→    MODULE_IDS.NOTIFICATIONS,
+   246→  ],
+   247→
+   248→  features: {
+   249→    [FEATURE_IDS.BASIC_BOOKINGS]: true,
+   250→    [FEATURE_IDS.RECURRING_BOOKINGS]: false,
+   251→    [FEATURE_IDS.GROUP_BOOKINGS]: false,
+   252→    [FEATURE_IDS.WAITLIST]: true,
+   253→    [FEATURE_IDS.DEPOSITS]: false,
+   254→    [FEATURE_IDS.EXPORT_REPORTS]: false,
+   255→    [FEATURE_IDS.IMPORT_DATA]: false,
+   256→    [FEATURE_IDS.ADVANCED_REPORTS]: false,
+   257→    [FEATURE_IDS.WHATSAPP_REMINDERS]: false,
+   258→    [FEATURE_IDS.EMAIL_CAMPAIGNS]: false,
+   259→    [FEATURE_IDS.EMAIL_REMINDERS]: true,
+   260→    [FEATURE_IDS.SMS_NOTIFICATIONS]: true,
+   261→    [FEATURE_IDS.MULTIPLE_BRANCHES]: false,
+   262→    [FEATURE_IDS.EMPLOYEE_MANAGEMENT]: true,
+   263→    [FEATURE_IDS.RESOURCE_MANAGEMENT]: false,
+   264→    [FEATURE_IDS.COUPON_MANAGEMENT]: false,
+   265→    [FEATURE_IDS.INVOICE_MANAGEMENT]: false,
+   266→    [FEATURE_IDS.ROLE_MANAGEMENT]: false,
+   267→    [FEATURE_IDS.AUDIT_LOGS]: false,
+   268→    [FEATURE_IDS.API_ACCESS]: false,
+   269→    [FEATURE_IDS.CUSTOM_BRANDING]: false,
+   270→    [FEATURE_IDS.BACKUP_RESTORE]: false,
+   271→    [FEATURE_IDS.CALENDAR_SYNC]: false,
+   272→    [FEATURE_IDS.CUSTOM_DOMAIN]: false,
+   273→    [FEATURE_IDS.WHITE_LABEL]: false,
+   274→    [FEATURE_IDS.PRIORITY_SUPPORT]: false,
+   275→    [FEATURE_IDS.DEDICATED_MANAGER]: false,
+   276→    [FEATURE_IDS.CUSTOM_SLA]: false,
+   277→    [FEATURE_IDS.PRIVATE_DEPLOYMENT]: false,
+   278→  },
+   279→
+   280→  limits: {
+   281→    maxCustomers: 200,
+   282→    maxEmployees: 3,
+   283→    maxServices: 20,
+   284→    maxBookingsPerMonth: 200,
+   285→    maxBranches: 1,
+   286→    maxUsers: 3,
+   287→    maxStorage: 500,
+   288→    maxWhatsappMessages: 0,
+   289→    maxEmailMessages: 500,
+   290→  },
+   291→
+   292→  integrations: [
+   293→    INTEGRATION_IDS.EMAIL,
+   294→    INTEGRATION_IDS.SMS,
+   295→  ],
+   296→
+   297→  permissions: {
+   298→    dashboard: { view: true },
+   299→    bookings: { view: true, create: true, edit: true },
+   300→    customers: { view: true, create: true, edit: true },
+   301→    employees: { view: true, create: true, edit: true },
+   302→    services: { view: true, create: true, edit: true },
+   303→    calendar: { view: true },
+   304→    notifications: { view: true },
+   305→  },
+   306→}
+   307→
+   308→// ─── Professional Plan ─────────────────────────────────────
+   309→const PROFESSIONAL_PLAN: PlanDefinition = {
+   310→  slug: 'professional',
+   311→  name: { ar: 'احترافي', en: 'Professional' },
+   312→  description: {
+   313→    ar: 'للأعمال المتنامية — تقارير متقدمة وفروع متعددة',
+   314→    en: 'For growing businesses — advanced reports & multi-branch',
+   315→  },
+   316→  price: 299,
+   317→  priceYearly: 2890,
+   318→  color: 'bg-violet-500',
+   319→  popular: true,
+   320→
+   321→  modules: [
+   322→    MODULE_IDS.DASHBOARD,
+   323→    MODULE_IDS.CALENDAR,
+   324→    MODULE_IDS.BOOKINGS,
+   325→    MODULE_IDS.CUSTOMERS,
+   326→    MODULE_IDS.EMPLOYEES,
+   327→    MODULE_IDS.SERVICES,
+   328→    MODULE_IDS.PAYMENTS,
+   329→    MODULE_IDS.REPORTS,
+   330→    MODULE_IDS.BRANCHES,
+   331→    MODULE_IDS.NOTIFICATIONS,
+   332→    MODULE_IDS.SUBSCRIPTIONS,
+   333→  ],
+   334→
+   335→  features: {
+   336→    [FEATURE_IDS.BASIC_BOOKINGS]: true,
+   337→    [FEATURE_IDS.RECURRING_BOOKINGS]: true,
+   338→    [FEATURE_IDS.GROUP_BOOKINGS]: false,
+   339→    [FEATURE_IDS.WAITLIST]: true,
+   340→    [FEATURE_IDS.DEPOSITS]: true,
+   341→    [FEATURE_IDS.EXPORT_REPORTS]: true,
+   342→    [FEATURE_IDS.IMPORT_DATA]: false,
+   343→    [FEATURE_IDS.ADVANCED_REPORTS]: false,
+   344→    [FEATURE_IDS.WHATSAPP_REMINDERS]: false,
+   345→    [FEATURE_IDS.EMAIL_CAMPAIGNS]: true,
+   346→    [FEATURE_IDS.EMAIL_REMINDERS]: true,
+   347→    [FEATURE_IDS.SMS_NOTIFICATIONS]: true,
+   348→    [FEATURE_IDS.MULTIPLE_BRANCHES]: true,
+   349→    [FEATURE_IDS.EMPLOYEE_MANAGEMENT]: true,
+   350→    [FEATURE_IDS.RESOURCE_MANAGEMENT]: false,
+   351→    [FEATURE_IDS.COUPON_MANAGEMENT]: true,
+   352→    [FEATURE_IDS.INVOICE_MANAGEMENT]: true,
+   353→    [FEATURE_IDS.ROLE_MANAGEMENT]: false,
+   354→    [FEATURE_IDS.AUDIT_LOGS]: false,
+   355→    [FEATURE_IDS.API_ACCESS]: false,
+   356→    [FEATURE_IDS.CUSTOM_BRANDING]: false,
+   357→    [FEATURE_IDS.BACKUP_RESTORE]: false,
+   358→    [FEATURE_IDS.CALENDAR_SYNC]: false,
+   359→    [FEATURE_IDS.CUSTOM_DOMAIN]: false,
+   360→    [FEATURE_IDS.WHITE_LABEL]: false,
+   361→    [FEATURE_IDS.PRIORITY_SUPPORT]: false,
+   362→    [FEATURE_IDS.DEDICATED_MANAGER]: false,
+   363→    [FEATURE_IDS.CUSTOM_SLA]: false,
+   364→    [FEATURE_IDS.PRIVATE_DEPLOYMENT]: false,
+   365→  },
+   366→
+   367→  limits: {
+   368→    maxCustomers: 1000,
+   369→    maxEmployees: 10,
+   370→    maxServices: 50,
+   371→    maxBookingsPerMonth: 1000,
+   372→    maxBranches: 3,
+   373→    maxUsers: 10,
+   374→    maxStorage: 2000,
+   375→    maxWhatsappMessages: 0,
+   376→    maxEmailMessages: 2000,
+   377→  },
+   378→
+   379→  integrations: [
+   380→    INTEGRATION_IDS.EMAIL,
+   381→    INTEGRATION_IDS.SMS,
+   382→    INTEGRATION_IDS.PAYMENT_GATEWAY,
+   383→  ],
+   384→
+   385→  permissions: {
+   386→    dashboard: { view: true },
+   387→    bookings: { view: true, create: true, edit: true, delete: true },
+   388→    customers: { view: true, create: true, edit: true, delete: true },
+   389→    employees: { view: true, create: true, edit: true, delete: true },
+   390→    services: { view: true, create: true, edit: true, delete: true },
+   391→    calendar: { view: true },
+   392→    payments: { view: true },
+   393→    reports: { view: true, export: true },
+   394→    branches: { view: true, create: true, edit: true },
+   395→    coupons: { view: true, create: true, edit: true, delete: true },
+   396→    notifications: { view: true, create: true },
+   397→  },
+   398→}
+   399→
+   400→// ─── Business Plan ─────────────────────────────────────────
+   401→const BUSINESS_PLAN: PlanDefinition = {
+   402→  slug: 'business',
+   403→  name: { ar: 'أعمال', en: 'Business' },
+   404→  description: {
+   405→    ar: 'للأعمال المتوسطة — WhatsApp وإدارة كاملة للموارد',
+   406→    en: 'For medium businesses — WhatsApp & full resource management',
+   407→  },
+   408→  price: 599,
+   409→  priceYearly: 5790,
+   410→  color: 'bg-indigo-500',
+   411→  popular: false,
+   412→
+   413→  modules: [
+   414→    MODULE_IDS.DASHBOARD,
+   415→    MODULE_IDS.CALENDAR,
+   416→    MODULE_IDS.BOOKINGS,
+   417→    MODULE_IDS.CUSTOMERS,
+   418→    MODULE_IDS.EMPLOYEES,
+   419→    MODULE_IDS.SERVICES,
+   420→    MODULE_IDS.RESOURCES,
+   421→    MODULE_IDS.INVOICES,
+   422→    MODULE_IDS.PAYMENTS,
+   423→    MODULE_IDS.REPORTS,
+   424→    MODULE_IDS.BRANCHES,
+   425→    MODULE_IDS.COUPONS,
+   426→    MODULE_IDS.NOTIFICATIONS,
+   427→    MODULE_IDS.SUBSCRIPTIONS,
+   428→  ],
+   429→
+   430→  features: {
+   431→    [FEATURE_IDS.BASIC_BOOKINGS]: true,
+   432→    [FEATURE_IDS.RECURRING_BOOKINGS]: true,
+   433→    [FEATURE_IDS.GROUP_BOOKINGS]: true,
+   434→    [FEATURE_IDS.WAITLIST]: true,
+   435→    [FEATURE_IDS.DEPOSITS]: true,
+   436→    [FEATURE_IDS.EXPORT_REPORTS]: true,
+   437→    [FEATURE_IDS.IMPORT_DATA]: true,
+   438→    [FEATURE_IDS.ADVANCED_REPORTS]: true,
+   439→    [FEATURE_IDS.WHATSAPP_REMINDERS]: true,
+   440→    [FEATURE_IDS.EMAIL_CAMPAIGNS]: true,
+   441→    [FEATURE_IDS.EMAIL_REMINDERS]: true,
+   442→    [FEATURE_IDS.SMS_NOTIFICATIONS]: true,
+   443→    [FEATURE_IDS.MULTIPLE_BRANCHES]: true,
+   444→    [FEATURE_IDS.EMPLOYEE_MANAGEMENT]: true,
+   445→    [FEATURE_IDS.RESOURCE_MANAGEMENT]: true,
+   446→    [FEATURE_IDS.COUPON_MANAGEMENT]: true,
+   447→    [FEATURE_IDS.INVOICE_MANAGEMENT]: true,
+   448→    [FEATURE_IDS.ROLE_MANAGEMENT]: true,
+   449→    [FEATURE_IDS.AUDIT_LOGS]: true,
+   450→    [FEATURE_IDS.API_ACCESS]: false,
+   451→    [FEATURE_IDS.CUSTOM_BRANDING]: false,
+   452→    [FEATURE_IDS.BACKUP_RESTORE]: true,
+   453→    [FEATURE_IDS.CALENDAR_SYNC]: true,
+   454→    [FEATURE_IDS.CUSTOM_DOMAIN]: false,
+   455→    [FEATURE_IDS.WHITE_LABEL]: false,
+   456→    [FEATURE_IDS.PRIORITY_SUPPORT]: false,
+   457→    [FEATURE_IDS.DEDICATED_MANAGER]: false,
+   458→    [FEATURE_IDS.CUSTOM_SLA]: false,
+   459→    [FEATURE_IDS.PRIVATE_DEPLOYMENT]: false,
+   460→  },
+   461→
+   462→  limits: {
+   463→    maxCustomers: 5000,
+   464→    maxEmployees: 25,
+   465→    maxServices: 100,
+   466→    maxBookingsPerMonth: 5000,
+   467→    maxBranches: 10,
+   468→    maxUsers: 25,
+   469→    maxStorage: 10000,
+   470→    maxWhatsappMessages: 2000,
+   471→    maxEmailMessages: 5000,
+   472→  },
+   473→
+   474→  integrations: [
+   475→    INTEGRATION_IDS.EMAIL,
+   476→    INTEGRATION_IDS.SMS,
+   477→    INTEGRATION_IDS.WHATSAPP,
+   478→    INTEGRATION_IDS.PAYMENT_GATEWAY,
+   479→    INTEGRATION_IDS.GOOGLE_CALENDAR,
+   480→    INTEGRATION_IDS.STRIPE,
+   481→    INTEGRATION_IDS.APPLE_PAY,
+   482→    INTEGRATION_IDS.MADA,
+   483→    INTEGRATION_IDS.STC_PAY,
+   484→  ],
+   485→
+   486→  permissions: {
+   487→    dashboard: { view: true, export: true },
+   488→    bookings: { view: true, create: true, edit: true, delete: true, manage: true },
+   489→    customers: { view: true, create: true, edit: true, delete: true, manage: true },
+   490→    employees: { view: true, create: true, edit: true, delete: true, manage: true },
+   491→    services: { view: true, create: true, edit: true, delete: true, manage: true },
+   492→    calendar: { view: true, manage: true },
+   493→    payments: { view: true, create: true, manage: true },
+   494→    reports: { view: true, export: true, manage: true },
+   495→    branches: { view: true, create: true, edit: true, delete: true, manage: true },
+   496→    resources: { view: true, create: true, edit: true, delete: true, manage: true },
+   497→    invoices: { view: true, create: true, edit: true, delete: true, manage: true },
+   498→    coupons: { view: true, create: true, edit: true, delete: true, manage: true },
+   499→    notifications: { view: true, create: true, manage: true },
+   500→    audit_logs: { view: true, create: true, export: true, manage: true },
+   501→    roles: { view: true, create: true, edit: true, delete: true, manage: true },
+   502→  },
+   503→}
+   504→
+   505→// ─── Enterprise Plan ───────────────────────────────────────
+   506→const ENTERPRISE_PLAN: PlanDefinition = {
+   507→  slug: 'enterprise',
+   508→  name: { ar: 'مؤسسي', en: 'Enterprise' },
+   509→  description: {
+   510→    ar: 'للمؤسسات الكبيرة — كل الميزات مع دعم مخصص',
+   511→    en: 'For large enterprises — all features with dedicated support',
+   512→  },
+   513→  price: 999,
+   514→  priceYearly: 9690,
+   515→  color: 'bg-emerald-500',
+   516→  popular: false,
+   517→
+   518→  modules: [
+   519→    MODULE_IDS.DASHBOARD,
+   520→    MODULE_IDS.CALENDAR,
+   521→    MODULE_IDS.BOOKINGS,
+   522→    MODULE_IDS.CUSTOMERS,
+   523→    MODULE_IDS.EMPLOYEES,
+   524→    MODULE_IDS.SERVICES,
+   525→    MODULE_IDS.RESOURCES,
+   526→    MODULE_IDS.INVOICES,
+   527→    MODULE_IDS.PAYMENTS,
+   528→    MODULE_IDS.REPORTS,
+   529→    MODULE_IDS.BRANCHES,
+   530→    MODULE_IDS.COUPONS,
+   531→    MODULE_IDS.ROLES,
+   532→    MODULE_IDS.NOTIFICATIONS,
+   533→    MODULE_IDS.AUDIT_LOGS,
+   534→    MODULE_IDS.WHATSAPP,
+   535→    MODULE_IDS.SETTINGS,
+   536→    MODULE_IDS.SUBSCRIPTIONS,
+   537→  ],
+   538→
+   539→  features: {
+   540→    [FEATURE_IDS.BASIC_BOOKINGS]: true,
+   541→    [FEATURE_IDS.RECURRING_BOOKINGS]: true,
+   542→    [FEATURE_IDS.GROUP_BOOKINGS]: true,
+   543→    [FEATURE_IDS.WAITLIST]: true,
+   544→    [FEATURE_IDS.DEPOSITS]: true,
+   545→    [FEATURE_IDS.EXPORT_REPORTS]: true,
+   546→    [FEATURE_IDS.IMPORT_DATA]: true,
+   547→    [FEATURE_IDS.ADVANCED_REPORTS]: true,
+   548→    [FEATURE_IDS.WHATSAPP_REMINDERS]: true,
+   549→    [FEATURE_IDS.EMAIL_CAMPAIGNS]: true,
+   550→    [FEATURE_IDS.EMAIL_REMINDERS]: true,
+   551→    [FEATURE_IDS.SMS_NOTIFICATIONS]: true,
+   552→    [FEATURE_IDS.MULTIPLE_BRANCHES]: true,
+   553→    [FEATURE_IDS.EMPLOYEE_MANAGEMENT]: true,
+   554→    [FEATURE_IDS.RESOURCE_MANAGEMENT]: true,
+   555→    [FEATURE_IDS.COUPON_MANAGEMENT]: true,
+   556→    [FEATURE_IDS.INVOICE_MANAGEMENT]: true,
+   557→    [FEATURE_IDS.ROLE_MANAGEMENT]: true,
+   558→    [FEATURE_IDS.AUDIT_LOGS]: true,
+   559→    [FEATURE_IDS.API_ACCESS]: true,
+   560→    [FEATURE_IDS.CUSTOM_BRANDING]: true,
+   561→    [FEATURE_IDS.BACKUP_RESTORE]: true,
+   562→    [FEATURE_IDS.CALENDAR_SYNC]: true,
+   563→    [FEATURE_IDS.CUSTOM_DOMAIN]: true,
+   564→    [FEATURE_IDS.WHITE_LABEL]: true,
+   565→    [FEATURE_IDS.PRIORITY_SUPPORT]: true,
+   566→    [FEATURE_IDS.DEDICATED_MANAGER]: true,
+   567→    [FEATURE_IDS.CUSTOM_SLA]: true,
+   568→    [FEATURE_IDS.PRIVATE_DEPLOYMENT]: false,
+   569→  },
+   570→
+   571→  limits: {
+   572→    maxCustomers: -1, // unlimited
+   573→    maxEmployees: -1,
+   574→    maxServices: -1,
+   575→    maxBookingsPerMonth: -1,
+   576→    maxBranches: -1,
+   577→    maxUsers: -1,
+   578→    maxStorage: -1,
+   579→    maxWhatsappMessages: -1,
+   580→    maxEmailMessages: -1,
+   581→  },
+   582→
+   583→  integrations: [
+   584→    INTEGRATION_IDS.EMAIL,
+   585→    INTEGRATION_IDS.SMS,
+   586→    INTEGRATION_IDS.WHATSAPP,
+   587→    INTEGRATION_IDS.PAYMENT_GATEWAY,
+   588→    INTEGRATION_IDS.GOOGLE_CALENDAR,
+   589→    INTEGRATION_IDS.STRIPE,
+   590→    INTEGRATION_IDS.APPLE_PAY,
+   591→    INTEGRATION_IDS.MADA,
+   592→    INTEGRATION_IDS.STC_PAY,
+   593→  ],
+   594→
+   595→  permissions: {
+   596→    dashboard: { view: true, create: true, edit: true, delete: true, export: true, manage: true },
+   597→    bookings: { view: true, create: true, edit: true, delete: true, manage: true },
+   598→    customers: { view: true, create: true, edit: true, delete: true, manage: true },
+   599→    employees: { view: true, create: true, edit: true, delete: true, manage: true },
+   600→    services: { view: true, create: true, edit: true, delete: true, manage: true },
+   601→    calendar: { view: true, create: true, edit: true, delete: true, manage: true },
+   602→    payments: { view: true, create: true, edit: true, delete: true, manage: true },
+   603→    reports: { view: true, create: true, edit: true, delete: true, export: true, manage: true },
+   604→    branches: { view: true, create: true, edit: true, delete: true, manage: true },
+   605→    resources: { view: true, create: true, edit: true, delete: true, manage: true },
+   606→    invoices: { view: true, create: true, edit: true, delete: true, manage: true },
+   607→    coupons: { view: true, create: true, edit: true, delete: true, manage: true },
+   608→    notifications: { view: true, create: true, edit: true, manage: true },
+   609→    audit_logs: { view: true, create: true, edit: true, export: true, manage: true },
+   610→    roles: { view: true, create: true, edit: true, delete: true, manage: true },
+   611→    settings: { view: true, create: true, edit: true, delete: true, manage: true },
+   612→  },
+   613→}
+   614→
+   615→// ─── Plan Registry ─────────────────────────────────────────
+   616→export const PLANS: Record<string, PlanDefinition> = {
+   617→  free: FREE_PLAN,
+   618→  starter: STARTER_PLAN,
+   619→  professional: PROFESSIONAL_PLAN,
+   620→  business: BUSINESS_PLAN,
+   621→  enterprise: ENTERPRISE_PLAN,
+   622→}
+   623→
+   624→export const PLAN_SLUGS = Object.keys(PLANS) as string[]
+   625→
+   626→// ─── Helpers ───────────────────────────────────────────────
+   627→
+   628→/** Get a plan by slug. Returns null for unknown slugs. */
+   629→export function getPlan(slug: string): PlanDefinition | null {
+   630→  return PLANS[slug] ?? null
+   631→}
+   632→
+   633→/** Check if a plan includes a specific module (page). */
+   634→export function planHasModule(slug: string, moduleId: ModuleId): boolean {
+   635→  const plan = PLANS[slug]
+   636→  return plan ? plan.modules.includes(moduleId) : false
+   637→}
+   638→
+   639→/** Check if a plan includes a specific feature. */
+   640→export function planHasFeature(slug: string, featureId: FeatureId): boolean {
+   641→  const plan = PLANS[slug]
+   642→  return plan ? (plan.features[featureId] ?? false) : false
+   643→}
+   644→
+   645→/** Check if a plan includes a specific integration. */
+   646→export function planHasIntegration(slug: string, integrationId: IntegrationId): boolean {
+   647→  const plan = PLANS[slug]
+   648→  return plan ? plan.integrations.includes(integrationId) : false
+   649→}
+   650→
+   651→/** Get the limits for a plan. */
+   652→export function getPlanLimits(slug: string): PlanLimits {
+   653→  const plan = PLANS[slug]
+   654→  return plan ? plan.limits : DEFAULT_LIMITS
+   655→}
+   656→
+   657→/** Get the RBAC permissions for a plan. */
+   658→export function getPlanPermissions(slug: string): Record<string, Record<string, boolean>> {
+   659→  const plan = PLANS[slug]
+   660→  return plan ? plan.permissions : {}
+   661→}
+   662→
+   663→/** Check if a plan has a specific permission. */
+   664→export function planHasPermission(
+   665→  slug: string,
+   666→  resource: string,
+   667→  action: string
+   668→): boolean {
+   669→  const perms = getPlanPermissions(slug)
+   670→  return perms[resource]?.[action] ?? false
+   671→}
+   672→
+   673→/** Get ordered plans (lowest to highest tier). */
+   674→export function getOrderedPlans(): PlanDefinition[] {
+   675→  return PLAN_SLUGS.map((s) => PLANS[s])
+   676→}
+   677→
+   678→/** Check if target plan is an upgrade from source plan. */
+   679→export function isUpgrade(fromSlug: string, toSlug: string): boolean {
+   680→  const order = PLAN_SLUGS
+   681→  const fromIdx = order.indexOf(fromSlug)
+   682→  const toIdx = order.indexOf(toSlug)
+   683→  return toIdx > fromIdx
+   684→}
+   685→
+   686→/** Get the next plan tier, or null if already at max. */
+   687→export function getNextPlan(slug: string): PlanDefinition | null {
+   688→  const order = PLAN_SLUGS
+   689→  const idx = order.indexOf(slug)
+   690→  if (idx < 0 || idx >= order.length - 1) return null
+   691→  return PLANS[order[idx + 1]]
+   692→}
+   693→
+   694→/** Feature display labels (bilingual) */
+   695→export const FEATURE_LABELS: Record<FeatureId, Bilingual> = {
+   696→  [FEATURE_IDS.BASIC_BOOKINGS]: { ar: 'حجوزات أساسية', en: 'Basic Bookings' },
+   697→  [FEATURE_IDS.RECURRING_BOOKINGS]: { ar: 'حجوزات متكررة', en: 'Recurring Bookings' },
+   698→  [FEATURE_IDS.GROUP_BOOKINGS]: { ar: 'حجوزات جماعية', en: 'Group Bookings' },
+   699→  [FEATURE_IDS.WAITLIST]: { ar: 'قائمة الانتظار', en: 'Waitlist' },
+   700→  [FEATURE_IDS.DEPOSITS]: { ar: 'الدفعات المسبقة', en: 'Deposits' },
+   701→  [FEATURE_IDS.EXPORT_REPORTS]: { ar: 'تصدير التقارير', en: 'Export Reports' },
+   702→  [FEATURE_IDS.IMPORT_DATA]: { ar: 'استيراد البيانات', en: 'Import Data' },
+   703→  [FEATURE_IDS.ADVANCED_REPORTS]: { ar: 'تقارير متقدمة', en: 'Advanced Reports' },
+   704→  [FEATURE_IDS.WHATSAPP_REMINDERS]: { ar: 'تذكير واتساب', en: 'WhatsApp Reminders' },
+   705→  [FEATURE_IDS.EMAIL_CAMPAIGNS]: { ar: 'حملات بريدية', en: 'Email Campaigns' },
+   706→  [FEATURE_IDS.EMAIL_REMINDERS]: { ar: 'تذكير بالبريد', en: 'Email Reminders' },
+   707→  [FEATURE_IDS.SMS_NOTIFICATIONS]: { ar: 'إشعارات SMS', en: 'SMS Notifications' },
+   708→  [FEATURE_IDS.MULTIPLE_BRANCHES]: { ar: 'فروع متعددة', en: 'Multiple Branches' },
+   709→  [FEATURE_IDS.EMPLOYEE_MANAGEMENT]: { ar: 'إدارة الموظفين', en: 'Employee Management' },
+   710→  [FEATURE_IDS.RESOURCE_MANAGEMENT]: { ar: 'إدارة الموارد', en: 'Resource Management' },
+   711→  [FEATURE_IDS.COUPON_MANAGEMENT]: { ar: 'إدارة الكوبونات', en: 'Coupon Management' },
+   712→  [FEATURE_IDS.INVOICE_MANAGEMENT]: { ar: 'إدارة الفواتير', en: 'Invoice Management' },
+   713→  [FEATURE_IDS.ROLE_MANAGEMENT]: { ar: 'إدارة الأدوار', en: 'Role Management' },
+   714→  [FEATURE_IDS.AUDIT_LOGS]: { ar: 'سجل العمليات', en: 'Audit Logs' },
+   715→  [FEATURE_IDS.API_ACCESS]: { ar: 'API وصول', en: 'API Access' },
+   716→  [FEATURE_IDS.CUSTOM_BRANDING]: { ar: 'تخصيص العلامة', en: 'Custom Branding' },
+   717→  [FEATURE_IDS.BACKUP_RESTORE]: { ar: 'نسخ احتياطي', en: 'Backup & Restore' },
+   718→  [FEATURE_IDS.CALENDAR_SYNC]: { ar: 'مزامنة التقويم', en: 'Calendar Sync' },
+   719→  [FEATURE_IDS.CUSTOM_DOMAIN]: { ar: 'نطاق مخصص', en: 'Custom Domain' },
+   720→  [FEATURE_IDS.WHITE_LABEL]: { ar: 'علامة بيضاء', en: 'White Label' },
+   721→  [FEATURE_IDS.PRIORITY_SUPPORT]: { ar: 'دعم أولوي', en: 'Priority Support' },
+   722→  [FEATURE_IDS.DEDICATED_MANAGER]: { ar: 'مدير مخصص', en: 'Dedicated Manager' },
+   723→  [FEATURE_IDS.CUSTOM_SLA]: { ar: 'SLA مخصص', en: 'Custom SLA' },
+   724→  [FEATURE_IDS.PRIVATE_DEPLOYMENT]: { ar: 'نشر خاص', en: 'Private Deployment' },
+   725→}
+   726→
+   727→/** Limit display labels (bilingual) */
+   728→export const LIMIT_LABELS: Record<keyof PlanLimits, Bilingual> = {
+   729→  maxCustomers: { ar: 'العملاء', en: 'Customers' },
+   730→  maxEmployees: { ar: 'الموظفين', en: 'Employees' },
+   731→  maxServices: { ar: 'الخدمات', en: 'Services' },
+   732→  maxBookingsPerMonth: { ar: 'الحجوزات / شهر', en: 'Bookings / month' },
+   733→  maxBranches: { ar: 'الفروع', en: 'Branches' },
+   734→  maxUsers: { ar: 'المستخدمين', en: 'Users' },
+   735→  maxStorage: { ar: 'التخزين (MB)', en: 'Storage (MB)' },
+   736→  maxWhatsappMessages: { ar: 'رسائل واتساب / شهر', en: 'WhatsApp msgs / mo' },
+   737→  maxEmailMessages: { ar: 'رسائل بريد / شهر', en: 'Email msgs / mo' },
+   738→}

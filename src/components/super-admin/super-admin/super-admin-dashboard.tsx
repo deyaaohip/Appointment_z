@@ -440,60 +440,19 @@ function UsersPage() {
 }
 
 // ════════════════════════════════════════════════════════════════
-// PAGE 4: PLANS (Full CRUD + JOD currency)
+// PAGE 4: PLANS (JOD currency)
 // ════════════════════════════════════════════════════════════════
-const PLAN_COLORS = ['bg-gray-500', 'bg-sky-500', 'bg-violet-500', 'bg-indigo-500', 'bg-emerald-500', 'bg-amber-500', 'bg-rose-500']
-
 function PlansPage() {
   const { t, lang } = useSA()
-  const { sym, fmt } = useCurrency()
-  const [plans, setPlans] = useState<Plan[]>([...PLANS])
-  const [dlg, setDlg] = useState<{ type: 'add' | 'edit' | 'delete'; plan?: Plan } | null>(null)
+  const { sym } = useCurrency()
   const [detailPlan, setDetailPlan] = useState<Plan | null>(null)
-  const emptyFeature = { ar: '', en: '' }
-  const [form, setForm] = useState({ name: '', price: 0, tenants: 0, color: 'bg-violet-500', popular: false, features: [{ ar: '', en: '' }] as { ar: string; en: string }[] })
-
-  const openAdd = () => {
-    setForm({ name: '', price: 0, tenants: 0, color: 'bg-violet-500', popular: false, features: [{ ar: '', en: '' }] })
-    setDlg({ type: 'add' })
-  }
-  const openEdit = (p: Plan) => {
-    setForm({ name: p.name, price: p.price, tenants: p.tenants, color: p.color, popular: p.popular, features: [...p.features] })
-    setDlg({ type: 'edit', plan: p })
-  }
-
-  const handleSave = useCallback(() => {
-    if (!form.name.trim()) { toast.error(lang === 'ar' ? 'يرجى إدخال اسم الباقة' : 'Please enter plan name'); return }
-    const cleanFeatures = form.features.filter(f => f.ar.trim() || f.en.trim())
-    if (cleanFeatures.length === 0) { toast.error(lang === 'ar' ? 'أضف ميزة واحدة على الأقل' : 'Add at least one feature'); return }
-    if (dlg?.type === 'add') {
-      const p: Plan = { id: Date.now().toString(), name: form.name, price: form.price, tenants: form.tenants, features: cleanFeatures, color: form.color, popular: form.popular, currency: 'JOD' }
-      setPlans(prev => [...prev, p]); toast.success(lang === 'ar' ? 'تم إنشاء الباقة' : 'Plan created')
-    } else if (dlg?.plan) {
-      setPlans(prev => prev.map(p => p.id === dlg.plan!.id ? { ...p, name: form.name, price: form.price, tenants: form.tenants, features: cleanFeatures, color: form.color, popular: form.popular } : p))
-      toast.success(t.updated)
-    }
-    setDlg(null)
-  }, [form, dlg, t, lang])
-
-  const handleDelete = () => {
-    if (!dlg?.plan) return
-    setPlans(prev => prev.filter(p => p.id !== dlg.plan!.id)); toast.success(t.deleted); setDlg(null)
-  }
-
-  const addFeature = () => setForm(p => ({ ...p, features: [...p.features, { ar: '', en: '' }] }))
-  const removeFeature = (i: number) => setForm(p => ({ ...p, features: p.features.filter((_, idx) => idx !== i) }))
-  const updateFeature = (i: number, field: 'ar' | 'en', val: string) => {
-    setForm(p => { const f = [...p.features]; f[i] = { ...f[i], [field]: val }; return { ...p, features: f } })
-  }
-
   return (
     <div className="space-y-6">
-      <PageTitle title={t.plansTitle} action={<PrimaryBtn icon={Plus} label={t.createPlan} onClick={openAdd} />} />
+      <PageTitle title={t.plansTitle} action={<PrimaryBtn icon={Plus} label={t.createPlan} onClick={() => toast.info(t.willOpenCreatePlan)} />} />
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 sm:gap-5">
-        {plans.map((p, i) => (
+        {PLANS.map((p, i) => (
           <motion.div key={p.id} variants={fade} initial="hidden" animate="visible" transition={{ delay: i * 0.04 }}>
-            <Card className={`h-full flex flex-col transition-all hover:shadow-lg border-0 shadow-sm ${p.popular ? 'ring-2 ring-violet-500 shadow-violet-500/10' : ''}`}>
+            <Card className={`h-full flex flex-col transition-all hover:shadow-lg cursor-pointer border-0 shadow-sm ${p.popular ? 'ring-2 ring-violet-500 shadow-violet-500/10' : ''}`} onClick={() => setDetailPlan(p)}>
               <CardContent className="flex-1 flex flex-col items-center p-5 sm:p-6 pt-7">
                 {p.popular && <Badge className="bg-violet-600 text-white mb-3 -mt-1 text-[10px]">{t.mostPopular}</Badge>}
                 <div className={`h-12 w-12 rounded-2xl ${p.color} flex items-center justify-center mb-4 shadow-lg`}><CreditCard className="h-6 w-6 text-white" /></div>
@@ -504,18 +463,12 @@ function PlansPage() {
                 <ul className="space-y-2.5 w-full text-start flex-1">{p.features.map((f, j) => (
                   <li key={j} className="flex items-start gap-2 text-xs sm:text-sm"><CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" /><span>{lang === 'en' ? f.en : f.ar}</span></li>
                 ))}</ul>
-                <div className="flex gap-2 w-full mt-6">
-                  <Button className={`flex-1 ${p.popular ? 'bg-violet-600 hover:bg-violet-700 text-white' : ''}`} variant={p.popular ? 'default' : 'outline'} onClick={() => setDetailPlan(p)}>{t.view}</Button>
-                  <ActionBtn icon={Edit} label={t.edit} onClick={(e: React.MouseEvent) => { e.stopPropagation(); openEdit(p) }} />
-                  <ActionBtn icon={Trash2} onClick={(e: React.MouseEvent) => { e.stopPropagation(); setDlg({ type: 'delete', plan: p }) }} danger />
-                </div>
+                <Button className={`w-full mt-6 ${p.popular ? 'bg-violet-600 hover:bg-violet-700 text-white' : ''}`} variant={p.popular ? 'default' : 'outline'}>{t.managePlan}</Button>
               </CardContent>
             </Card>
           </motion.div>
         ))}
       </div>
-
-      {/* Detail Dialog */}
       <Dialog open={!!detailPlan} onOpenChange={() => setDetailPlan(null)}>
         <DialogContent className="max-w-sm"><DialogHeader><DialogTitle>{t.planDetails}</DialogTitle></DialogHeader>
           {detailPlan && <div className="space-y-4 pt-2">
@@ -523,77 +476,23 @@ function PlansPage() {
             <Separator />
             <ul className="space-y-2">{detailPlan.features.map((f, i) => (<li key={i} className="flex items-center gap-2 text-sm"><CheckCircle2 className="h-4 w-4 text-emerald-500" />{lang === 'en' ? f.en : f.ar}</li>))}</ul>
           </div>}
-          <DlgFooter onCancel={() => setDetailPlan(null)} onConfirm={() => { if (detailPlan) { openEdit(detailPlan); setDetailPlan(null) } }} confirmLabel={t.edit} />
+          <DlgFooter onCancel={() => setDetailPlan(null)} onConfirm={() => { toast.info(t.willOpenPlanEditor); setDetailPlan(null) }} confirmLabel={t.edit} />
         </DialogContent>
       </Dialog>
-
-      {/* Add/Edit Dialog */}
-      <Dialog open={dlg?.type === 'add' || dlg?.type === 'edit'} onOpenChange={() => setDlg(null)}>
-        <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>{dlg?.type === 'add' ? t.createPlan : t.editPlanDlg}</DialogTitle></DialogHeader>
-          <div className="space-y-4 pt-2">
-            <FormField label={lang === 'ar' ? 'اسم الباقة' : 'Plan Name'}>
-              <Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder={lang === 'ar' ? 'مثال: Professional' : 'e.g. Professional'} />
-            </FormField>
-            <div className="grid grid-cols-2 gap-3">
-              <FormField label={t.amount}>
-                <Input type="number" value={form.price || ''} onChange={e => setForm(p => ({ ...p, price: Number(e.target.value) }))} placeholder="0" />
-              </FormField>
-              <FormField label={lang === 'ar' ? 'عدد المستأجرين' : 'Max Tenants'}>
-                <Input type="number" value={form.tenants || ''} onChange={e => setForm(p => ({ ...p, tenants: Number(e.target.value) }))} placeholder="0" />
-              </FormField>
-            </div>
-            <FormField label={lang === 'ar' ? 'اللون' : 'Color'}>
-              <div className="flex flex-wrap gap-2">
-                {PLAN_COLORS.map(c => (
-                  <button key={c} className={`h-8 w-8 rounded-full ${c} transition-transform ${form.color === c ? 'ring-2 ring-offset-2 ring-violet-500 scale-110' : 'opacity-60 hover:opacity-100'}`} onClick={() => setForm(p => ({ ...p, color: c }))} />
-                ))}
-              </div>
-            </FormField>
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">{t.mostPopular}</span>
-              <Toggle on={form.popular} onToggle={() => setForm(p => ({ ...p, popular: !p.popular }))} />
-            </div>
-            <Separator />
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">{lang === 'ar' ? 'المميزات' : 'Features'}</span>
-                <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={addFeature}><Plus className="h-3 w-3" />{lang === 'ar' ? 'إضافة' : 'Add'}</Button>
-              </div>
-              {form.features.map((f, i) => (
-                <div key={i} className="flex items-start gap-2">
-                  <div className="flex-1 grid grid-cols-2 gap-2">
-                    <Input value={f.ar} onChange={e => updateFeature(i, 'ar', e.target.value)} placeholder={lang === 'ar' ? 'بالعربي' : 'Arabic'} />
-                    <Input value={f.en} onChange={e => updateFeature(i, 'en', e.target.value)} placeholder="English" dir="ltr" />
-                  </div>
-                  {form.features.length > 1 && <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0 mt-0.5" onClick={() => removeFeature(i)}><Trash2 className="h-3.5 w-3.5 text-red-400" /></Button>}
-                </div>
-              ))}
-            </div>
-          </div>
-          <DlgFooter onCancel={() => setDlg(null)} onConfirm={handleSave} />
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete Confirm */}
-      <ConfirmDialog open={dlg?.type === 'delete'} onOpenChange={() => setDlg(null)} title={t.delete} desc={lang === 'ar' ? `هل أنت متأكد من حذف باقة "${dlg?.plan?.name}"؟` : `Delete plan "${dlg?.plan?.name}"?`} onConfirm={handleDelete} danger />
     </div>
   )
 }
 
 // ════════════════════════════════════════════════════════════════
-// PAGE 5: BILLING (Full invoice CRUD + CSV export + JOD)
+// PAGE 5: BILLING (JOD currency)
 // ════════════════════════════════════════════════════════════════
 function BillingPage() {
-  const { t, lang, isRTL } = useSA()
+  const { t, lang } = useSA()
   const { fmt, sym } = useCurrency()
-  const [invoices, setInvoices] = useState<Invoice[]>([...INVOICES])
+  const [invoices, setInvoices] = useState<Invoice[]>(INVOICES)
   const [filter, setFilter] = useState('all')
   const [page, setPage] = useState(1)
   const [sort, setSort] = useState<SortState>({ key: 'date', dir: 'desc' })
-  const [addOpen, setAddOpen] = useState(false)
-  const [invForm, setInvForm] = useState({ tenant: '', tenantEn: '', plan: 'Starter', amount: 0, status: 'pending' as string })
-
   const filtered = useMemo(() => {
     let list = filter === 'all' ? [...invoices] : invoices.filter(i => i.status === filter)
     return genericSort(list, sort.key, sort.dir, lang)
@@ -608,50 +507,9 @@ function BillingPage() {
     toast.success(t.paid)
   }
 
-  const handleCreateInvoice = () => {
-    if (!invForm.tenant.trim()) { toast.error(isRTL ? 'يرجى اختيار المستأجر' : 'Please select a tenant'); return }
-    if (invForm.amount <= 0) { toast.error(isRTL ? 'يرجى إدخال مبلغ صحيح' : 'Please enter a valid amount'); return }
-    const newId = `INV-${String(invoices.length + 1).padStart(3, '0')}`
-    const inv: Invoice = {
-      id: newId, tenant: invForm.tenant, tenantEn: invForm.tenantEn,
-      amount: invForm.amount, status: invForm.status,
-      date: new Date().toISOString().split('T')[0],
-      plan: invForm.plan, currency: 'JOD',
-    }
-    setInvoices(p => [inv, ...p]); toast.success(isRTL ? `تم إنشاء الفاتورة ${newId}` : `Invoice ${newId} created`); setAddOpen(false)
-    setInvForm({ tenant: '', tenantEn: '', plan: 'Starter', amount: 0, status: 'pending' })
-  }
-
-  const handleExportCSV = () => {
-    const headers = isRTL
-      ? ['رقم الفاتورة', 'المستأجر', 'الباقة', 'المبلغ', 'العملة', 'الحالة', 'التاريخ']
-      : ['Invoice No.', 'Tenant', 'Plan', 'Amount', 'Currency', 'Status', 'Date']
-    const rows = filtered.map(inv => [
-      inv.id, isRTL ? inv.tenant : (inv.tenantEn || inv.tenant), inv.plan,
-      inv.amount, inv.currency, inv.status, inv.date,
-    ])
-    const csv = [headers, ...rows].map(r => r.join(',')).join('\n')
-    const BOM = '\uFEFF'
-    const blob = new Blob([BOM + csv], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url; a.download = `invoices_${new Date().toISOString().split('T')[0]}.csv`
-    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url)
-    toast.success(isRTL ? 'تم تصدير الفواتير بنجاح' : 'Invoices exported successfully')
-  }
-
-  const handleDeleteInvoice = (inv: Invoice) => {
-    setInvoices(p => p.filter(i => i.id !== inv.id)); toast.success(t.deleted); setPage(1)
-  }
-
   return (
     <div className="space-y-5">
-      <PageTitle title={t.billingTitle} action={
-        <div className="flex gap-2">
-          <Button variant="outline" className="gap-2 h-9" onClick={handleExportCSV}><Download className="h-4 w-4" />{t.export} CSV</Button>
-          <PrimaryBtn icon={Plus} label={t.createInvoice} onClick={() => setAddOpen(true)} />
-        </div>
-      } />
+      <PageTitle title={t.billingTitle} action={<PrimaryBtn icon={Plus} label={t.createInvoice} onClick={() => toast.info(t.willCreateInvoice)} />} />
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <StatCard icon={CheckCircle2} label={t.payments} value={fmt(totalPaid)} color="text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30" />
         <StatCard icon={Clock} label={t.pending} value={fmt(totalPending)} color="text-amber-600 bg-amber-50 dark:bg-amber-950/30" />
@@ -687,15 +545,13 @@ function BillingPage() {
                 <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <ActionBtn icon={Eye} label={t.view} onClick={() => toast.info(t.viewingInvoice.replace('{id}', inv.id))} />
                   {inv.status !== 'paid' && <ActionBtn icon={CheckCircle2} label={t.paid} onClick={() => handleMarkPaid(inv)} />}
-                  <ActionBtn icon={Download} onClick={() => handleExportCSV()} />
-                  <ActionBtn icon={Trash2} onClick={() => handleDeleteInvoice(inv)} danger />
+                  <ActionBtn icon={Download} onClick={() => toast.success(t.downloadingInvoice.replace('{id}', inv.id))} />
                 </div>
               </TableCell>
             </TableRow>
           ))}
           </TableBody></Table>
         </div>
-        <TableFooter current={items.length} total={filtered.length} entity={isRTL ? 'فاتورة' : 'invoices'} />
         <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
       </Card>
 
@@ -709,58 +565,14 @@ function BillingPage() {
             <div className="flex items-center justify-between pt-2 border-t">
               <span className="font-bold text-sm">{inv.amount.toLocaleString()} <span className="text-xs font-normal text-muted-foreground">{sym}</span></span>
               <div className="flex gap-1">
+                <ActionBtn icon={Eye} onClick={() => toast.info(t.viewingInvoice.replace('{id}', inv.id))} />
                 {inv.status !== 'paid' && <ActionBtn icon={CheckCircle2} onClick={() => handleMarkPaid(inv)} />}
-                <ActionBtn icon={Download} onClick={() => handleExportCSV()} />
-                <ActionBtn icon={Trash2} onClick={() => handleDeleteInvoice(inv)} danger />
+                <ActionBtn icon={Download} onClick={() => toast.success(t.downloadingInvoice.replace('{id}', inv.id))} />
               </div>
             </div>
           </CardContent></Card>
         ))}
       </div>
-
-      {/* Create Invoice Dialog */}
-      <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent className="max-w-md"><DialogHeader><DialogTitle>{t.createInvoice}</DialogTitle></DialogHeader>
-          <div className="space-y-4 pt-2">
-            <FormField label={t.tenant}>
-              <Select value={invForm.tenant} onValueChange={v => {
-                const tn = INIT_TENANTS.find(t => t.name === v || t.nameEn === v)
-                setInvForm(p => ({ ...p, tenant: tn?.name || v, tenantEn: tn?.nameEn || v }))
-              }}>
-                <SelectTrigger><SelectValue placeholder={isRTL ? 'اختر المستأجر' : 'Select tenant'} /></SelectTrigger>
-                <SelectContent>
-                  {INIT_TENANTS.map(tn => <SelectItem key={tn.id} value={lang === 'en' ? tn.nameEn : tn.name}>{lang === 'en' ? tn.nameEn : tn.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </FormField>
-            <div className="grid grid-cols-2 gap-3">
-              <FormField label={t.plan}>
-                <Select value={invForm.plan} onValueChange={v => {
-                  setInvForm(p => ({ ...p, plan: v }))
-                  const plan = PLANS.find(pl => pl.name === v)
-                  if (plan) setInvForm(p => ({ ...p, amount: plan.price }))
-                }}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{PLANS.map(p => <SelectItem key={p.id} value={p.name}>{p.name} ({p.price} {sym})</SelectItem>)}</SelectContent>
-                </Select>
-              </FormField>
-              <FormField label={t.amount}>
-                <Input type="number" value={invForm.amount || ''} onChange={e => setInvForm(p => ({ ...p, amount: Number(e.target.value) }))} />
-              </FormField>
-            </div>
-            <FormField label={t.status}>
-              <Select value={invForm.status} onValueChange={v => setInvForm(p => ({ ...p, status: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pending">{t.pending}</SelectItem>
-                  <SelectItem value="paid">{t.paid}</SelectItem>
-                </SelectContent>
-              </Select>
-            </FormField>
-          </div>
-          <DlgFooter onCancel={() => setAddOpen(false)} onConfirm={handleCreateInvoice} confirmLabel={isRTL ? 'إنشاء' : 'Create'} />
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
@@ -1270,8 +1082,7 @@ function SecurityPage() {
 // PAGE 14: SETTINGS (JOD default + CLIQ config section)
 // ════════════════════════════════════════════════════════════════
 function SettingsPage() {
-  const { t, lang, isRTL } = useSA()
-  const { setCustomCurrency, setCustomTimezone, setThemeMode } = useAppStore()
+  const { t, lang } = useSA()
   const [form, setForm] = useState({
     platformName: 'BookFlow', supportEmail: 'support@bookflow.com',
     currency: 'JOD', timezone: 'Asia/Amman',
@@ -1279,11 +1090,7 @@ function SettingsPage() {
   })
   const [cliq, setCliq] = useState<CliqConfig>({ ...DEFAULT_CLIQ_CONFIG })
 
-  const handleSaveSettings = () => {
-    setCustomCurrency(form.currency)
-    setCustomTimezone(form.timezone)
-    toast.success(t.settingsSaved)
-  }
+  const handleSaveSettings = () => { toast.success(t.settingsSaved) }
   const handleSaveCliq = () => { toast.success(t.settingsSaved) }
 
   return (
@@ -1407,8 +1214,6 @@ function CliqPaymentsPage() {
     } : x))
     toast.success(t.cliqApprovedMsg)
     setActionDlg(null)
-    // Log the approval action
-    console.log(`[CLIQ Audit] Payment ${p.id} approved for ${p.tenantName} - Plan: ${p.plan} - Amount: ${p.amount} JOD - Reviewed by: Super Admin`)
   }
 
   const handleReject = (p: CliqPayment) => {
@@ -1417,7 +1222,6 @@ function CliqPaymentsPage() {
       ...x, status: 'rejected', reviewedAt: new Date().toISOString(), reviewedBy: 'Super Admin', rejectionReason: reasonText
     } : x))
     toast.success(t.cliqRejectedMsg)
-    console.log(`[CLIQ Audit] Payment ${p.id} rejected for ${p.tenantName} - Reason: ${reasonText} - Reviewed by: Super Admin`)
     setActionDlg(null); setReasonText('')
   }
 
@@ -1427,7 +1231,6 @@ function CliqPaymentsPage() {
       ...x, status: 'info_requested', additionalInfoRequest: reasonText
     } : x))
     toast.success(t.cliqInfoRequestedMsg)
-    console.log(`[CLIQ Audit] Payment ${p.id} info requested for ${p.tenantName} - Request: ${reasonText} - By: Super Admin`)
     setActionDlg(null); setReasonText('')
   }
 

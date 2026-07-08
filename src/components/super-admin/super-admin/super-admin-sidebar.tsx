@@ -59,7 +59,7 @@ function SidebarContent({ collapsed, onNavigate }: { collapsed: boolean; onNavig
   const handleNav = (viewId: string) => { setSuperAdminView(viewId); if (onNavigate) onNavigate() }
 
   return (
-    <div className={`flex flex-col h-full ${isRTL ? 'text-right' : 'text-left'}`} dir={isRTL ? 'rtl' : 'ltr'}>
+    <div className="flex flex-col h-full" dir={isRTL ? 'rtl' : 'ltr'}>
       {/* Logo */}
       <div className="flex items-center gap-3 px-4 py-4">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 shadow-lg shadow-violet-600/20">
@@ -68,7 +68,7 @@ function SidebarContent({ collapsed, onNavigate }: { collapsed: boolean; onNavig
         {!collapsed && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="overflow-hidden">
             <h1 className="text-base font-bold tracking-tight">BookFlow</h1>
-            <p className={`text-[10px] font-medium text-muted-foreground uppercase tracking-wider ${isRTL ? 'tracking-tight' : 'tracking-wider'}`}>{t.superAdmin}</p>
+            <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">{t.superAdmin}</p>
           </motion.div>
         )}
       </div>
@@ -87,8 +87,8 @@ function SidebarContent({ collapsed, onNavigate }: { collapsed: boolean; onNavig
                   <TooltipContent side={isRTL ? 'left' : 'right'}>{isRTL ? section.ar : section.en}</TooltipContent>
                 </Tooltip>
               ) : (
-                <button onClick={() => toggleSection(section.id)} className={`flex items-center gap-2 w-full px-2 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase ${isRTL ? 'tracking-tight' : 'tracking-wider'} hover:text-foreground transition-colors`}>
-                  <span className={`flex-1 ${isRTL ? 'text-right' : 'text-left'}`}>{isRTL ? section.ar : section.en}</span>
+                <button onClick={() => toggleSection(section.id)} className="flex items-center gap-2 w-full px-2 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors">
+                  <span className="flex-1 text-start">{isRTL ? section.ar : section.en}</span>
                   {isRTL
                     ? <ChevronLeft className={`h-3 w-3 transition-transform ${expandedSections[section.id] ? 'rotate-90' : ''}`} />
                     : <ChevronRight className={`h-3 w-3 transition-transform ${expandedSections[section.id] ? 'rotate-90' : ''}`} />
