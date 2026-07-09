@@ -1,0 +1,502 @@
+   400→   400→                  <SelectTrigger><SelectValue /></SelectTrigger>
+   401→   401→                  <SelectContent>{PLANS.filter(p => p.price > 0).map(p => <SelectItem key={p.id} value={p.name}>{p.name} — {p.price} {sym}/{t.perMonth}</SelectItem>)}</SelectContent>
+   402→   402→                </Select>
+   403→   403→              </FormField>
+   404→   404→              <FormField label={t.durationMonths}>
+   405→   405→                <Select value={String(extendMonths)} onValueChange={v => setExtendMonths(Number(v))}>
+   406→   406→                  <SelectTrigger><SelectValue /></SelectTrigger>
+   407→   407→                  <SelectContent>
+   408→   408→                    {[1, 3, 6, 12, 24].map(m => <SelectItem key={m} value={String(m)}>{m} {t.months}</SelectItem>)}
+   409→   409→                  </SelectContent>
+   410→   410→                </Select>
+   411→   411→              </FormField>
+   412→   412→              {extendPlan && (() => {
+   413→   413→                const plan = PLANS.find(p => p.name === extendPlan)
+   414→   414→                const total = plan ? plan.price * extendMonths : 0
+   415→   415→                return total > 0 ? (
+   416→   416→                  <div className="rounded-lg bg-violet-50 dark:bg-violet-950/30 p-3 text-center">
+   417→   417→                    <p className="text-[10px] text-muted-foreground">{isRTL ? 'الإجمالي' : 'Total'}</p>
+   418→   418→                    <p className="text-lg font-bold text-violet-700 dark:text-violet-400">{total.toLocaleString()} {sym}</p>
+   419→   419→                  </div>
+   420→   420→                ) : null
+   421→   421→              })()}
+   422→   422→            </>}
+   423→   423→          </div>
+   424→   424→          <DlgFooter onCancel={() => setExtendDlg(null)} onConfirm={handleExtend} confirmLabel={isRTL ? 'تمديد الاشتراك' : 'Extend Subscription'} />
+   425→   425→        </DialogContent>
+   426→   426→      </Dialog>
+   427→   427→
+   428→   428→      {/* Multi-step Tenant Creation Wizard */}
+   429→   429→      <TenantWizard open={wizardOpen} onClose={() => setWizardOpen(false)} onSave={handleWizardSave} existingTenants={existingTenants} />
+   430→   430→
+   431→   431→      {/* Tenant Details Dialog */}
+   432→   432→      {detailTenant && <TenantDetailsDialog tenant={detailTenant} open={!!detailTenant} onClose={() => setDetailTenant(null)} />}
+   433→   433→    </div>
+   434→   434→  )
+   435→   435→}
+   436→   436→
+   437→   437→// ════════════════════════════════════════════════════════════════
+   438→   438→// PAGE 3: USERS (full CRUD + RFC email validation + password policy)
+   439→   439→// ════════════════════════════════════════════════════════════════
+   440→   440→function UsersPage() {
+   441→   441→  const { t, lang, isRTL } = useSA()
+   442→   442→  const { sym } = useCurrency()
+   443→   443→  const [users, setUsers] = useState<PlatformUser[]>(INIT_USERS)
+   444→   444→  const [search, setSearch] = useState('')
+   445→   445→  const [filter, setFilter] = useState('all')
+   446→   446→  const [page, setPage] = useState(1)
+   447→   447→  const [sort, setSort] = useState<SortState>({ key: 'name', dir: 'asc' })
+   448→   448→  const [dlg, setDlg] = useState<{ type: string; user?: PlatformUser } | null>(null)
+   449→   449→  const [form, setForm] = useState({ name: '', email: '', tenant: '', tenantEn: '', role: 'owner', password: '', confirmPassword: '', phone: '' })
+   450→   450→  const [errors, setErrors] = useState<Record<string, string>>({})
+   451→   451→  const [showPassword, setShowPassword] = useState(false)
+   452→   452→  const [pwValidation, setPwValidation] = useState<PasswordValidation | null>(null)
+   453→   453→
+   454→   454→  const ROLE_MAP: Record<string, string> = { owner: t.owner, manager: t.manager, receptionist: t.receptionist, accountant: t.accountant }
+   455→   455→
+   456→   456→  const existingEmails = useMemo(() => users.map(u => u.email.toLowerCase()), [users])
+   457→   457→
+   458→   458→  const filtered = useMemo(() => {
+   459→   459→    let list = [...users]
+   460→   460→    if (filter !== 'all') list = list.filter(u => u.status === filter)
+   461→   461→    if (search) { const q = search.toLowerCase(); list = list.filter(u => u.name.includes(q) || u.email.toLowerCase().includes(q) || u.tenant.includes(q)) }
+   462→   462→    return genericSort(list, sort.key, sort.dir, lang)
+   463→   463→  }, [users, search, filter, sort, lang])
+   464→   464→
+   465→   465→  const { items, totalPages } = paginate(filtered, page, PER_PAGE)
+   466→   466→  const handleSort = (key: string) => setSort(p => p.key === key ? { key, dir: p.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' })
+   467→   467→
+   468→   468→  const openAdd = () => { setForm({ name: '', email: '', tenant: '', tenantEn: '', role: 'owner', password: '', confirmPassword: '', phone: '' }); setErrors({}); setPwValidation(null); setShowPassword(false); setDlg({ type: 'add' }) }
+   469→   469→  const openEdit = (u: PlatformUser) => { setForm({ name: u.name, email: u.email, tenant: u.tenant, tenantEn: u.tenantEn || '', role: u.role, password: '', confirmPassword: '', phone: '' }); setErrors({}); setPwValidation(null); setShowPassword(false); setDlg({ type: 'edit', user: u }) }
+   470→   470→
+   471→   471→  const updateField = (field: string, value: string) => {
+   472→   472→    setForm(p => ({ ...p, [field]: value }))
+   473→   473→    if (errors[field]) setErrors(p => { const n = { ...p }; delete n[field]; return n })
+   474→   474→    // Live password validation
+   475→   475→    if (field === 'password' || field === 'confirmPassword') {
+   476→   476→      setPwValidation(validatePassword(form.password, form.confirmPassword, lang === 'ar' ? 'ar' : 'en'))
+   477→   477→    }
+   478→   478→  }
+   479→   479→
+   480→   480→  const handleSave = useCallback(() => {
+   481→   481→    const newErrors: Record<string, string> = {}
+   482→   482→    // Name validation
+   483→   483→    if (!form.name.trim()) newErrors.name = isRTL ? 'الاسم مطلوب' : 'Name is required'
+   484→   484→    // Email validation (RFC-compliant)
+   485→   485→    if (!form.email.trim()) newErrors.email = isRTL ? 'البريد مطلوب' : 'Email is required'
+   486→   486→    else {
+   487→   487→      const emailCheck = validateEmail(form.email, dlg?.type === 'edit' && dlg.user ? existingEmails.filter(e => e !== dlg.user.email.toLowerCase()) : existingEmails, lang === 'ar' ? 'ar' : 'en')
+   488→   488→      if (!emailCheck.valid && emailCheck.error) newErrors.email = isRTL ? emailCheck.errorAr! : emailCheck.error!
+   489→   489→    }
+   490→   490→    // Phone validation
+   491→   491→    const phoneCheck = validatePhone(form.phone, lang === 'ar' ? 'ar' : 'en')
+   492→   492→    if (!phoneCheck.valid && phoneCheck.error) newErrors.phone = isRTL ? phoneCheck.errorAr! : phoneCheck.error
+   493→   493→    // Password validation (only for add)
+   494→   494→    if (dlg?.type === 'add') {
+   495→   495→      const pwCheck = validatePassword(form.password, form.confirmPassword, lang === 'ar' ? 'ar' : 'en')
+   496→   496→      if (!pwCheck.valid) newErrors.password = isRTL ? 'كلمة المرور لا تلبي المتطلبات' : 'Password does not meet requirements'
+   497→   497→      if (form.password !== form.confirmPassword) newErrors.confirmPassword = isRTL ? 'كلمتا المرور غير متطابقتين' : 'Passwords do not match'
+   498→   498→    }
+   499→   499→
+   500→   500→    if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return }
+   501→   501→
+   502→   502→    if (dlg?.type === 'add') {
+   503→   503→      setUsers(p => [{ id: Date.now().toString(), ...form, tenantEn: form.tenantEn, status: 'active', lastLogin: new Date().toISOString() }, ...p])
+   504→   504→      toast.success(t.added.replace('{name}', form.name))
+   505→   505→    } else if (dlg?.user) {
+   506→   506→      setUsers(p => p.map(u => u.id === dlg.user!.id ? { ...u, name: form.name, email: form.email, tenant: form.tenant, role: form.role } : u)); toast.success(t.updated)
+   507→   507→    }
+   508→   508→    setDlg(null); setPage(1); setErrors({})
+   509→   509→  }, [form, dlg, t, existingEmails, isRTL])
+   510→   510→
+   511→   511→  const handleDelete = (u: PlatformUser) => { setUsers(p => p.filter(x => x.id !== u.id)); toast.success(t.userDeleted); setPage(1) }
+   512→   512→  const handleToggleStatus = (u: PlatformUser) => {
+   513→   513→    const newStatus = u.status === 'suspended' ? 'active' : 'suspended'
+   514→   514→    setUsers(p => p.map(x => x.id === u.id ? { ...x, status: newStatus } : x))
+   515→   515→    toast.success(newStatus === 'suspended' ? t.userSuspended : t.userActivated)
+   516→   516→  }
+   517→   517→
+   518→   518→  return (
+   519→   519→    <div className="space-y-5">
+   520→   520→      <PageTitle title={t.userMgmt} action={<PrimaryBtn icon={UserPlus} label={t.addUser} onClick={openAdd} />} />
+   521→   521→      <div className="flex flex-col sm:flex-row gap-3">
+   522→   522→        <SearchInput value={search} onChange={v => { setSearch(v); setPage(1) }} placeholder={t.userSearch} />
+   523→   523→        <Select value={filter} onValueChange={v => { setFilter(v); setPage(1) }}>
+   524→   524→          <SelectTrigger className="w-full sm:w-44 h-10"><SelectValue /></SelectTrigger>
+   525→   525→          <SelectContent><SelectItem value="all">{t.all}</SelectItem><SelectItem value="active">{t.active}</SelectItem><SelectItem value="suspended">{t.suspended}</SelectItem></SelectContent>
+   526→   526→        </Select>
+   527→   527→      </div>
+   528→   528→
+   529→   529→      <Card className="border-0 shadow-sm overflow-hidden hidden md:block">
+   530→   530→        <div className="overflow-x-auto">
+   531→   531→          <Table><TableHeader><TableRow className="bg-muted/50 hover:bg-muted/50">
+   532→   532→            <SortableTH label={t.user} sortKey="name" currentSort={sort} onSort={handleSort} className="ps-5" />
+   533→   533→            <SortableTH label={t.email} sortKey="email" currentSort={sort} onSort={handleSort} />
+   534→   534→            <SortableTH label={t.tenant} sortKey="tenant" currentSort={sort} onSort={handleSort} />
+   535→   535→            <SortableTH label={t.role} sortKey="role" currentSort={sort} onSort={handleSort} />
+   536→   536→            <SortableTH label={t.status} sortKey="status" currentSort={sort} onSort={handleSort} />
+   537→   537→            <TableHead className="pe-5 font-semibold text-xs uppercase tracking-wider text-end">{t.actions}</TableHead>
+   538→   538→          </TableRow></TableHeader>
+   539→   539→          <TableBody>
+   540→   540→            {items.length === 0 ? <EmptyRow colSpan={6} /> : items.map(u => (
+   541→   541→              <TableRow key={u.id} className="group hover:bg-muted/20 transition-colors">
+   542→   542→                <TableCell className="ps-5">
+   543→   543→                  <div className="flex items-center gap-3">
+   544→   544→                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky-100 dark:bg-sky-900/30 text-sky-600 font-bold text-xs">{u.name.charAt(0)}</div>
+   545→   545→                    <span className="font-medium text-sm">{u.name}</span>
+   546→   546→                  </div>
+   547→   547→                </TableCell>
+   548→   548→                <TableCell className="px-3 text-sm text-muted-foreground" dir="ltr">{u.email}</TableCell>
+   549→   549→                <TableCell className="px-3 text-sm">{userTenant(u, lang)}</TableCell>
+   550→   550→                <TableCell className="px-3"><Badge variant="secondary" className="text-xs">{ROLE_MAP[u.role] || u.role}</Badge></TableCell>
+   551→   551→                <TableCell className="px-3"><StatusBadge status={u.status} locale={lang} /></TableCell>
+   552→   552→                <TableCell className="pe-5">
+   553→   553→                  <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+   554→   554→                    <ActionBtn icon={Edit} label={t.edit} onClick={() => openEdit(u)} />
+   555→   555→                    <ActionBtn icon={u.status === 'suspended' ? Power : PowerOff} label={u.status === 'suspended' ? t.active : t.suspended} onClick={() => handleToggleStatus(u)} />
+   556→   556→                    <ActionBtn icon={Trash2} onClick={() => setDlg({ type: 'delete', user: u })} danger />
+   557→   557→                  </div>
+   558→   558→                </TableCell>
+   559→   559→              </TableRow>
+   560→   560→            ))}
+   561→   561→          </TableBody></Table>
+   562→   562→        </div>
+   563→   563→        <TableFooter current={items.length} total={filtered.length} entity={t.user.toLowerCase()} />
+   564→   564→        <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+   565→   565→      </Card>
+   566→   566→
+   567→   567→      <div className="md:hidden space-y-3">
+   568→   568→        {items.length === 0 ? <Card className="border-0 shadow-sm"><CardContent className="py-16 text-center text-muted-foreground text-sm">{t.noResults}</CardContent></Card> : items.map(u => (
+   569→   569→          <Card key={u.id} className="border-0 shadow-sm"><CardContent className="p-4">
+   570→   570→            <div className="flex items-start justify-between gap-3 mb-3">
+   571→   571→              <div className="flex items-center gap-3 min-w-0">
+   572→   572→                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-sky-100 dark:bg-sky-900/30 text-sky-600 font-bold text-sm">{u.name.charAt(0)}</div>
+   573→   573→                <div className="min-w-0"><p className="font-semibold text-sm truncate">{u.name}</p><p className="text-xs text-muted-foreground truncate" dir="ltr">{u.email}</p></div>
+   574→   574→              </div>
+   575→   575→              <StatusBadge status={u.status} locale={lang} />
+   576→   576→            </div>
+   577→   577→            <div className="grid grid-cols-2 gap-3 mb-3">
+   578→   578→              <div className="rounded-lg bg-muted/50 p-2"><p className="text-[10px] text-muted-foreground">{t.tenant}</p><p className="text-xs font-semibold mt-0.5 truncate">{userTenant(u, lang)}</p></div>
+   579→   579→              <div className="rounded-lg bg-muted/50 p-2"><p className="text-[10px] text-muted-foreground">{t.role}</p><p className="text-xs font-semibold mt-0.5">{ROLE_MAP[u.role] || u.role}</p></div>
+   580→   580→            </div>
+   581→   581→            <div className="flex items-center justify-end gap-1 pt-2 border-t">
+   582→   582→              <ActionBtn icon={Edit} label={t.edit} onClick={() => openEdit(u)} />
+   583→   583→              <ActionBtn icon={u.status === 'suspended' ? Power : PowerOff} label={u.status === 'suspended' ? t.active : t.suspended} onClick={() => handleToggleStatus(u)} />
+   584→   584→              <ActionBtn icon={Trash2} onClick={() => setDlg({ type: 'delete', user: u })} danger />
+   585→   585→            </div>
+   586→   586→          </CardContent></Card>
+   587→   587→        ))}
+   588→   588→      </div>
+   589→   589→
+   590→   590→      <Dialog open={dlg?.type === 'add' || dlg?.type === 'edit'} onOpenChange={() => setDlg(null)}>
+   591→   591→        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto" dir={isRTL ? 'rtl' : 'ltr'}><DialogHeader><DialogTitle>{dlg?.type === 'add' ? t.addUserDlg : t.editUserDlg}</DialogTitle><DialogDescription className="sr-only">{isRTL ? 'إدارة المستخدمين' : 'Manage users'}</DialogDescription></DialogHeader>
+   592→   592→          <div className="space-y-4 pt-2">
+   593→   593→            <FormField label={t.name}>
+   594→   594→              <Input value={form.name} onChange={e => updateField('name', e.target.value)} placeholder={isRTL ? 'أحمد المنصور' : 'e.g. Ahmed Mansour'} />
+   595→   595→              {errors.name && <p className="text-[11px] text-red-500 mt-1">{errors.name}</p>}
+   596→   596→            </FormField>
+   597→   597→            <FormField label={t.email}>
+   598→   598→              <Input type="email" value={form.email} onChange={e => updateField('email', e.target.value)} placeholder="user@company.com" dir="ltr" className={errors.email ? 'border-red-500' : ''} />
+   599→   599→              {errors.email && <p className="text-[11px] text-red-500 mt-1">{errors.email}</p>}
+   600→   600→              {errors.email?.includes('isposable') && <p className="text-[11px] text-amber-600 mt-0.5">{isRTL ? 'تنبيه: بريد مؤقت غير مسموح' : 'Note: Disposable emails not allowed'}</p>}
+   601→   601→            </FormField>
+   602→   602→            <FormField label={isRTL ? 'رقم الهاتف' : 'Phone'}>
+   603→   603→              <Input value={form.phone} onChange={e => updateField('phone', e.target.value)} placeholder="+962XXXXXXXXX" dir="ltr" />
+   604→   604→              {errors.phone && <p className="text-[11px] text-red-500 mt-1">{errors.phone}</p>}
+   605→   605→            </FormField>
+   606→   606→            <FormField label={t.tenant}>
+   607→   607→              <Select value={form.tenant} onValueChange={v => {
+   608→   608→                const tn = INIT_TENANTS.find(x => x.name === v || x.nameEn === v)
+   609→   609→                setForm(p => ({ ...p, tenant: tn?.name || v, tenantEn: tn?.nameEn || v }))
+   610→   610→              }}>
+   611→   611→                <SelectTrigger><SelectValue placeholder={isRTL ? 'اختر المستأجر' : 'Select tenant'} /></SelectTrigger>
+   612→   612→                <SelectContent>{INIT_TENANTS.map(tn => <SelectItem key={tn.id} value={lang === 'en' ? tn.nameEn : tn.name}>{lang === 'en' ? tn.nameEn : tn.name}</SelectItem>)}</SelectContent>
+   613→   613→              </Select>
+   614→   614→            </FormField>
+   615→   615→            <FormField label={t.role}>
+   616→   616→              <Select value={form.role} onValueChange={v => updateField('role', v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="owner">{t.owner}</SelectItem><SelectItem value="manager">{t.manager}</SelectItem><SelectItem value="receptionist">{t.receptionist}</SelectItem><SelectItem value="accountant">{t.accountant}</SelectItem></SelectContent></Select>
+   617→   617→            </FormField>
+   618→   618→            {dlg?.type === 'add' && <>
+   619→   619→              <Separator />
+   620→   620→              <FormField label={isRTL ? 'كلمة المرور' : 'Password'}>
+   621→   621→                <div className="relative">
+   622→   622→                  <Input type={showPassword ? 'text' : 'password'} value={form.password} onChange={e => updateField('password', e.target.value)} placeholder={isRTL ? '12 حرف على الأقل' : 'Min 12 characters'} dir="ltr" className={`pe-10 ${errors.password ? 'border-red-500' : ''}`} />
+   623→   623→                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute top-1/2 -translate-y-1/2 end-3 text-muted-foreground hover:text-foreground">
+   624→   624→                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+   625→   625→                  </button>
+   626→   626→                </div>
+   627→   627→                {errors.password && <p className="text-[11px] text-red-500 mt-1">{errors.password}</p>}
+   628→   628→                {form.password && pwValidation && (
+   629→   629→                  <div className="mt-2 space-y-1.5">
+   630→   630→                    <div className="flex items-center justify-between">
+   631→   631→                      <span className="text-[11px] text-muted-foreground">
+   632→   632→                        {isRTL ? 'قوة كلمة المرور:' : 'Strength:'} {lang === 'ar' ? pwValidation.labelAr : pwValidation.label}
+   633→   633→                      </span>
+   634→   634→                      <span className="text-[10px] text-muted-foreground">{pwValidation.score}/6</span>
+   635→   635→                    </div>
+   636→   636→                    <div className="flex gap-1">{[1,2,3,4,5,6].map(i => (
+   637→   637→                      <div key={i} className={`h-1.5 flex-1 rounded-full transition-colors duration-300 ${i <= pwValidation.score ? pwValidation.color : 'bg-muted'}`} />
+   638→   638→                    ))}</div>
+   639→   639→                  </div>
+   640→   640→                )}
+   641→   641→              </FormField>
+   642→   642→              <FormField label={isRTL ? 'تأكيد كلمة المرور' : 'Confirm Password'}>
+   643→   643→                <Input type={showPassword ? 'text' : 'password'} value={form.confirmPassword} onChange={e => updateField('confirmPassword', e.target.value)} placeholder={isRTL ? 'أعد كتابة كلمة المرور' : 'Re-enter password'} dir="ltr" className={errors.confirmPassword ? 'border-red-500' : ''} />
+   644→   644→                {errors.confirmPassword && <p className="text-[11px] text-red-500 mt-1">{errors.confirmPassword}</p>}
+   645→   645→              </FormField>
+   646→   646→              {pwValidation && (
+   647→   647→                <div className="grid grid-cols-2 gap-1.5 mt-1">
+   648→   648→                  {pwValidation.requirements.slice(0, 5).map(r => (
+   649→   649→                    <div key={r.id} className="flex items-center gap-1.5 text-[11px]">
+   650→   650→                      {r.met ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" /> : <XCircle className="h-3.5 w-3.5 text-red-400 shrink-0" />}
+   651→   651→                      <span className={r.met ? '' : 'text-muted-foreground'}>{lang === 'ar' ? r.labelAr : r.label}</span>
+   652→   652→                    </div>
+   653→   653→                  ))}
+   654→   654→                </div>
+   655→   655→              )}
+   656→   656→            </>}
+   657→   657→          </div>
+   658→   658→          <DlgFooter onCancel={() => setDlg(null)} onConfirm={handleSave} />
+   659→   659→        </DialogContent>
+   660→   660→      </Dialog>
+   661→   661→      <ConfirmDialog open={dlg?.type === 'delete'} onOpenChange={() => setDlg(null)} title={t.deleteUserDlg} desc={t.confirmDeleteUser.replace('{name}', dlg?.user?.name || '')} onConfirm={() => { if (dlg?.user) handleDelete(dlg.user) }} danger />
+   662→   662→    </div>
+   663→   663→  )
+   664→   664→}
+   665→   665→
+   666→   666→// ════════════════════════════════════════════════════════════════
+   667→   667→// PAGE 4: PLANS (Dynamic Feature/Limit/Quota Management)
+   668→   668→// ════════════════════════════════════════════════════════════════
+   669→   669→const PLAN_COLORS = ['bg-gray-500', 'bg-sky-500', 'bg-violet-500', 'bg-indigo-500', 'bg-emerald-500', 'bg-amber-500', 'bg-rose-500']
+   670→   670→
+   671→   671→function PlansPage() {
+   672→   672→  const { t, lang, isRTL } = useSA()
+   673→   673→  const { sym, fmt } = useCurrency()
+   674→   674→  const [dynamicPlans, setDynamicPlans] = useState<DynamicPlan[]>(buildDynamicPlans())
+   675→   675→  const [dlg, setDlg] = useState<{ type: 'add' | 'edit' | 'delete'; plan?: DynamicPlan } | null>(null)
+   676→   676→  const [detailPlan, setDetailPlan] = useState<DynamicPlan | null>(null)
+   677→   677→  const [limitsView, setLimitsView] = useState<DynamicPlan | null>(null)
+   678→   678→  const [activeCategory, setActiveCategory] = useState<string>('all')
+   679→   679→
+   680→   680→  const emptyFeature = { ar: '', en: '' }
+   681→   681→  const [form, setForm] = useState({ name: '', price: 0, color: 'bg-violet-500', popular: false, features: [{ ar: '', en: '' }] as { ar: string; en: string }[], limits: generateDefaultLimits(0, '') })
+   682→   682→
+   683→   683→  const openAdd = () => {
+   684→   684→    setForm({ name: '', price: 0, color: 'bg-violet-500', popular: false, features: [{ ar: '', en: '' }], limits: generateDefaultLimits(0, '') })
+   685→   685→    setDlg({ type: 'add' })
+   686→   686→  }
+   687→   687→  const openEdit = (p: DynamicPlan) => {
+   688→   688→    setForm({ name: p.name, price: p.price, color: p.color, popular: p.popular, features: [...p.features], limits: p.limits.map(l => ({ ...l })) })
+   689→   689→    setDlg({ type: 'edit', plan: p })
+   690→   690→  }
+   691→   691→
+   692→   692→  const handleSave = useCallback(() => {
+   693→   693→    if (!form.name.trim()) { toast.error(lang === 'ar' ? 'يرجى إدخال اسم الباقة' : 'Please enter plan name'); return }
+   694→   694→    const cleanFeatures = form.features.filter(f => f.ar.trim() || f.en.trim())
+   695→   695→    if (cleanFeatures.length === 0) { toast.error(lang === 'ar' ? 'أضف ميزة واحدة على الأقل' : 'Add at least one feature'); return }
+   696→   696→
+   697→   697→    const updatedLimits = form.limits.map(l => ({ ...l, value: typeof l.value === 'boolean' ? l.value : Number(l.value) || 0 }))
+   698→   698→
+   699→   699→    if (dlg?.type === 'add') {
+   700→   700→      const p: DynamicPlan = { id: Date.now().toString(), name: form.name, price: form.price, color: form.color, popular: form.popular, currency: 'JOD', features: cleanFeatures, limits: updatedLimits }
+   701→   701→      setDynamicPlans(prev => [...prev, p]); toast.success(lang === 'ar' ? 'تم إنشاء الباقة' : 'Plan created')
+   702→   702→    } else if (dlg?.plan) {
+   703→   703→      setDynamicPlans(prev => prev.map(p => p.id === dlg.plan!.id ? { ...p, name: form.name, price: form.price, color: form.color, popular: form.popular, features: cleanFeatures, limits: updatedLimits } : p))
+   704→   704→      toast.success(lang === 'ar' ? 'تم تحديث الباقة — تم تحديث صلاحيات المستأجرين تلقائياً' : 'Plan updated — tenant permissions synced automatically')
+   705→   705→    }
+   706→   706→    setDlg(null)
+   707→   707→  }, [form, dlg, t, lang])
+   708→   708→
+   709→   709→  const handleDelete = () => {
+   710→   710→    if (!dlg?.plan) return
+   711→   711→    setDynamicPlans(prev => prev.filter(p => p.id !== dlg.plan!.id)); toast.success(t.deleted); setDlg(null)
+   712→   712→  }
+   713→   713→
+   714→   714→  const addFeature = () => setForm(p => ({ ...p, features: [...p.features, { ar: '', en: '' }] }))
+   715→   715→  const removeFeature = (i: number) => setForm(p => ({ ...p, features: p.features.filter((_, idx) => idx !== i) }))
+   716→   716→  const updateFeature = (i: number, field: 'ar' | 'en', val: string) => {
+   717→   717→    setForm(p => { const f = [...p.features]; f[i] = { ...f[i], [field]: val }; return { ...p, features: f } })
+   718→   718→  }
+   719→   719→
+   720→   720→  const updateLimit = (limitId: string, value: number | boolean) => {
+   721→   721→    setForm(p => ({ ...p, limits: p.limits.map(l => l.id === limitId ? { ...l, value } : l) }))
+   722→   722→  }
+   723→   723→
+   724→   724→  const toggleLimit = (limitId: string) => {
+   725→   725→    setForm(p => ({ ...p, limits: p.limits.map(l => l.id === limitId ? { ...l, value: !l.value } : l) }))
+   726→   726→  }
+   727→   727→
+   728→   728→  const getCategoryLimits = (plan: DynamicPlan, cat: string) => plan.limits.filter(l => l.category === cat)
+   729→   729→  const filteredCategories = activeCategory === 'all' ? LIMIT_CATEGORIES : LIMIT_CATEGORIES.filter(c => c.key === activeCategory)
+   730→   730→
+   731→   731→  return (
+   732→   732→    <div className="space-y-6">
+   733→   733→      <PageTitle title={t.plansTitle} action={<PrimaryBtn icon={Plus} label={t.createPlan} onClick={openAdd} />} />
+   734→   734→      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 sm:gap-5">
+   735→   735→        {plans.map((p, i) => (
+   736→   736→          <motion.div key={p.id} variants={fade} initial="hidden" animate="visible" transition={{ delay: i * 0.04 }}>
+   737→   737→            <Card className={`h-full flex flex-col transition-all hover:shadow-lg border-0 shadow-sm ${p.popular ? 'ring-2 ring-violet-500 shadow-violet-500/10' : ''}`}>
+   738→   738→              <CardContent className="flex-1 flex flex-col items-center p-5 sm:p-6 pt-7">
+   739→   739→                {p.popular && <Badge className="bg-violet-600 text-white mb-3 -mt-1 text-[10px]">{t.mostPopular}</Badge>}
+   740→   740→                <div className={`h-12 w-12 rounded-2xl ${p.color} flex items-center justify-center mb-4 shadow-lg`}><CreditCard className="h-6 w-6 text-white" /></div>
+   741→   741→                <h3 className="font-bold text-base">{p.name}</h3>
+   742→   742→                <p className="text-3xl font-extrabold mt-3 mb-1">{p.price > 0 ? `${p.price}` : t.free}</p>
+   743→   743→                <p className="text-xs text-muted-foreground mb-2">{p.price > 0 ? `${sym} ${t.perMonth}` : ''}</p>
+   744→   744→                <p className="text-[10px] text-muted-foreground mb-4">{p.limits.filter(l => !!l.value).length} {lang === 'ar' ? 'حد نشط' : 'active limits'}</p>
+   745→   745→                <Separator className="w-full mb-4" />
+   746→   746→                <ul className="space-y-2 w-full text-start flex-1">{p.features.slice(0, 3).map((f, j) => (
+   747→   747→                  <li key={j} className="flex items-start gap-2 text-xs sm:text-sm"><CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" /><span>{lang === 'en' ? f.en : f.ar}</span></li>
+   748→   748→                ))}
+   749→   749→                {p.features.length > 3 && <li className="text-[11px] text-muted-foreground">+{p.features.length - 3} {lang === 'ar' ? 'أخرى' : 'more'}</li>}
+   750→   750→                <div className="flex gap-2 w-full mt-4">
+   751→   751→                  <Button variant="outline" size="sm" className="flex-1 text-xs" onClick={() => setDetailPlan(p)}>{t.view}</Button>
+   752→   752→                  <Button variant="outline" size="sm" className="flex-1 text-xs" onClick={() => setLimitsView(p)}>{lang === 'ar' ? 'الحدود' : 'Limits'}</Button>
+   753→   753→                  <ActionBtn icon={Edit} label={t.edit} onClick={() => openEdit(p)} />
+   754→   754→                  <ActionBtn icon={Trash2} onClick={() => setDlg({ type: 'delete', plan: p })} danger />
+   755→   755→                </div>
+   756→   756→              </CardContent>
+   757→   757→            </Card>
+   758→   758→          </motion.div>
+   759→   759→        ))}
+   760→   760→      </div>
+   761→   761→
+   762→   762→      {/* Detail Dialog */}
+   763→   763→      <Dialog open={!!detailPlan} onOpenChange={() => setDetailPlan(null)}>
+   764→   764→        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto" dir={isRTL ? 'rtl' : 'ltr'}><DialogHeader><DialogTitle>{t.planDetails}</DialogTitle><DialogDescription className="sr-only">{lang === 'ar' ? 'تفاصيل الباقة' : 'Plan details'}</DialogDescription></DialogHeader>
+   765→   765→          {detailPlan && <div className="space-y-4 pt-2">
+   766→   766→            <div className="text-center"><p className="text-3xl font-extrabold">{detailPlan.price > 0 ? `${detailPlan.price} ${sym}` : t.free}</p><p className="text-sm text-muted-foreground mt-1">{t.monthly}</p></div>
+   767→   767→            <Separator />
+   768→   768→            <div className="flex flex-wrap gap-1.5 justify-center mb-4">
+   769→   769→              {LIMIT_CATEGORIES.map(cat => {
+   770→   770→                const count = getCategoryLimits(detailPlan, cat.key).length
+   771→   771→                return <Badge key={cat.key} variant="outline" className="text-[10px]">{lang === 'ar' ? cat.labelAr : cat.labelEn} ({count})</Badge>
+   772→   772→              })}
+   773→   773→            </div>
+   774→   774→            <Separator />
+   775→   775→            <ul className="space-y-2">{detailPlan.features.map((f, i) => (<li key={i} className="flex items-center gap-2 text-sm"><CheckCircle2 className="h-4 w-4 text-emerald-500" />{lang === 'en' ? f.en : f.ar}</li>))}</ul>
+   776→   776→            <Separator />
+   777→   777→            <div>
+   778→   778→              <p className="text-sm font-semibold mb-3">{lang === 'ar' ? 'الحدود والحوامص' : 'Limits & Quotas'}</p>
+   779→   779→              <div className="space-y-3">{detailPlan.limits.map(l => (
+   780→   780→                <div key={l.id} className="flex items-center justify-between py-1.5 text-sm border-b border-border/50 last:border-0">
+   781→   781→                  <div className="flex items-center gap-2"><div className={`h-7 w-7 rounded-lg ${l.value ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600' : 'bg-muted text-muted-foreground'} flex items-center justify-center`><span className="text-[10px] font-bold">{l.value === true ? '✓' : l.value || 0}</span></div>
+   782→   782→                    <span className="flex-1">{lang === 'ar' ? l.labelAr : l.labelEn}</span>
+   783→   783→                  <span className="text-xs text-muted-foreground tabular-nums">{l.unit || ''}</span>
+   784→   784→                </div>
+   785→   785→              ))}</div>
+   786→   786→          </div>}
+   787→   787→          <DlgFooter onCancel={() => setDetailPlan(null)} onConfirm={() => { if (detailPlan) { openEdit(detailPlan); setDetailPlan(null) } }} confirmLabel={t.edit} />
+   788→   788→        </DialogContent>
+   789→   789→      </Dialog>
+   790→   790→
+   791→   791→      {/* Limits/Quotas Dialog */}
+   792→   792→      <Dialog open={!!limitsView} onOpenChange={() => setLimitsView(null)}>
+   793→   793→        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto" dir={isRTL ? 'rtl' : 'ltr'}><DialogHeader><DialogTitle>{lang === 'ar' ? `حدود وباقات "${limitsView.name}"` : `Limits & Quotas for "${limitsView.name}"`}</DialogTitle><DialogDescription className="sr-only">{lang === 'ar' ? 'عرض الحدود' : 'View limits'}</DialogDescription></DialogHeader>
+   794→   794→          {limitsView && <div className="space-y-4 pt-2">
+   795→   795→            {LIMIT_CATEGORIES.map(cat => {
+   796→   796→              const limits = getCategoryLimits(limitsView, cat.key)
+   797→   797→              if (limits.length === 0) return null
+   798→   798→              return (
+   799→   799→                <div key={cat.key} className="space-y-2">
+   800→   800→                  <div className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-semibold ${cat.color}`}>
+   801→   801→                    <span>{lang === 'ar' ? cat.labelAr : cat.labelEn}</span>
+   802→   802→                    <Badge variant="secondary" className="text-[10px]">{limits.length}</Badge>
+   803→   803→                  </div>
+   804→   804→                  <div className="space-y-1.5 ml-3 border-s border-e pe-3">
+   805→   805→                    {limits.map(l => (
+   806→   806→                      <div key={l.id} className="flex items-center justify-between py-2 text-sm border-b border-border/50 last:border-0 gap-3">
+   807→   807→                        <div className="flex items-center gap-2">
+   808→   808→                          <button type="button" onClick={() => { if (limitsView) { const nl = limitsView.limits.map(x => x.id === l.id ? { ...x, value: !x.value } : x); setLimitsView({ ...limitsView, limits: nl }) }} className={`inline-flex h-6 w-6 items-center justify-center rounded-md transition-colors ${l.value ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600' : 'bg-muted text-muted-foreground'}`}>
+   809→   809→                            {l.value === true ? <CheckCircle2 className="h-3.5 w-3.5" /> : <span className="text-[9px]">{l.value || '0'}</span>}
+   810→   810→                          </button>
+   811→   811→                        </div>
+   812→   812→                        <span className="flex-1 text-xs">{lang === 'ar' ? l.labelAr : l.labelEn}</span>
+   813→   813→                        <span className="text-xs text-muted-foreground tabular-nums">{typeof l.value === 'number' ? l.value.toLocaleString() : ''} {l.unit || ''}</span>
+   814→   814→                      </div>
+   815→   815→                    ))}
+   816→   816→                  </div>
+   817→   817→                </div>
+   818→   818→              )
+   819→   819→            })}
+   820→   820→          </div>}
+   821→   821→          <DlgFooter onCancel={() => setLimitsView(null)} onConfirm={() => { if (limitsView) { openEdit(limitsView); setLimitsView(null) } }} confirmLabel={t.edit} />
+   822→   822→        </DialogContent>
+   823→   823→      </Dialog>
+   824→   824→
+   825→   825→      {/* Add/Edit Dialog */}
+   826→   826→      <Dialog open={dlg?.type === 'add' || dlg?.type === 'edit'} onOpenChange={() => setDlg(null)}>
+   827→   827→        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto" dir={isRTL ? 'rtl' : 'ltr'}>
+   828→   828→          <DialogHeader><DialogTitle>{dlg?.type === 'add' ? t.createPlan : t.editPlanDlg}</DialogTitle><DialogDescription className="sr-only">{lang === 'ar' ? 'إضافة أو تعديل باقة' : 'Add or edit a plan'}</DialogDescription></DialogHeader>
+   829→   829→          <div className="space-y-4 pt-2">
+   830→   830→            <FormField label={lang === 'ar' ? 'اسم الباقة' : 'Plan Name'}>
+   831→   831→              <Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder={lang === 'ar' ? 'مثال: Professional' : 'e.g. Professional'} />
+   832→   832→            </FormField>
+   833→   833→            <div className="grid grid-cols-2 gap-3">
+   834→   834→              <FormField label={t.amount}>
+   835→   835→                <Input type="number" value={form.price || ''} onChange={e => setForm(p => ({ ...p, price: Number(e.target.value) }))} placeholder="0" />
+   836→   836→              </FormField>
+   837→   837→              <FormField label={lang === 'ar' ? 'عدد المستأجرين' : 'Max Tenants'}>
+   838→   838→                <Input type="number" value={form.tenants || ''} onChange={e => setForm(p => ({ ...p, tenants: Number(e.target.value) }))} placeholder="0" />
+   839→   839→              </FormField>
+   840→   840→            </div>
+   841→   841→            <FormField label={lang === 'ar' ? 'اللون' : 'Color'}>
+   842→   842→              <div className="flex flex-wrap gap-2">
+   843→   843→                {PLAN_COLORS.map(c => (
+   844→   844→                  <button key={c} className={`h-8 w-8 rounded-full ${c} transition-transform ${form.color === c ? 'ring-2 ring-offset-2 ring-violet-500 scale-110' : 'opacity-60 hover:opacity-100'}`} onClick={() => setForm(p => ({ ...p, color: c }))} />
+   845→   845→                ))}
+   846→   846→              </div>
+   847→   847→            </FormField>
+   848→   848→            <div className="flex items-center justify-between">
+   849→   849→              <span className="text-sm font-medium">{t.mostPopular}</span>
+   850→   850→              <Toggle on={form.popular} onToggle={() => setForm(p => ({ ...p, popular: !p.popular }))} />
+   851→   851→            </div>
+   852→   852→            <Separator />
+   853→   853→            <div className="space-y-3">
+   854→   854→              <div className="flex items-center justify-between">
+   855→   855→                <span className="text-sm font-medium">{lang === 'ar' ? 'المميزات' : 'Features'}</span>
+   856→   856→                <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={addFeature}><Plus className="h-3 w-3" />{lang === 'ar' ? 'إضافة' : 'Add'}</Button>
+   857→   857→              </div>
+   858→   858→              {form.features.map((f, i) => (
+   859→   859→                <div key={i} className="flex items-start gap-2">
+   860→   860→                  <div className="flex-1 grid grid-cols-2 gap-2">
+   861→   861→                    <Input value={f.ar} onChange={e => updateFeature(i, 'ar', e.target.value)} placeholder={lang === 'ar' ? 'بالعربي' : 'Arabic'} />
+   862→   862→                    <Input value={f.en} onChange={e => updateFeature(i, 'en', e.target.value)} placeholder="English" dir="ltr" />
+   863→   863→                  </div>
+   864→   864→                  {form.features.length > 1 && <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0 mt-0.5" onClick={() => removeFeature(i)}><Trash2 className="h-3.5 w-3.5 text-red-400" /></Button>}
+   865→   865→                </div>
+   866→   866→              ))}
+   867→   867→            </div>
+   868→   868→            <Separator />
+   869→   869→            {/* Limits & Quotas */}
+   870→   870→            <div>
+   871→   871→              <div className="flex items-center justify-between mb-3">
+   872→   872→                <span className="text-sm font-semibold">{lang === 'ar' ? 'الحدود والحصوص' : 'Limits & Quotas'}</span>
+   873→   873→                <Button size="icon" variant="outline" className="h-7 w-7" onClick={() => setForm(p => ({ ...p, limits: generateDefaultLimits(p.price || 0, p.name) }))}><RefreshCw className="h-3.5 w-3.5" /></Button>
+   874→   874→              </div>
+   875→   875→              <div className="space-y-3">{(form.limits || []).filter(l => true).map(cat => {
+   876→   876→                const catInfo = LIMIT_CATEGORIES.find(c => c.key === cat)
+   877→   877→                if (!catInfo) return null
+   878→   878→                const catLimits = (form.limits || []).filter(l => l.category === cat)
+   879→   879→                if (catLimits.length === 0) return null
+   880→   880→                return (
+   881→   881→                  <div key={cat} className="rounded-xl border p-3 space-y-2">
+   882→   882→                    <div className={`inline-flex items-center gap-2 rounded-lg px-3 py-1 text-xs font-semibold ${catInfo.color}`}>
+   883→   883→                      <span>{lang === 'ar' ? catInfo.labelAr : catInfo.labelEn}</span>
+   884→   884→                      <Badge variant="secondary" className="text-[10px]">{catLimits.length}</Badge>
+   885→   885→                    </div>
+   886→   886→                    <div className="space-y-1.5">
+   887→   887→                      {catLimits.map(l => (
+   888→   888→                        <div key={l.id} className="flex items-center justify-between gap-2 text-xs py-1">
+   889→   889→                          <button type="button" onClick={() => toggleLimit(l.id)} className={`inline-flex h-6 w-6 items-center justify-center rounded-md transition-colors ${l.value ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600' : 'bg-muted text-muted-foreground'}`}>
+   890→   890→                            {l.value ? <CheckCircle2 className="h-3.5 w-3.5" /> : <span className="text-[9px]">{l.value || '0'}</span>}
+   891→   891→                          </button>
+   892→   892→                          <span className="flex-1">{lang === 'ar' ? l.labelAr : l.labelEn}</span>
+   893→   893→                          <span className="text-muted-foreground tabular-nums">{typeof l.value === 'number' ? l.value.toLocaleString() : ''} {l.unit || ''}</span>
+   894→   894→                        </div>
+   895→   895→                      ))}
+   896→   896→                    </div>
+   897→   897→                  </div>
+   898→   898→                )
+   899→   899→              })}</div>
+
+[showing lines 400-899 of 2002; use offset=900 with limit to continue reading]

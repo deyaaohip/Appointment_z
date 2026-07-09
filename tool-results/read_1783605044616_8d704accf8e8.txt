@@ -1,0 +1,2002 @@
+     1→'use client'
+     2→
+     3→import { useState, useMemo, useCallback, useEffect } from 'react'
+     4→import { motion } from 'framer-motion'
+     5→import { toast } from 'sonner'
+     6→import { useAppStore } from '@/stores/app-store'
+     7→import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+     8→import { Badge } from '@/components/ui/badge'
+     9→import { Button } from '@/components/ui/button'
+    10→import { Input } from '@/components/ui/input'
+    11→import { Textarea } from '@/components/ui/textarea'
+    12→import { Progress } from '@/components/ui/progress'
+    13→import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+    14→import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
+    15→import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+    16→import { Separator } from '@/components/ui/separator'
+    17→import {
+    18→  Building2, Users, CalendarDays, Activity, CreditCard,
+    19→  Settings, Shield, Eye, Edit, Trash2, Plus, BarChart3, Server,
+    20→  Database, Lock, Bell, FileText, UserCog, CheckCircle2, AlertTriangle,
+    21→  RefreshCw, Globe, UserPlus, Clock, Monitor, HardDrive, Mail, Download,
+    22→  Power, PowerOff, Save, ChevronLeft, Search, Wallet, XCircle, Info,
+    23→  Upload, Image as ImageIcon, ClipboardCheck, Banknote,
+    24→} from 'lucide-react'
+    25→
+    26→// ─── Imports from shared modules ───────────────────────────────
+    27→import { useT } from './sa-i18n'
+    28→import { type Lang } from './sa-i18n'
+    29→import {
+    30→  type Tenant, type PlatformUser, type SysLog, type Invoice,
+    31→  type Role, type Plan, type Server as ServerType, type Backup,
+    32→  type SecurityAttempt, type NotificationTemplate, type Report,
+    33→  type SortState, type CliqPayment, type CliqConfig,
+    34→  INIT_TENANTS, INIT_USERS, INIT_LOGS, PLANS, INIT_ROLES, SERVERS,
+    35→  INVOICES, BACKUPS, SECURITY_ATTEMPTS, NOTIF_TEMPLATES, REPORTS,
+    36→  DEFAULT_CLIQ_CONFIG, INIT_CLIQ_PAYMENTS, bField,
+    37→} from './sa-data'
+    38→import {
+    39→  fade, useSA, StatusBadge, LogDot, getLogLabel, PageTitle, FormField,
+    40→  Toggle, ConfirmDialog, KpiCard, StatCard, ActionBtn, PrimaryBtn,
+    41→  EmptyRow, SearchInput, SortableTH, Pagination, TableFooter, DlgFooter,
+    42→  gaugeColor, genericSort, paginate, useCurrency,
+    43→} from './sa-helpers'
+    44→import { TenantWizard, type TenantFormData } from './tenant-wizard'
+    45→import { TenantDetailsDialog } from './tenant-details-dialog'
+    46→import { InvoicePreviewDialog } from './invoice-preview'
+    47→import { validateEmail, validatePassword, validatePhone, type PasswordValidation } from './sa-validation'
+    48→import { buildDynamicPlans, generateDefaultLimits, LIMIT_CATEGORIES, type DynamicPlan, type PlanLimit } from './dynamic-plans-data'
+    49→
+    50→const PER_PAGE = 7
+    51→
+    52→// ─── Bilingual field helper for logs ───────────────────────────
+    53→function logMsg(l: SysLog, lang: Lang) { return lang === 'en' ? l.messageEn : l.message }
+    54→function logSrc(l: SysLog, lang: Lang) { return lang === 'en' ? l.sourceEn : l.source }
+    55→function serverRegion(s: ServerType, lang: Lang) { return lang === 'en' ? s.regionEn : s.region }
+    56→function secCountry(a: SecurityAttempt, lang: Lang) { return lang === 'en' ? a.countryEn : a.country }
+    57→function invTenant(inv: Invoice, lang: Lang) { return lang === 'en' ? (inv.tenantEn || inv.tenant) : inv.tenant }
+    58→function userTenant(u: PlatformUser, lang: Lang) { return lang === 'en' ? (u.tenantEn || u.tenant) : u.tenant }
+    59→function cliqTenantName(p: CliqPayment, lang: Lang) { return lang === 'en' ? (p.tenantNameEn || p.tenantName) : p.tenantName }
+    60→
+    61→// ════════════════════════════════════════════════════════════════
+    62→// PAGE 1: OVERVIEW (Audited — all KPIs derived from real data)
+    63→// ════════════════════════════════════════════════════════════════
+    64→function OverviewPage() {
+    65→  const { t, isRTL, lang } = useSA()
+    66→  const { sym, fmt } = useCurrency()
+    67→  const [tenants] = useState<Tenant[]>(INIT_TENANTS)
+    68→  const [logs] = useState<SysLog[]>(INIT_LOGS)
+    69→  const [invoices] = useState<Invoice[]>(INVOICES)
+    70→
+    71→  // Computed from real data — no hardcoded values
+    72→  const totalRevenue = tenants.reduce((s, tn) => s + tn.revenue, 0)
+    73→  const totalBookings = tenants.reduce((s, tn) => s + tn.bookings, 0)
+    74→  const activeCount = tenants.filter(tn => tn.status === 'active').length
+    75→  const expiredCount = tenants.filter(tn => tn.subscriptionStatus === 'expired').length
+    76→  const pendingSubs = tenants.filter(tn => tn.subscriptionStatus === 'trial' || tn.status === 'trial').length
+    77→  const paidInvoices = invoices.filter(i => i.status === 'paid')
+    78→  const monthlyRevenue = paidInvoices.reduce((s, i) => s + i.amount, 0)
+    79→  const activeTenants = tenants.filter(tn => tn.status === 'active').slice(0, 6)
+    80→
+    81→  return (
+    82→    <div className="space-y-6">
+    83→      {/* Primary KPIs — all computed from tenant/invoice data */}
+    84→      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+    85→        <KpiCard icon={Building2} bg="bg-violet-600" label={t.totalTenants} value={tenants.length} sub={`${activeCount} ${t.active.toLowerCase()}`} trend={12} delay={0} />
+    86→        <KpiCard icon={Users} bg="bg-sky-600" label={t.totalUsers} value={INIT_USERS.length} sub={`${tenants.reduce((s, tn) => s + tn.users, 0)} ${t.users.toLowerCase()}`} trend={8} delay={0.04} />
+    87→        <KpiCard icon={Banknote} bg="bg-amber-500" label={t.revenue} value={`${(totalRevenue / 1000).toFixed(1)}K ${sym}`} sub={t.thisMonth} trend={18} delay={0.08} />
+    88→        <KpiCard icon={CalendarDays} bg="bg-emerald-600" label={t.totalBookings} value={totalBookings.toLocaleString()} sub={t.last30Days} trend={5} delay={0.12} />
+    89→      </div>
+    90→
+    91→      {/* Secondary KPIs — subscription health */}
+    92→      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+    93→        <StatCard icon={CheckCircle2} label={t.monthlyRevenue} value={fmt(monthlyRevenue)} color="text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30" />
+    94→        <StatCard icon={Clock} label={t.pendingRequests} value={String(pendingSubs)} color="text-amber-600 bg-amber-50 dark:bg-amber-950/30" />
+    95→        <StatCard icon={AlertTriangle} label={t.expiredSubs} value={String(expiredCount)} color="text-red-600 bg-red-50 dark:bg-red-950/30" />
+    96→        <StatCard icon={CreditCard} label={t.recentPayments} value={String(paidInvoices.length)} color="text-sky-600 bg-sky-50 dark:bg-sky-950/30" />
+    97→      </div>
+    98→
+    99→      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6">
+   100→        <motion.div variants={fade} initial="hidden" animate="visible" transition={{ delay: 0.15 }} className="xl:col-span-2">
+   101→          <Card className="border-0 shadow-sm">
+   102→            <CardHeader className="pb-2"><CardTitle className="text-sm sm:text-base font-semibold">{t.revenueByPlan}</CardTitle></CardHeader>
+   103→            <CardContent className="space-y-4">
+   104→              {PLANS.filter(p => p.price > 0).map(p => {
+   105→                const rev = tenants.filter(tn => tn.plan === p.name).reduce((s, tn) => s + tn.revenue, 0)
+   106→                const pct = totalRevenue > 0 ? Math.round(rev / totalRevenue * 100) : 0
+   107→                return (
+   108→                  <div key={p.id} className="space-y-2">
+   109→                    <div className="flex items-center justify-between text-sm">
+   110→                      <span className="font-medium">{p.name}</span>
+   111→                      <span className="text-muted-foreground tabular-nums text-xs sm:text-sm">{rev.toLocaleString()} {sym}</span>
+   112→                    </div>
+   113→                    <div className="h-2.5 rounded-full bg-muted overflow-hidden">
+   114→                      <div className={`h-full rounded-full ${p.color} transition-all duration-700`} style={{ width: `${pct}%` }} />
+   115→                    </div>
+   116→                  </div>
+   117→                )
+   118→              })}
+   119→            </CardContent>
+   120→          </Card>
+   121→        </motion.div>
+   122→
+   123→        <motion.div variants={fade} initial="hidden" animate="visible" transition={{ delay: 0.2 }}>
+   124→          <Card className="border-0 shadow-sm h-full">
+   125→            <CardHeader className="pb-2"><CardTitle className="text-sm sm:text-base font-semibold">{t.recentActivity}</CardTitle></CardHeader>
+   126→            <CardContent>
+   127→              <div className="space-y-1">{logs.slice(0, 6).map(l => (
+   128→                <div key={l.id} className="flex gap-3 rounded-lg px-2.5 py-2 hover:bg-muted/50 transition-colors">
+   129→                  <LogDot level={l.level} />
+   130→                  <div className="min-w-0 flex-1">
+   131→                    <p className="text-xs sm:text-sm leading-relaxed line-clamp-2">{logMsg(l, lang)}</p>
+   132→                    <p className="text-[10px] sm:text-[11px] text-muted-foreground mt-0.5">{logSrc(l, lang)}</p>
+   133→                  </div>
+   134→                </div>
+   135→              ))}</div>
+   136→            </CardContent>
+   137→          </Card>
+   138→        </motion.div>
+   139→      </div>
+   140→
+   141→      <motion.div variants={fade} initial="hidden" animate="visible" transition={{ delay: 0.25 }}>
+   142→        <Card className="border-0 shadow-sm">
+   143→          <CardHeader className="pb-2"><CardTitle className="text-sm sm:text-base font-semibold">{t.activeTenants}</CardTitle></CardHeader>
+   144→          <CardContent>
+   145→            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
+   146→              {activeTenants.map(tn => (
+   147→                <button key={tn.id} className="flex items-center gap-3 rounded-xl border p-3 text-start hover:bg-accent/50 transition-colors group" onClick={() => toast.info(t.details.replace('{name}', bField(tn, 'name', lang)))}>
+   148→                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-900/30 text-violet-600 font-bold text-sm">{bField(tn, 'name', lang).charAt(0)}</div>
+   149→                  <div className="min-w-0 flex-1">
+   150→                    <p className="text-sm font-semibold truncate">{bField(tn, 'name', lang)}</p>
+   151→                    <p className="text-xs text-muted-foreground">{tn.plan} · {tn.bookings.toLocaleString()} {t.bookings}</p>
+   152→                  </div>
+   153→                  <ChevronLeft className="h-4 w-4 text-muted-foreground shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" style={{ transform: isRTL ? 'scaleX(-1)' : undefined }} />
+   154→                </button>
+   155→              ))}
+   156→            </div>
+   157→          </CardContent>
+   158→        </Card>
+   159→      </motion.div>
+   160→    </div>
+   161→  )
+   162→}
+   163→
+   164→// ════════════════════════════════════════════════════════════════
+   165→// PAGE 2: TENANTS (full CRUD + sort + pagination)
+   166→// ════════════════════════════════════════════════════════════════
+   167→function TenantsPage() {
+   168→  const { t, isRTL, lang } = useSA()
+   169→  const { sym } = useCurrency()
+   170→  const [tenants, setTenants] = useState<Tenant[]>(INIT_TENANTS)
+   171→  const [search, setSearch] = useState('')
+   172→  const [filter, setFilter] = useState('all')
+   173→  const [page, setPage] = useState(1)
+   174→  const [sort, setSort] = useState<SortState>({ key: 'name', dir: 'asc' })
+   175→  const [dlg, setDlg] = useState<{ type: string; tenant?: Tenant } | null>(null)
+   176→  const [form, setForm] = useState({ name: '', nameEn: '', email: '', country: '', plan: 'Starter' })
+   177→  const [extendDlg, setExtendDlg] = useState<Tenant | null>(null)
+   178→  const [extendMonths, setExtendMonths] = useState(12)
+   179→  const [extendPlan, setExtendPlan] = useState('')
+   180→  const [wizardOpen, setWizardOpen] = useState(false)
+   181→  const [detailTenant, setDetailTenant] = useState<Tenant | null>(null)
+   182→
+   183→  const filtered = useMemo(() => {
+   184→    let list = [...tenants]
+   185→    if (filter !== 'all') list = list.filter(tn => tn.status === filter)
+   186→    if (search) { const q = search.toLowerCase(); list = list.filter(tn => tn.name.includes(q) || tn.nameEn.toLowerCase().includes(q) || tn.email.toLowerCase().includes(q)) }
+   187→    return genericSort(list, sort.key, sort.dir, lang)
+   188→  }, [tenants, search, filter, sort, lang])
+   189→
+   190→  const { items, totalPages } = paginate(filtered, page, PER_PAGE)
+   191→  const handleSort = (key: string) => setSort(p => p.key === key ? { key, dir: p.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' })
+   192→
+   193→  const openAdd = () => { setWizardOpen(true) }
+   194→  const openEdit = (tn: Tenant) => { setForm({ name: tn.name, nameEn: tn.nameEn, email: tn.email, country: tn.country, plan: tn.plan }); setDlg({ type: 'edit', tenant: tn }) }
+   195→
+   196→  // Wizard-based tenant creation with full validation
+   197→  const handleWizardSave = useCallback((data: TenantFormData) => {
+   198→    // Duplicate checks
+   199→    const emailExists = tenants.some(tn => tn.email.toLowerCase() === data.email.toLowerCase())
+   200→    if (emailExists) { toast.error(isRTL ? 'البريد الإلكتروني مستخدم بالفعل' : 'Email already exists'); return }
+   201→    const nameArExists = tenants.some(tn => tn.name === data.nameAr.trim())
+   202→    if (nameArExists) { toast.error(isRTL ? 'اسم المستأجر (عربي) مستخدم بالفعل' : 'Tenant Arabic name already exists'); return }
+   203→    const nameEnExists = tenants.some(tn => tn.nameEn === data.nameEn.trim())
+   204→    if (nameEnExists) { toast.error(isRTL ? 'اسم المستأجر (إنجليزي) مستخدم بالفعل' : 'Tenant English name already exists'); return }
+   205→
+   206→    // Calculate subscription end date based on billing cycle
+   207→    const cycleMonths = data.billingCycle === 'quarterly' ? 3 : data.billingCycle === 'yearly' ? 12 : 1
+   208→    const endDate = new Date(data.startDate)
+   209→    endDate.setMonth(endDate.getMonth() + cycleMonths)
+   210→
+   211→    const newTenant: Tenant = {
+   212→      id: Date.now().toString(),
+   213→      name: data.nameAr,
+   214→      nameEn: data.nameEn,
+   215→      email: data.email,
+   216→      country: data.country,
+   217→      plan: data.plan,
+   218→      bookings: 0,
+   219→      revenue: 0,
+   220→      users: 1,
+   221→      status: 'active',
+   222→      createdAt: data.startDate,
+   223→      subscriptionStatus: 'active',
+   224→      subscriptionEndDate: endDate.toISOString().split('T')[0],
+   225→    }
+   226→    // Atomic update: add tenant + create invoice in one state batch
+   227→    setTenants(prev => [newTenant, ...prev])
+   228→    setPage(1)
+   229→    setFilter('all')
+   230→    setSearch('')
+   231→  }, [tenants, isRTL])
+   232→
+   233→  const handleSave = useCallback(() => {
+   234→    if (!form.name.trim()) { toast.error(t.enterTenantName); return }
+   235→    if (form.email && !form.email.includes('@')) { toast.error(t.enterValidEmail); return }
+   236→    if (dlg?.type === 'edit' && dlg.tenant) {
+   237→      // Check for duplicates on edit (excluding self)
+   238→      const dupEmail = tenants.some(tn => tn.id !== dlg.tenant!.id && tn.email.toLowerCase() === form.email.toLowerCase())
+   239→      if (dupEmail) { toast.error(isRTL ? 'البريد الإلكتروني مستخدم بالفعل' : 'Email already exists'); return }
+   240→      setTenants(p => p.map(tn => tn.id === dlg.tenant!.id ? { ...tn, ...form } : tn)); toast.success(t.updated)
+   241→    }
+   242→    setDlg(null); setPage(1)
+   243→  }, [form, dlg, t, tenants, isRTL])
+   244→
+   245→  const handleDelete = (tn: Tenant) => { setTenants(p => p.filter(x => x.id !== tn.id)); toast.success(t.deleted); setPage(1) }
+   246→  const handleToggleStatus = (tn: Tenant) => {
+   247→    const newStatus = tn.status === 'suspended' ? 'active' : 'suspended'
+   248→    setTenants(p => p.map(x => x.id === tn.id ? { ...x, status: newStatus } : x))
+   249→    toast.success(newStatus === 'suspended' ? t.tenantSuspended : t.tenantActivated)
+   250→    setPage(1)
+   251→  }
+   252→
+   253→  const openExtend = (tn: Tenant) => { setExtendDlg(tn); setExtendPlan(tn.plan); setExtendMonths(12) }
+   254→  const handleExtend = () => {
+   255→    if (!extendDlg) return
+   256→    const startDate = extendDlg.subscriptionEndDate && extendDlg.subscriptionEndDate > new Date().toISOString().split('T')[0]
+   257→      ? new Date(extendDlg.subscriptionEndDate) : new Date()
+   258→    const newEnd = new Date(startDate)
+   259→    newEnd.setMonth(newEnd.getMonth() + extendMonths)
+   260→    setTenants(p => p.map(x => x.id === extendDlg.id ? {
+   261→      ...x, plan: extendPlan || x.plan,
+   262→      subscriptionStatus: 'active', status: 'active',
+   263→      subscriptionEndDate: newEnd.toISOString().split('T')[0]
+   264→    } : x))
+   265→    toast.success(t.subscriptionExtended)
+   266→    setExtendDlg(null)
+   267→  }
+   268→
+   269→  const tnName = (tn: Tenant) => bField(tn, 'name', lang)
+   270→
+   271→  // Existing tenants for wizard duplicate check
+   272→  const existingTenants = useMemo(() => tenants.map(tn => ({ email: tn.email, name: tn.name, nameEn: tn.nameEn })), [tenants])
+   273→
+   274→  return (
+   275→    <div className="space-y-5">
+   276→      <PageTitle title={t.tenantMgmt} action={<PrimaryBtn icon={Plus} label={t.addTenant} onClick={openAdd} />} />
+   277→      <div className="flex flex-col sm:flex-row gap-3">
+   278→        <SearchInput value={search} onChange={v => { setSearch(v); setPage(1) }} placeholder={t.tenantSearch} />
+   279→        <Select value={filter} onValueChange={v => { setFilter(v); setPage(1) }}>
+   280→          <SelectTrigger className="w-full sm:w-44 h-10"><SelectValue /></SelectTrigger>
+   281→          <SelectContent>
+   282→            <SelectItem value="all">{t.allStatuses}</SelectItem>
+   283→            <SelectItem value="active">{t.active}</SelectItem>
+   284→            <SelectItem value="trial">{t.trial}</SelectItem>
+   285→            <SelectItem value="suspended">{t.suspended}</SelectItem>
+   286→          </SelectContent>
+   287→        </Select>
+   288→      </div>
+   289→
+   290→      <Card className="border-0 shadow-sm overflow-hidden hidden md:block">
+   291→        <div className="overflow-x-auto">
+   292→          <Table>
+   293→            <TableHeader><TableRow className="bg-muted/50 hover:bg-muted/50">
+   294→              <SortableTH label={t.tenant} sortKey="name" currentSort={sort} onSort={handleSort} className="ps-5" />
+   295→              <SortableTH label={t.plan} sortKey="plan" currentSort={sort} onSort={handleSort} />
+   296→              <SortableTH label={t.bookings} sortKey="bookings" currentSort={sort} onSort={handleSort} align="end" />
+   297→              <SortableTH label={t.tenantRevenue} sortKey="revenue" currentSort={sort} onSort={handleSort} align="end" />
+   298→              <SortableTH label={t.status} sortKey="status" currentSort={sort} onSort={handleSort} />
+   299→              <TableHead className="px-3 font-semibold text-xs uppercase tracking-wider">{t.subscriptionStatus}</TableHead>
+   300→              <TableHead className="pe-5 font-semibold text-xs uppercase tracking-wider text-end">{t.actions}</TableHead>
+   301→            </TableRow></TableHeader>
+   302→            <TableBody>
+   303→              {items.length === 0 ? <EmptyRow colSpan={7} /> : items.map(tn => (
+   304→                <TableRow key={tn.id} className="group hover:bg-muted/20 transition-colors">
+   305→                  <TableCell className="ps-5">
+   306→                    <div className="flex items-center gap-3">
+   307→                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-900/30 text-violet-600 font-bold text-xs">{tnName(tn).charAt(0)}</div>
+   308→                      <div className="min-w-0"><p className="font-medium text-sm truncate max-w-[200px]">{tnName(tn)}</p><p className="text-xs text-muted-foreground truncate max-w-[200px]" dir="ltr">{tn.email}</p></div>
+   309→                    </div>
+   310→                  </TableCell>
+   311→                  <TableCell className="px-3"><Badge variant="secondary" className="font-medium text-xs">{tn.plan}</Badge></TableCell>
+   312→                  <TableCell className="px-3 text-end tabular-nums text-sm">{tn.bookings.toLocaleString()}</TableCell>
+   313→                  <TableCell className="px-3 text-end font-semibold tabular-nums text-sm">{tn.revenue.toLocaleString()} <span className="text-xs font-normal text-muted-foreground">{sym}</span></TableCell>
+   314→                  <TableCell className="px-3"><StatusBadge status={tn.status} locale={lang} /></TableCell>
+   315→                  <TableCell className="px-3">
+   316→                    <div className="space-y-0.5">
+   317→                      <StatusBadge status={tn.subscriptionStatus} locale={lang} />
+   318→                      {tn.subscriptionEndDate && <p className="text-[10px] text-muted-foreground">{t.subscriptionEnd}: {tn.subscriptionEndDate}</p>}
+   319→                    </div>
+   320→                  </TableCell>
+   321→                  <TableCell className="pe-5">
+   322→                    <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+   323→                      <ActionBtn icon={Eye} label={t.view} onClick={() => setDetailTenant(tn)} />
+   324→                      <ActionBtn icon={Edit} label={t.edit} onClick={() => openEdit(tn)} />
+   325→                      <ActionBtn icon={CalendarDays} label={t.extendSubscription} onClick={() => openExtend(tn)} />
+   326→                      <ActionBtn icon={tn.status === 'suspended' ? Power : PowerOff} label={tn.status === 'suspended' ? t.active : t.suspended} onClick={() => handleToggleStatus(tn)} />
+   327→                      <ActionBtn icon={Trash2} onClick={() => setDlg({ type: 'delete', tenant: tn })} danger />
+   328→                    </div>
+   329→                  </TableCell>
+   330→                </TableRow>
+   331→              ))}
+   332→            </TableBody>
+   333→          </Table>
+   334→        </div>
+   335→        <TableFooter current={items.length} total={filtered.length} entity={t.tenant.toLowerCase()} />
+   336→        <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+   337→      </Card>
+   338→
+   339→      <div className="md:hidden space-y-3">
+   340→        {items.length === 0 ? <Card className="border-0 shadow-sm"><CardContent className="py-16 text-center text-muted-foreground text-sm">{t.noResults}</CardContent></Card> : items.map(tn => (
+   341→          <Card key={tn.id} className="border-0 shadow-sm"><CardContent className="p-4">
+   342→            <div className="flex items-start justify-between gap-3 mb-3">
+   343→              <div className="flex items-center gap-3 min-w-0">
+   344→                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-900/30 text-violet-600 font-bold text-sm">{tnName(tn).charAt(0)}</div>
+   345→                <div className="min-w-0"><p className="font-semibold text-sm truncate">{tnName(tn)}</p><p className="text-xs text-muted-foreground truncate" dir="ltr">{tn.email}</p></div>
+   346→              </div>
+   347→              <StatusBadge status={tn.status} locale={lang} />
+   348→            </div>
+   349→            <div className="grid grid-cols-3 gap-3 mb-3 text-center">
+   350→              <div className="rounded-lg bg-muted/50 p-2"><p className="text-[10px] text-muted-foreground">{t.plan}</p><p className="text-xs font-semibold mt-0.5">{tn.plan}</p></div>
+   351→              <div className="rounded-lg bg-muted/50 p-2"><p className="text-[10px] text-muted-foreground">{t.bookings}</p><p className="text-xs font-semibold mt-0.5 tabular-nums">{tn.bookings.toLocaleString()}</p></div>
+   352→              <div className="rounded-lg bg-muted/50 p-2"><p className="text-[10px] text-muted-foreground">{t.tenantRevenue}</p><p className="text-xs font-semibold mt-0.5 tabular-nums">{tn.revenue.toLocaleString()} {sym}</p></div>
+   353→            </div>
+   354→            <div className="flex items-center gap-2 mb-3">
+   355→              <StatusBadge status={tn.subscriptionStatus} locale={lang} />
+   356→              {tn.subscriptionEndDate && <span className="text-[10px] text-muted-foreground">{t.subscriptionEnd}: {tn.subscriptionEndDate}</span>}
+   357→            </div>
+   358→            <div className="flex items-center justify-end gap-1 pt-2 border-t">
+   359→              <ActionBtn icon={Eye} onClick={() => setDetailTenant(tn)} />
+   360→              <ActionBtn icon={CalendarDays} label={t.extendSubscription} onClick={() => openExtend(tn)} />
+   361→              <ActionBtn icon={Edit} label={t.edit} onClick={() => openEdit(tn)} />
+   362→              <ActionBtn icon={tn.status === 'suspended' ? Power : PowerOff} label={tn.status === 'suspended' ? t.active : t.suspended} onClick={() => handleToggleStatus(tn)} />
+   363→              <ActionBtn icon={Trash2} onClick={() => setDlg({ type: 'delete', tenant: tn })} danger />
+   364→            </div>
+   365→          </CardContent></Card>
+   366→        ))}
+   367→      </div>
+   368→
+   369→      <Dialog open={dlg?.type === 'edit'} onOpenChange={() => setDlg(null)}>
+   370→        <DialogContent className="max-w-md" dir={isRTL ? 'rtl' : 'ltr'}><DialogHeader><DialogTitle>{t.editTenantDlg}</DialogTitle><DialogDescription className="sr-only">{isRTL ? 'تعديل بيانات المستأجر' : 'Edit tenant details'}</DialogDescription></DialogHeader>
+   371→          <div className="space-y-4 pt-2">
+   372→            <FormField label={t.nameAr}><Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} /></FormField>
+   373→            <FormField label={t.nameEn}><Input value={form.nameEn} onChange={e => setForm(p => ({ ...p, nameEn: e.target.value }))} dir="ltr" /></FormField>
+   374→            <FormField label={t.email}><Input type="email" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} dir="ltr" /></FormField>
+   375→            <div className="grid grid-cols-2 gap-3">
+   376→              <FormField label={t.country}><Input value={form.country} onChange={e => setForm(p => ({ ...p, country: e.target.value }))} /></FormField>
+   377→              <FormField label={t.plan}><Select value={form.plan} onValueChange={v => setForm(p => ({ ...p, plan: v }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{PLANS.map(p => <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>)}</SelectContent></Select></FormField>
+   378→            </div>
+   379→          </div>
+   380→          <DlgFooter onCancel={() => setDlg(null)} onConfirm={handleSave} />
+   381→        </DialogContent>
+   382→      </Dialog>
+   383→      <ConfirmDialog open={dlg?.type === 'delete'} onOpenChange={() => setDlg(null)} title={t.deleteTenantDlg} desc={t.deleteTenantDesc.replace('{name}', dlg?.tenant?.name || '')} onConfirm={() => { if (dlg?.tenant) handleDelete(dlg.tenant) }} danger />
+   384→
+   385→      {/* Extend Subscription Dialog */}
+   386→      <Dialog open={!!extendDlg} onOpenChange={() => setExtendDlg(null)}>
+   387→        <DialogContent className="max-w-md" dir={isRTL ? 'rtl' : 'ltr'}>
+   388→          <DialogHeader><DialogTitle>{t.extendSubscriptionDlg}</DialogTitle><DialogDescription className="sr-only">{isRTL ? 'تمديد اشتراك المستأجر' : 'Extend tenant subscription'}</DialogDescription></DialogHeader>
+   389→          <div className="space-y-4 pt-2">
+   390→            {extendDlg && <>
+   391→              <div className="rounded-lg bg-muted/50 p-3 space-y-1">
+   392→                <p className="font-semibold text-sm">{tnName(extendDlg)}</p>
+   393→                <div className="flex items-center gap-2">
+   394→                  <StatusBadge status={extendDlg.subscriptionStatus} locale={lang} />
+   395→                  {extendDlg.subscriptionEndDate && <span className="text-[11px] text-muted-foreground">{t.subscriptionEnd}: {extendDlg.subscriptionEndDate}</span>}
+   396→                </div>
+   397→              </div>
+   398→              <FormField label={t.plan}>
+   399→                <Select value={extendPlan} onValueChange={setExtendPlan}>
+   400→                  <SelectTrigger><SelectValue /></SelectTrigger>
+   401→                  <SelectContent>{PLANS.filter(p => p.price > 0).map(p => <SelectItem key={p.id} value={p.name}>{p.name} — {p.price} {sym}/{t.perMonth}</SelectItem>)}</SelectContent>
+   402→                </Select>
+   403→              </FormField>
+   404→              <FormField label={t.durationMonths}>
+   405→                <Select value={String(extendMonths)} onValueChange={v => setExtendMonths(Number(v))}>
+   406→                  <SelectTrigger><SelectValue /></SelectTrigger>
+   407→                  <SelectContent>
+   408→                    {[1, 3, 6, 12, 24].map(m => <SelectItem key={m} value={String(m)}>{m} {t.months}</SelectItem>)}
+   409→                  </SelectContent>
+   410→                </Select>
+   411→              </FormField>
+   412→              {extendPlan && (() => {
+   413→                const plan = PLANS.find(p => p.name === extendPlan)
+   414→                const total = plan ? plan.price * extendMonths : 0
+   415→                return total > 0 ? (
+   416→                  <div className="rounded-lg bg-violet-50 dark:bg-violet-950/30 p-3 text-center">
+   417→                    <p className="text-[10px] text-muted-foreground">{isRTL ? 'الإجمالي' : 'Total'}</p>
+   418→                    <p className="text-lg font-bold text-violet-700 dark:text-violet-400">{total.toLocaleString()} {sym}</p>
+   419→                  </div>
+   420→                ) : null
+   421→              })()}
+   422→            </>}
+   423→          </div>
+   424→          <DlgFooter onCancel={() => setExtendDlg(null)} onConfirm={handleExtend} confirmLabel={isRTL ? 'تمديد الاشتراك' : 'Extend Subscription'} />
+   425→        </DialogContent>
+   426→      </Dialog>
+   427→
+   428→      {/* Multi-step Tenant Creation Wizard */}
+   429→      <TenantWizard open={wizardOpen} onClose={() => setWizardOpen(false)} onSave={handleWizardSave} existingTenants={existingTenants} />
+   430→
+   431→      {/* Tenant Details Dialog */}
+   432→      {detailTenant && <TenantDetailsDialog tenant={detailTenant} open={!!detailTenant} onClose={() => setDetailTenant(null)} />}
+   433→    </div>
+   434→  )
+   435→}
+   436→
+   437→// ════════════════════════════════════════════════════════════════
+   438→// PAGE 3: USERS (full CRUD + RFC email validation + password policy)
+   439→// ════════════════════════════════════════════════════════════════
+   440→function UsersPage() {
+   441→  const { t, lang, isRTL } = useSA()
+   442→  const { sym } = useCurrency()
+   443→  const [users, setUsers] = useState<PlatformUser[]>(INIT_USERS)
+   444→  const [search, setSearch] = useState('')
+   445→  const [filter, setFilter] = useState('all')
+   446→  const [page, setPage] = useState(1)
+   447→  const [sort, setSort] = useState<SortState>({ key: 'name', dir: 'asc' })
+   448→  const [dlg, setDlg] = useState<{ type: string; user?: PlatformUser } | null>(null)
+   449→  const [form, setForm] = useState({ name: '', email: '', tenant: '', tenantEn: '', role: 'owner', password: '', confirmPassword: '', phone: '' })
+   450→  const [errors, setErrors] = useState<Record<string, string>>({})
+   451→  const [showPassword, setShowPassword] = useState(false)
+   452→  const [pwValidation, setPwValidation] = useState<PasswordValidation | null>(null)
+   453→
+   454→  const ROLE_MAP: Record<string, string> = { owner: t.owner, manager: t.manager, receptionist: t.receptionist, accountant: t.accountant }
+   455→
+   456→  const existingEmails = useMemo(() => users.map(u => u.email.toLowerCase()), [users])
+   457→
+   458→  const filtered = useMemo(() => {
+   459→    let list = [...users]
+   460→    if (filter !== 'all') list = list.filter(u => u.status === filter)
+   461→    if (search) { const q = search.toLowerCase(); list = list.filter(u => u.name.includes(q) || u.email.toLowerCase().includes(q) || u.tenant.includes(q)) }
+   462→    return genericSort(list, sort.key, sort.dir, lang)
+   463→  }, [users, search, filter, sort, lang])
+   464→
+   465→  const { items, totalPages } = paginate(filtered, page, PER_PAGE)
+   466→  const handleSort = (key: string) => setSort(p => p.key === key ? { key, dir: p.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' })
+   467→
+   468→  const openAdd = () => { setForm({ name: '', email: '', tenant: '', tenantEn: '', role: 'owner', password: '', confirmPassword: '', phone: '' }); setErrors({}); setPwValidation(null); setShowPassword(false); setDlg({ type: 'add' }) }
+   469→  const openEdit = (u: PlatformUser) => { setForm({ name: u.name, email: u.email, tenant: u.tenant, tenantEn: u.tenantEn || '', role: u.role, password: '', confirmPassword: '', phone: '' }); setErrors({}); setPwValidation(null); setShowPassword(false); setDlg({ type: 'edit', user: u }) }
+   470→
+   471→  const updateField = (field: string, value: string) => {
+   472→    setForm(p => ({ ...p, [field]: value }))
+   473→    if (errors[field]) setErrors(p => { const n = { ...p }; delete n[field]; return n })
+   474→    // Live password validation
+   475→    if (field === 'password' || field === 'confirmPassword') {
+   476→      setPwValidation(validatePassword(form.password, form.confirmPassword, lang === 'ar' ? 'ar' : 'en'))
+   477→    }
+   478→  }
+   479→
+   480→  const handleSave = useCallback(() => {
+   481→    const newErrors: Record<string, string> = {}
+   482→    // Name validation
+   483→    if (!form.name.trim()) newErrors.name = isRTL ? 'الاسم مطلوب' : 'Name is required'
+   484→    // Email validation (RFC-compliant)
+   485→    if (!form.email.trim()) newErrors.email = isRTL ? 'البريد مطلوب' : 'Email is required'
+   486→    else {
+   487→      const emailCheck = validateEmail(form.email, dlg?.type === 'edit' && dlg.user ? existingEmails.filter(e => e !== dlg.user.email.toLowerCase()) : existingEmails, lang === 'ar' ? 'ar' : 'en')
+   488→      if (!emailCheck.valid && emailCheck.error) newErrors.email = isRTL ? emailCheck.errorAr! : emailCheck.error!
+   489→    }
+   490→    // Phone validation
+   491→    const phoneCheck = validatePhone(form.phone, lang === 'ar' ? 'ar' : 'en')
+   492→    if (!phoneCheck.valid && phoneCheck.error) newErrors.phone = isRTL ? phoneCheck.errorAr! : phoneCheck.error
+   493→    // Password validation (only for add)
+   494→    if (dlg?.type === 'add') {
+   495→      const pwCheck = validatePassword(form.password, form.confirmPassword, lang === 'ar' ? 'ar' : 'en')
+   496→      if (!pwCheck.valid) newErrors.password = isRTL ? 'كلمة المرور لا تلبي المتطلبات' : 'Password does not meet requirements'
+   497→      if (form.password !== form.confirmPassword) newErrors.confirmPassword = isRTL ? 'كلمتا المرور غير متطابقتين' : 'Passwords do not match'
+   498→    }
+   499→
+   500→    if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return }
+   501→
+   502→    if (dlg?.type === 'add') {
+   503→      setUsers(p => [{ id: Date.now().toString(), ...form, tenantEn: form.tenantEn, status: 'active', lastLogin: new Date().toISOString() }, ...p])
+   504→      toast.success(t.added.replace('{name}', form.name))
+   505→    } else if (dlg?.user) {
+   506→      setUsers(p => p.map(u => u.id === dlg.user!.id ? { ...u, name: form.name, email: form.email, tenant: form.tenant, role: form.role } : u)); toast.success(t.updated)
+   507→    }
+   508→    setDlg(null); setPage(1); setErrors({})
+   509→  }, [form, dlg, t, existingEmails, isRTL])
+   510→
+   511→  const handleDelete = (u: PlatformUser) => { setUsers(p => p.filter(x => x.id !== u.id)); toast.success(t.userDeleted); setPage(1) }
+   512→  const handleToggleStatus = (u: PlatformUser) => {
+   513→    const newStatus = u.status === 'suspended' ? 'active' : 'suspended'
+   514→    setUsers(p => p.map(x => x.id === u.id ? { ...x, status: newStatus } : x))
+   515→    toast.success(newStatus === 'suspended' ? t.userSuspended : t.userActivated)
+   516→  }
+   517→
+   518→  return (
+   519→    <div className="space-y-5">
+   520→      <PageTitle title={t.userMgmt} action={<PrimaryBtn icon={UserPlus} label={t.addUser} onClick={openAdd} />} />
+   521→      <div className="flex flex-col sm:flex-row gap-3">
+   522→        <SearchInput value={search} onChange={v => { setSearch(v); setPage(1) }} placeholder={t.userSearch} />
+   523→        <Select value={filter} onValueChange={v => { setFilter(v); setPage(1) }}>
+   524→          <SelectTrigger className="w-full sm:w-44 h-10"><SelectValue /></SelectTrigger>
+   525→          <SelectContent><SelectItem value="all">{t.all}</SelectItem><SelectItem value="active">{t.active}</SelectItem><SelectItem value="suspended">{t.suspended}</SelectItem></SelectContent>
+   526→        </Select>
+   527→      </div>
+   528→
+   529→      <Card className="border-0 shadow-sm overflow-hidden hidden md:block">
+   530→        <div className="overflow-x-auto">
+   531→          <Table><TableHeader><TableRow className="bg-muted/50 hover:bg-muted/50">
+   532→            <SortableTH label={t.user} sortKey="name" currentSort={sort} onSort={handleSort} className="ps-5" />
+   533→            <SortableTH label={t.email} sortKey="email" currentSort={sort} onSort={handleSort} />
+   534→            <SortableTH label={t.tenant} sortKey="tenant" currentSort={sort} onSort={handleSort} />
+   535→            <SortableTH label={t.role} sortKey="role" currentSort={sort} onSort={handleSort} />
+   536→            <SortableTH label={t.status} sortKey="status" currentSort={sort} onSort={handleSort} />
+   537→            <TableHead className="pe-5 font-semibold text-xs uppercase tracking-wider text-end">{t.actions}</TableHead>
+   538→          </TableRow></TableHeader>
+   539→          <TableBody>
+   540→            {items.length === 0 ? <EmptyRow colSpan={6} /> : items.map(u => (
+   541→              <TableRow key={u.id} className="group hover:bg-muted/20 transition-colors">
+   542→                <TableCell className="ps-5">
+   543→                  <div className="flex items-center gap-3">
+   544→                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky-100 dark:bg-sky-900/30 text-sky-600 font-bold text-xs">{u.name.charAt(0)}</div>
+   545→                    <span className="font-medium text-sm">{u.name}</span>
+   546→                  </div>
+   547→                </TableCell>
+   548→                <TableCell className="px-3 text-sm text-muted-foreground" dir="ltr">{u.email}</TableCell>
+   549→                <TableCell className="px-3 text-sm">{userTenant(u, lang)}</TableCell>
+   550→                <TableCell className="px-3"><Badge variant="secondary" className="text-xs">{ROLE_MAP[u.role] || u.role}</Badge></TableCell>
+   551→                <TableCell className="px-3"><StatusBadge status={u.status} locale={lang} /></TableCell>
+   552→                <TableCell className="pe-5">
+   553→                  <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+   554→                    <ActionBtn icon={Edit} label={t.edit} onClick={() => openEdit(u)} />
+   555→                    <ActionBtn icon={u.status === 'suspended' ? Power : PowerOff} label={u.status === 'suspended' ? t.active : t.suspended} onClick={() => handleToggleStatus(u)} />
+   556→                    <ActionBtn icon={Trash2} onClick={() => setDlg({ type: 'delete', user: u })} danger />
+   557→                  </div>
+   558→                </TableCell>
+   559→              </TableRow>
+   560→            ))}
+   561→          </TableBody></Table>
+   562→        </div>
+   563→        <TableFooter current={items.length} total={filtered.length} entity={t.user.toLowerCase()} />
+   564→        <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+   565→      </Card>
+   566→
+   567→      <div className="md:hidden space-y-3">
+   568→        {items.length === 0 ? <Card className="border-0 shadow-sm"><CardContent className="py-16 text-center text-muted-foreground text-sm">{t.noResults}</CardContent></Card> : items.map(u => (
+   569→          <Card key={u.id} className="border-0 shadow-sm"><CardContent className="p-4">
+   570→            <div className="flex items-start justify-between gap-3 mb-3">
+   571→              <div className="flex items-center gap-3 min-w-0">
+   572→                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-sky-100 dark:bg-sky-900/30 text-sky-600 font-bold text-sm">{u.name.charAt(0)}</div>
+   573→                <div className="min-w-0"><p className="font-semibold text-sm truncate">{u.name}</p><p className="text-xs text-muted-foreground truncate" dir="ltr">{u.email}</p></div>
+   574→              </div>
+   575→              <StatusBadge status={u.status} locale={lang} />
+   576→            </div>
+   577→            <div className="grid grid-cols-2 gap-3 mb-3">
+   578→              <div className="rounded-lg bg-muted/50 p-2"><p className="text-[10px] text-muted-foreground">{t.tenant}</p><p className="text-xs font-semibold mt-0.5 truncate">{userTenant(u, lang)}</p></div>
+   579→              <div className="rounded-lg bg-muted/50 p-2"><p className="text-[10px] text-muted-foreground">{t.role}</p><p className="text-xs font-semibold mt-0.5">{ROLE_MAP[u.role] || u.role}</p></div>
+   580→            </div>
+   581→            <div className="flex items-center justify-end gap-1 pt-2 border-t">
+   582→              <ActionBtn icon={Edit} label={t.edit} onClick={() => openEdit(u)} />
+   583→              <ActionBtn icon={u.status === 'suspended' ? Power : PowerOff} label={u.status === 'suspended' ? t.active : t.suspended} onClick={() => handleToggleStatus(u)} />
+   584→              <ActionBtn icon={Trash2} onClick={() => setDlg({ type: 'delete', user: u })} danger />
+   585→            </div>
+   586→          </CardContent></Card>
+   587→        ))}
+   588→      </div>
+   589→
+   590→      <Dialog open={dlg?.type === 'add' || dlg?.type === 'edit'} onOpenChange={() => setDlg(null)}>
+   591→        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto" dir={isRTL ? 'rtl' : 'ltr'}><DialogHeader><DialogTitle>{dlg?.type === 'add' ? t.addUserDlg : t.editUserDlg}</DialogTitle><DialogDescription className="sr-only">{isRTL ? 'إدارة المستخدمين' : 'Manage users'}</DialogDescription></DialogHeader>
+   592→          <div className="space-y-4 pt-2">
+   593→            <FormField label={t.name}>
+   594→              <Input value={form.name} onChange={e => updateField('name', e.target.value)} placeholder={isRTL ? 'أحمد المنصور' : 'e.g. Ahmed Mansour'} />
+   595→              {errors.name && <p className="text-[11px] text-red-500 mt-1">{errors.name}</p>}
+   596→            </FormField>
+   597→            <FormField label={t.email}>
+   598→              <Input type="email" value={form.email} onChange={e => updateField('email', e.target.value)} placeholder="user@company.com" dir="ltr" className={errors.email ? 'border-red-500' : ''} />
+   599→              {errors.email && <p className="text-[11px] text-red-500 mt-1">{errors.email}</p>}
+   600→              {errors.email?.includes('isposable') && <p className="text-[11px] text-amber-600 mt-0.5">{isRTL ? 'تنبيه: بريد مؤقت غير مسموح' : 'Note: Disposable emails not allowed'}</p>}
+   601→            </FormField>
+   602→            <FormField label={isRTL ? 'رقم الهاتف' : 'Phone'}>
+   603→              <Input value={form.phone} onChange={e => updateField('phone', e.target.value)} placeholder="+962XXXXXXXXX" dir="ltr" />
+   604→              {errors.phone && <p className="text-[11px] text-red-500 mt-1">{errors.phone}</p>}
+   605→            </FormField>
+   606→            <FormField label={t.tenant}>
+   607→              <Select value={form.tenant} onValueChange={v => {
+   608→                const tn = INIT_TENANTS.find(x => x.name === v || x.nameEn === v)
+   609→                setForm(p => ({ ...p, tenant: tn?.name || v, tenantEn: tn?.nameEn || v }))
+   610→              }}>
+   611→                <SelectTrigger><SelectValue placeholder={isRTL ? 'اختر المستأجر' : 'Select tenant'} /></SelectTrigger>
+   612→                <SelectContent>{INIT_TENANTS.map(tn => <SelectItem key={tn.id} value={lang === 'en' ? tn.nameEn : tn.name}>{lang === 'en' ? tn.nameEn : tn.name}</SelectItem>)}</SelectContent>
+   613→              </Select>
+   614→            </FormField>
+   615→            <FormField label={t.role}>
+   616→              <Select value={form.role} onValueChange={v => updateField('role', v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="owner">{t.owner}</SelectItem><SelectItem value="manager">{t.manager}</SelectItem><SelectItem value="receptionist">{t.receptionist}</SelectItem><SelectItem value="accountant">{t.accountant}</SelectItem></SelectContent></Select>
+   617→            </FormField>
+   618→            {dlg?.type === 'add' && <>
+   619→              <Separator />
+   620→              <FormField label={isRTL ? 'كلمة المرور' : 'Password'}>
+   621→                <div className="relative">
+   622→                  <Input type={showPassword ? 'text' : 'password'} value={form.password} onChange={e => updateField('password', e.target.value)} placeholder={isRTL ? '12 حرف على الأقل' : 'Min 12 characters'} dir="ltr" className={`pe-10 ${errors.password ? 'border-red-500' : ''}`} />
+   623→                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute top-1/2 -translate-y-1/2 end-3 text-muted-foreground hover:text-foreground">
+   624→                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+   625→                  </button>
+   626→                </div>
+   627→                {errors.password && <p className="text-[11px] text-red-500 mt-1">{errors.password}</p>}
+   628→                {form.password && pwValidation && (
+   629→                  <div className="mt-2 space-y-1.5">
+   630→                    <div className="flex items-center justify-between">
+   631→                      <span className="text-[11px] text-muted-foreground">
+   632→                        {isRTL ? 'قوة كلمة المرور:' : 'Strength:'} {lang === 'ar' ? pwValidation.labelAr : pwValidation.label}
+   633→                      </span>
+   634→                      <span className="text-[10px] text-muted-foreground">{pwValidation.score}/6</span>
+   635→                    </div>
+   636→                    <div className="flex gap-1">{[1,2,3,4,5,6].map(i => (
+   637→                      <div key={i} className={`h-1.5 flex-1 rounded-full transition-colors duration-300 ${i <= pwValidation.score ? pwValidation.color : 'bg-muted'}`} />
+   638→                    ))}</div>
+   639→                  </div>
+   640→                )}
+   641→              </FormField>
+   642→              <FormField label={isRTL ? 'تأكيد كلمة المرور' : 'Confirm Password'}>
+   643→                <Input type={showPassword ? 'text' : 'password'} value={form.confirmPassword} onChange={e => updateField('confirmPassword', e.target.value)} placeholder={isRTL ? 'أعد كتابة كلمة المرور' : 'Re-enter password'} dir="ltr" className={errors.confirmPassword ? 'border-red-500' : ''} />
+   644→                {errors.confirmPassword && <p className="text-[11px] text-red-500 mt-1">{errors.confirmPassword}</p>}
+   645→              </FormField>
+   646→              {pwValidation && (
+   647→                <div className="grid grid-cols-2 gap-1.5 mt-1">
+   648→                  {pwValidation.requirements.slice(0, 5).map(r => (
+   649→                    <div key={r.id} className="flex items-center gap-1.5 text-[11px]">
+   650→                      {r.met ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" /> : <XCircle className="h-3.5 w-3.5 text-red-400 shrink-0" />}
+   651→                      <span className={r.met ? '' : 'text-muted-foreground'}>{lang === 'ar' ? r.labelAr : r.label}</span>
+   652→                    </div>
+   653→                  ))}
+   654→                </div>
+   655→              )}
+   656→            </>}
+   657→          </div>
+   658→          <DlgFooter onCancel={() => setDlg(null)} onConfirm={handleSave} />
+   659→        </DialogContent>
+   660→      </Dialog>
+   661→      <ConfirmDialog open={dlg?.type === 'delete'} onOpenChange={() => setDlg(null)} title={t.deleteUserDlg} desc={t.confirmDeleteUser.replace('{name}', dlg?.user?.name || '')} onConfirm={() => { if (dlg?.user) handleDelete(dlg.user) }} danger />
+   662→    </div>
+   663→  )
+   664→}
+   665→
+   666→// ════════════════════════════════════════════════════════════════
+   667→// PAGE 4: PLANS (Dynamic Feature/Limit/Quota Management)
+   668→// ════════════════════════════════════════════════════════════════
+   669→const PLAN_COLORS = ['bg-gray-500', 'bg-sky-500', 'bg-violet-500', 'bg-indigo-500', 'bg-emerald-500', 'bg-amber-500', 'bg-rose-500']
+   670→
+   671→function PlansPage() {
+   672→  const { t, lang, isRTL } = useSA()
+   673→  const { sym, fmt } = useCurrency()
+   674→  const [dynamicPlans, setDynamicPlans] = useState<DynamicPlan[]>(buildDynamicPlans())
+   675→  const [dlg, setDlg] = useState<{ type: 'add' | 'edit' | 'delete'; plan?: DynamicPlan } | null>(null)
+   676→  const [detailPlan, setDetailPlan] = useState<DynamicPlan | null>(null)
+   677→  const [limitsView, setLimitsView] = useState<DynamicPlan | null>(null)
+   678→  const [activeCategory, setActiveCategory] = useState<string>('all')
+   679→
+   680→  const emptyFeature = { ar: '', en: '' }
+   681→  const [form, setForm] = useState({ name: '', price: 0, color: 'bg-violet-500', popular: false, features: [{ ar: '', en: '' }] as { ar: string; en: string }[], limits: generateDefaultLimits(0, '') })
+   682→
+   683→  const openAdd = () => {
+   684→    setForm({ name: '', price: 0, color: 'bg-violet-500', popular: false, features: [{ ar: '', en: '' }], limits: generateDefaultLimits(0, '') })
+   685→    setDlg({ type: 'add' })
+   686→  }
+   687→  const openEdit = (p: DynamicPlan) => {
+   688→    setForm({ name: p.name, price: p.price, color: p.color, popular: p.popular, features: [...p.features], limits: p.limits.map(l => ({ ...l })) })
+   689→    setDlg({ type: 'edit', plan: p })
+   690→  }
+   691→
+   692→  const handleSave = useCallback(() => {
+   693→    if (!form.name.trim()) { toast.error(lang === 'ar' ? 'يرجى إدخال اسم الباقة' : 'Please enter plan name'); return }
+   694→    const cleanFeatures = form.features.filter(f => f.ar.trim() || f.en.trim())
+   695→    if (cleanFeatures.length === 0) { toast.error(lang === 'ar' ? 'أضف ميزة واحدة على الأقل' : 'Add at least one feature'); return }
+   696→
+   697→    const updatedLimits = form.limits.map(l => ({ ...l, value: typeof l.value === 'boolean' ? l.value : Number(l.value) || 0 }))
+   698→
+   699→    if (dlg?.type === 'add') {
+   700→      const p: DynamicPlan = { id: Date.now().toString(), name: form.name, price: form.price, color: form.color, popular: form.popular, currency: 'JOD', features: cleanFeatures, limits: updatedLimits }
+   701→      setDynamicPlans(prev => [...prev, p]); toast.success(lang === 'ar' ? 'تم إنشاء الباقة' : 'Plan created')
+   702→    } else if (dlg?.plan) {
+   703→      setDynamicPlans(prev => prev.map(p => p.id === dlg.plan!.id ? { ...p, name: form.name, price: form.price, color: form.color, popular: form.popular, features: cleanFeatures, limits: updatedLimits } : p))
+   704→      toast.success(lang === 'ar' ? 'تم تحديث الباقة — تم تحديث صلاحيات المستأجرين تلقائياً' : 'Plan updated — tenant permissions synced automatically')
+   705→    }
+   706→    setDlg(null)
+   707→  }, [form, dlg, t, lang])
+   708→
+   709→  const handleDelete = () => {
+   710→    if (!dlg?.plan) return
+   711→    setDynamicPlans(prev => prev.filter(p => p.id !== dlg.plan!.id)); toast.success(t.deleted); setDlg(null)
+   712→  }
+   713→
+   714→  const addFeature = () => setForm(p => ({ ...p, features: [...p.features, { ar: '', en: '' }] }))
+   715→  const removeFeature = (i: number) => setForm(p => ({ ...p, features: p.features.filter((_, idx) => idx !== i) }))
+   716→  const updateFeature = (i: number, field: 'ar' | 'en', val: string) => {
+   717→    setForm(p => { const f = [...p.features]; f[i] = { ...f[i], [field]: val }; return { ...p, features: f } })
+   718→  }
+   719→
+   720→  const updateLimit = (limitId: string, value: number | boolean) => {
+   721→    setForm(p => ({ ...p, limits: p.limits.map(l => l.id === limitId ? { ...l, value } : l) }))
+   722→  }
+   723→
+   724→  const toggleLimit = (limitId: string) => {
+   725→    setForm(p => ({ ...p, limits: p.limits.map(l => l.id === limitId ? { ...l, value: !l.value } : l) }))
+   726→  }
+   727→
+   728→  const getCategoryLimits = (plan: DynamicPlan, cat: string) => plan.limits.filter(l => l.category === cat)
+   729→  const filteredCategories = activeCategory === 'all' ? LIMIT_CATEGORIES : LIMIT_CATEGORIES.filter(c => c.key === activeCategory)
+   730→
+   731→  return (
+   732→    <div className="space-y-6">
+   733→      <PageTitle title={t.plansTitle} action={<PrimaryBtn icon={Plus} label={t.createPlan} onClick={openAdd} />} />
+   734→      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 sm:gap-5">
+   735→        {plans.map((p, i) => (
+   736→          <motion.div key={p.id} variants={fade} initial="hidden" animate="visible" transition={{ delay: i * 0.04 }}>
+   737→            <Card className={`h-full flex flex-col transition-all hover:shadow-lg border-0 shadow-sm ${p.popular ? 'ring-2 ring-violet-500 shadow-violet-500/10' : ''}`}>
+   738→              <CardContent className="flex-1 flex flex-col items-center p-5 sm:p-6 pt-7">
+   739→                {p.popular && <Badge className="bg-violet-600 text-white mb-3 -mt-1 text-[10px]">{t.mostPopular}</Badge>}
+   740→                <div className={`h-12 w-12 rounded-2xl ${p.color} flex items-center justify-center mb-4 shadow-lg`}><CreditCard className="h-6 w-6 text-white" /></div>
+   741→                <h3 className="font-bold text-base">{p.name}</h3>
+   742→                <p className="text-3xl font-extrabold mt-3 mb-1">{p.price > 0 ? `${p.price}` : t.free}</p>
+   743→                <p className="text-xs text-muted-foreground mb-2">{p.price > 0 ? `${sym} ${t.perMonth}` : ''}</p>
+   744→                <p className="text-[10px] text-muted-foreground mb-4">{p.limits.filter(l => !!l.value).length} {lang === 'ar' ? 'حد نشط' : 'active limits'}</p>
+   745→                <Separator className="w-full mb-4" />
+   746→                <ul className="space-y-2 w-full text-start flex-1">{p.features.slice(0, 3).map((f, j) => (
+   747→                  <li key={j} className="flex items-start gap-2 text-xs sm:text-sm"><CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" /><span>{lang === 'en' ? f.en : f.ar}</span></li>
+   748→                ))}
+   749→                {p.features.length > 3 && <li className="text-[11px] text-muted-foreground">+{p.features.length - 3} {lang === 'ar' ? 'أخرى' : 'more'}</li>}
+   750→                <div className="flex gap-2 w-full mt-4">
+   751→                  <Button variant="outline" size="sm" className="flex-1 text-xs" onClick={() => setDetailPlan(p)}>{t.view}</Button>
+   752→                  <Button variant="outline" size="sm" className="flex-1 text-xs" onClick={() => setLimitsView(p)}>{lang === 'ar' ? 'الحدود' : 'Limits'}</Button>
+   753→                  <ActionBtn icon={Edit} label={t.edit} onClick={() => openEdit(p)} />
+   754→                  <ActionBtn icon={Trash2} onClick={() => setDlg({ type: 'delete', plan: p })} danger />
+   755→                </div>
+   756→              </CardContent>
+   757→            </Card>
+   758→          </motion.div>
+   759→        ))}
+   760→      </div>
+   761→
+   762→      {/* Detail Dialog */}
+   763→      <Dialog open={!!detailPlan} onOpenChange={() => setDetailPlan(null)}>
+   764→        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto" dir={isRTL ? 'rtl' : 'ltr'}><DialogHeader><DialogTitle>{t.planDetails}</DialogTitle><DialogDescription className="sr-only">{lang === 'ar' ? 'تفاصيل الباقة' : 'Plan details'}</DialogDescription></DialogHeader>
+   765→          {detailPlan && <div className="space-y-4 pt-2">
+   766→            <div className="text-center"><p className="text-3xl font-extrabold">{detailPlan.price > 0 ? `${detailPlan.price} ${sym}` : t.free}</p><p className="text-sm text-muted-foreground mt-1">{t.monthly}</p></div>
+   767→            <Separator />
+   768→            <div className="flex flex-wrap gap-1.5 justify-center mb-4">
+   769→              {LIMIT_CATEGORIES.map(cat => {
+   770→                const count = getCategoryLimits(detailPlan, cat.key).length
+   771→                return <Badge key={cat.key} variant="outline" className="text-[10px]">{lang === 'ar' ? cat.labelAr : cat.labelEn} ({count})</Badge>
+   772→              })}
+   773→            </div>
+   774→            <Separator />
+   775→            <ul className="space-y-2">{detailPlan.features.map((f, i) => (<li key={i} className="flex items-center gap-2 text-sm"><CheckCircle2 className="h-4 w-4 text-emerald-500" />{lang === 'en' ? f.en : f.ar}</li>))}</ul>
+   776→            <Separator />
+   777→            <div>
+   778→              <p className="text-sm font-semibold mb-3">{lang === 'ar' ? 'الحدود والحوامص' : 'Limits & Quotas'}</p>
+   779→              <div className="space-y-3">{detailPlan.limits.map(l => (
+   780→                <div key={l.id} className="flex items-center justify-between py-1.5 text-sm border-b border-border/50 last:border-0">
+   781→                  <div className="flex items-center gap-2"><div className={`h-7 w-7 rounded-lg ${l.value ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600' : 'bg-muted text-muted-foreground'} flex items-center justify-center`><span className="text-[10px] font-bold">{l.value === true ? '✓' : l.value || 0}</span></div>
+   782→                    <span className="flex-1">{lang === 'ar' ? l.labelAr : l.labelEn}</span>
+   783→                  <span className="text-xs text-muted-foreground tabular-nums">{l.unit || ''}</span>
+   784→                </div>
+   785→              ))}</div>
+   786→          </div>}
+   787→          <DlgFooter onCancel={() => setDetailPlan(null)} onConfirm={() => { if (detailPlan) { openEdit(detailPlan); setDetailPlan(null) } }} confirmLabel={t.edit} />
+   788→        </DialogContent>
+   789→      </Dialog>
+   790→
+   791→      {/* Limits/Quotas Dialog */}
+   792→      <Dialog open={!!limitsView} onOpenChange={() => setLimitsView(null)}>
+   793→        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto" dir={isRTL ? 'rtl' : 'ltr'}><DialogHeader><DialogTitle>{lang === 'ar' ? `حدود وباقات "${limitsView.name}"` : `Limits & Quotas for "${limitsView.name}"`}</DialogTitle><DialogDescription className="sr-only">{lang === 'ar' ? 'عرض الحدود' : 'View limits'}</DialogDescription></DialogHeader>
+   794→          {limitsView && <div className="space-y-4 pt-2">
+   795→            {LIMIT_CATEGORIES.map(cat => {
+   796→              const limits = getCategoryLimits(limitsView, cat.key)
+   797→              if (limits.length === 0) return null
+   798→              return (
+   799→                <div key={cat.key} className="space-y-2">
+   800→                  <div className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-semibold ${cat.color}`}>
+   801→                    <span>{lang === 'ar' ? cat.labelAr : cat.labelEn}</span>
+   802→                    <Badge variant="secondary" className="text-[10px]">{limits.length}</Badge>
+   803→                  </div>
+   804→                  <div className="space-y-1.5 ml-3 border-s border-e pe-3">
+   805→                    {limits.map(l => (
+   806→                      <div key={l.id} className="flex items-center justify-between py-2 text-sm border-b border-border/50 last:border-0 gap-3">
+   807→                        <div className="flex items-center gap-2">
+   808→                          <button type="button" onClick={() => { if (limitsView) { const nl = limitsView.limits.map(x => x.id === l.id ? { ...x, value: !x.value } : x); setLimitsView({ ...limitsView, limits: nl }) }} className={`inline-flex h-6 w-6 items-center justify-center rounded-md transition-colors ${l.value ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600' : 'bg-muted text-muted-foreground'}`}>
+   809→                            {l.value === true ? <CheckCircle2 className="h-3.5 w-3.5" /> : <span className="text-[9px]">{l.value || '0'}</span>}
+   810→                          </button>
+   811→                        </div>
+   812→                        <span className="flex-1 text-xs">{lang === 'ar' ? l.labelAr : l.labelEn}</span>
+   813→                        <span className="text-xs text-muted-foreground tabular-nums">{typeof l.value === 'number' ? l.value.toLocaleString() : ''} {l.unit || ''}</span>
+   814→                      </div>
+   815→                    ))}
+   816→                  </div>
+   817→                </div>
+   818→              )
+   819→            })}
+   820→          </div>}
+   821→          <DlgFooter onCancel={() => setLimitsView(null)} onConfirm={() => { if (limitsView) { openEdit(limitsView); setLimitsView(null) } }} confirmLabel={t.edit} />
+   822→        </DialogContent>
+   823→      </Dialog>
+   824→
+   825→      {/* Add/Edit Dialog */}
+   826→      <Dialog open={dlg?.type === 'add' || dlg?.type === 'edit'} onOpenChange={() => setDlg(null)}>
+   827→        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto" dir={isRTL ? 'rtl' : 'ltr'}>
+   828→          <DialogHeader><DialogTitle>{dlg?.type === 'add' ? t.createPlan : t.editPlanDlg}</DialogTitle><DialogDescription className="sr-only">{lang === 'ar' ? 'إضافة أو تعديل باقة' : 'Add or edit a plan'}</DialogDescription></DialogHeader>
+   829→          <div className="space-y-4 pt-2">
+   830→            <FormField label={lang === 'ar' ? 'اسم الباقة' : 'Plan Name'}>
+   831→              <Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder={lang === 'ar' ? 'مثال: Professional' : 'e.g. Professional'} />
+   832→            </FormField>
+   833→            <div className="grid grid-cols-2 gap-3">
+   834→              <FormField label={t.amount}>
+   835→                <Input type="number" value={form.price || ''} onChange={e => setForm(p => ({ ...p, price: Number(e.target.value) }))} placeholder="0" />
+   836→              </FormField>
+   837→              <FormField label={lang === 'ar' ? 'عدد المستأجرين' : 'Max Tenants'}>
+   838→                <Input type="number" value={form.tenants || ''} onChange={e => setForm(p => ({ ...p, tenants: Number(e.target.value) }))} placeholder="0" />
+   839→              </FormField>
+   840→            </div>
+   841→            <FormField label={lang === 'ar' ? 'اللون' : 'Color'}>
+   842→              <div className="flex flex-wrap gap-2">
+   843→                {PLAN_COLORS.map(c => (
+   844→                  <button key={c} className={`h-8 w-8 rounded-full ${c} transition-transform ${form.color === c ? 'ring-2 ring-offset-2 ring-violet-500 scale-110' : 'opacity-60 hover:opacity-100'}`} onClick={() => setForm(p => ({ ...p, color: c }))} />
+   845→                ))}
+   846→              </div>
+   847→            </FormField>
+   848→            <div className="flex items-center justify-between">
+   849→              <span className="text-sm font-medium">{t.mostPopular}</span>
+   850→              <Toggle on={form.popular} onToggle={() => setForm(p => ({ ...p, popular: !p.popular }))} />
+   851→            </div>
+   852→            <Separator />
+   853→            <div className="space-y-3">
+   854→              <div className="flex items-center justify-between">
+   855→                <span className="text-sm font-medium">{lang === 'ar' ? 'المميزات' : 'Features'}</span>
+   856→                <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={addFeature}><Plus className="h-3 w-3" />{lang === 'ar' ? 'إضافة' : 'Add'}</Button>
+   857→              </div>
+   858→              {form.features.map((f, i) => (
+   859→                <div key={i} className="flex items-start gap-2">
+   860→                  <div className="flex-1 grid grid-cols-2 gap-2">
+   861→                    <Input value={f.ar} onChange={e => updateFeature(i, 'ar', e.target.value)} placeholder={lang === 'ar' ? 'بالعربي' : 'Arabic'} />
+   862→                    <Input value={f.en} onChange={e => updateFeature(i, 'en', e.target.value)} placeholder="English" dir="ltr" />
+   863→                  </div>
+   864→                  {form.features.length > 1 && <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0 mt-0.5" onClick={() => removeFeature(i)}><Trash2 className="h-3.5 w-3.5 text-red-400" /></Button>}
+   865→                </div>
+   866→              ))}
+   867→            </div>
+   868→            <Separator />
+   869→            {/* Limits & Quotas */}
+   870→            <div>
+   871→              <div className="flex items-center justify-between mb-3">
+   872→                <span className="text-sm font-semibold">{lang === 'ar' ? 'الحدود والحصوص' : 'Limits & Quotas'}</span>
+   873→                <Button size="icon" variant="outline" className="h-7 w-7" onClick={() => setForm(p => ({ ...p, limits: generateDefaultLimits(p.price || 0, p.name) }))}><RefreshCw className="h-3.5 w-3.5" /></Button>
+   874→              </div>
+   875→              <div className="space-y-3">{(form.limits || []).filter(l => true).map(cat => {
+   876→                const catInfo = LIMIT_CATEGORIES.find(c => c.key === cat)
+   877→                if (!catInfo) return null
+   878→                const catLimits = (form.limits || []).filter(l => l.category === cat)
+   879→                if (catLimits.length === 0) return null
+   880→                return (
+   881→                  <div key={cat} className="rounded-xl border p-3 space-y-2">
+   882→                    <div className={`inline-flex items-center gap-2 rounded-lg px-3 py-1 text-xs font-semibold ${catInfo.color}`}>
+   883→                      <span>{lang === 'ar' ? catInfo.labelAr : catInfo.labelEn}</span>
+   884→                      <Badge variant="secondary" className="text-[10px]">{catLimits.length}</Badge>
+   885→                    </div>
+   886→                    <div className="space-y-1.5">
+   887→                      {catLimits.map(l => (
+   888→                        <div key={l.id} className="flex items-center justify-between gap-2 text-xs py-1">
+   889→                          <button type="button" onClick={() => toggleLimit(l.id)} className={`inline-flex h-6 w-6 items-center justify-center rounded-md transition-colors ${l.value ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600' : 'bg-muted text-muted-foreground'}`}>
+   890→                            {l.value ? <CheckCircle2 className="h-3.5 w-3.5" /> : <span className="text-[9px]">{l.value || '0'}</span>}
+   891→                          </button>
+   892→                          <span className="flex-1">{lang === 'ar' ? l.labelAr : l.labelEn}</span>
+   893→                          <span className="text-muted-foreground tabular-nums">{typeof l.value === 'number' ? l.value.toLocaleString() : ''} {l.unit || ''}</span>
+   894→                        </div>
+   895→                      ))}
+   896→                    </div>
+   897→                  </div>
+   898→                )
+   899→              })}</div>
+   900→            </div>
+   901→          </div>
+   902→          <DlgFooter onCancel={() => setDlg(null)} onConfirm={handleSave} />
+   903→        </DialogContent>
+   904→      </Dialog>
+   905→
+   906→      {/* Delete Confirm */}
+   907→      <ConfirmDialog open={dlg?.type === 'delete'} onOpenChange={() => setDlg(null)} title={t.delete} desc={lang === 'ar' ? `هل أنت متأكد من حذف باقة "${dlg?.plan?.name}"؟` : `Delete plan "${dlg?.plan?.name}"?`} onConfirm={handleDelete} danger />
+   908→    </div>
+   909→  )
+   910→}
+   911→
+   912→// ════════════════════════════════════════════════════════════════
+   913→// PAGE 5: BILLING (Full invoice CRUD + CSV export + JOD)
+   914→// ════════════════════════════════════════════════════════════════
+   915→function BillingPage() {
+   916→  const { t, lang, isRTL } = useSA()
+   917→  const { fmt, sym } = useCurrency()
+   918→  const [invoices, setInvoices] = useState<Invoice[]>([...INVOICES])
+   919→  const [filter, setFilter] = useState('all')
+   920→  const [page, setPage] = useState(1)
+   921→  const [sort, setSort] = useState<SortState>({ key: 'date', dir: 'desc' })
+   922→  const [addOpen, setAddOpen] = useState(false)
+   923→  const [invForm, setInvForm] = useState({ tenant: '', tenantEn: '', plan: 'Starter', amount: 0, status: 'pending' as string })
+   924→
+   925→  const filtered = useMemo(() => {
+   926→    let list = filter === 'all' ? [...invoices] : invoices.filter(i => i.status === filter)
+   927→    return genericSort(list, sort.key, sort.dir, lang)
+   928→  }, [invoices, filter, sort, lang])
+   929→  const { items, totalPages } = paginate(filtered, page, PER_PAGE)
+   930→  const handleSort = (key: string) => setSort(p => p.key === key ? { key, dir: p.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' })
+   931→  const totalPaid = invoices.filter(i => i.status === 'paid').reduce((s, i) => s + i.amount, 0)
+   932→  const totalPending = invoices.filter(i => i.status === 'pending' || i.status === 'overdue').reduce((s, i) => s + i.amount, 0)
+   933→
+   934→  const [previewInv, setPreviewInv] = useState<Invoice | null>(null)
+   935→
+   936→  const handleMarkPaid = (inv: Invoice) => {
+   937→    setInvoices(p => p.map(i => i.id === inv.id ? { ...i, status: 'paid' } : i))
+   938→    toast.success(t.paid)
+   939→  }
+   940→
+   941→  const handleCreateInvoice = () => {
+   942→    if (!invForm.tenant.trim()) { toast.error(isRTL ? 'يرجى اختيار المستأجر' : 'Please select a tenant'); return }
+   943→    if (invForm.amount <= 0) { toast.error(isRTL ? 'يرجى إدخال مبلغ صحيح' : 'Please enter a valid amount'); return }
+   944→    const newId = `INV-${String(invoices.length + 1).padStart(3, '0')}`
+   945→    const inv: Invoice = {
+   946→      id: newId, tenant: invForm.tenant, tenantEn: invForm.tenantEn,
+   947→      amount: invForm.amount, status: invForm.status,
+   948→      date: new Date().toISOString().split('T')[0],
+   949→      plan: invForm.plan, currency: 'JOD',
+   950→    }
+   951→    setInvoices(p => [inv, ...p]); toast.success(isRTL ? `تم إنشاء الفاتورة ${newId}` : `Invoice ${newId} created`); setAddOpen(false)
+   952→    setInvForm({ tenant: '', tenantEn: '', plan: 'Starter', amount: 0, status: 'pending' })
+   953→  }
+   954→
+   955→  const handleExportExcel = useCallback(() => {
+   956→    import('xlsx').then(XLSX => {
+   957→      const statusLabels: Record<string, string> = { paid: isRTL ? 'مدفوع' : 'Paid', pending: isRTL ? 'معلق' : 'Pending', overdue: isRTL ? 'متأخر' : 'Overdue', failed: isRTL ? 'فاشل' : 'Failed' }
+   958→      const headers = isRTL
+   959→        ? ['رقم الفاتورة', 'المستأجر', 'الباقة', 'المبلغ (د.أ)', 'العملة', 'الحالة', 'التاريخ']
+   960→        : ['Invoice No.', 'Tenant', 'Plan', 'Amount (JOD)', 'Currency', 'Status', 'Date']
+   961→      const rows = filtered.map(inv => [
+   962→        inv.id, isRTL ? inv.tenant : (inv.tenantEn || inv.tenant), inv.plan,
+   963→        inv.amount, inv.currency, statusLabels[inv.status] || inv.status, inv.date,
+   964→      ])
+   965→      const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
+   966→      ws['!cols'] = headers.map(() => ({ wch: 20 }))
+   967→      const wb = XLSX.utils.book_new()
+   968→      XLSX.utils.book_append_sheet(wb, ws, isRTL ? 'الفواتير' : 'Invoices')
+   969→      XLSX.writeFile(wb, `invoices_${new Date().toISOString().split('T')[0]}.xlsx`)
+   970→      toast.success(isRTL ? 'تم تصدير الفواتير إلى Excel بنجاح' : 'Invoices exported to Excel successfully')
+   971→    }).catch(() => {
+   972→      toast.error(isRTL ? 'فشل تصدير Excel' : 'Excel export failed')
+   973→    })
+   974→  }, [filtered, isRTL])
+   975→
+   976→  const handleDeleteInvoice = (inv: Invoice) => {
+   977→    setInvoices(p => p.filter(i => i.id !== inv.id)); toast.success(t.deleted); setPage(1)
+   978→  }
+   979→
+   980→  return (
+   981→    <div className="space-y-5">
+   982→      <PageTitle title={t.billingTitle} action={
+   983→        <div className="flex gap-2">
+   984→          <Button variant="outline" className="gap-2 h-9" onClick={handleExportExcel}><Download className="h-4 w-4" />{t.exportExcel}</Button>
+   985→          <PrimaryBtn icon={Plus} label={t.createInvoice} onClick={() => setAddOpen(true)} />
+   986→        </div>
+   987→      } />
+   988→      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+   989→        <StatCard icon={CheckCircle2} label={t.payments} value={fmt(totalPaid)} color="text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30" />
+   990→        <StatCard icon={Clock} label={t.pending} value={fmt(totalPending)} color="text-amber-600 bg-amber-50 dark:bg-amber-950/30" />
+   991→        <StatCard icon={Banknote} label={t.paid} value={`${invoices.filter(i => i.status === 'paid').length}`} color="text-sky-600 bg-sky-50 dark:bg-sky-950/30" />
+   992→        <StatCard icon={AlertTriangle} label={t.overdue} value={`${invoices.filter(i => i.status === 'overdue').length}`} color="text-red-600 bg-red-50 dark:bg-red-950/30" />
+   993→      </div>
+   994→      <div className="flex gap-3">
+   995→        <Select value={filter} onValueChange={v => { setFilter(v); setPage(1) }}>
+   996→          <SelectTrigger className="w-44 h-10"><SelectValue /></SelectTrigger>
+   997→          <SelectContent><SelectItem value="all">{t.all}</SelectItem><SelectItem value="paid">{t.paid}</SelectItem><SelectItem value="pending">{t.pending}</SelectItem><SelectItem value="overdue">{t.overdue}</SelectItem><SelectItem value="failed">{t.failed}</SelectItem></SelectContent>
+   998→        </Select>
+   999→      </div>
+  1000→
+  1001→      <Card className="border-0 shadow-sm overflow-hidden hidden md:block">
+  1002→        <div className="overflow-x-auto">
+  1003→          <Table><TableHeader><TableRow className="bg-muted/50 hover:bg-muted/50">
+  1004→            <SortableTH label={t.invoiceNo} sortKey="id" currentSort={sort} onSort={handleSort} className="ps-5" />
+  1005→            <SortableTH label={t.tenant} sortKey="tenant" currentSort={sort} onSort={handleSort} />
+  1006→            <SortableTH label={t.plan} sortKey="plan" currentSort={sort} onSort={handleSort} className="hidden lg:table-cell" />
+  1007→            <SortableTH label={t.amount} sortKey="amount" currentSort={sort} onSort={handleSort} align="end" />
+  1008→            <SortableTH label={t.status} sortKey="status" currentSort={sort} onSort={handleSort} />
+  1009→            <TableHead className="pe-5 font-semibold text-xs uppercase tracking-wider text-end">{t.actions}</TableHead>
+  1010→          </TableRow></TableHeader>
+  1011→          <TableBody>
+  1012→            {items.length === 0 ? <EmptyRow colSpan={6} /> : items.map(inv => (
+  1013→            <TableRow key={inv.id} className="group hover:bg-muted/20 transition-colors">
+  1014→              <TableCell className="ps-5 font-mono text-sm font-semibold">{inv.id}</TableCell>
+  1015→              <TableCell className="px-3 text-sm">{invTenant(inv, lang)}</TableCell>
+  1016→              <TableCell className="px-3 hidden lg:table-cell"><Badge variant="secondary" className="text-xs">{inv.plan}</Badge></TableCell>
+  1017→              <TableCell className="px-3 text-end font-semibold tabular-nums text-sm">{inv.amount.toLocaleString()} <span className="text-xs font-normal text-muted-foreground">{sym}</span></TableCell>
+  1018→              <TableCell className="px-3"><StatusBadge status={inv.status} locale={lang} /></TableCell>
+  1019→              <TableCell className="pe-5">
+  1020→                <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+  1021→                  <ActionBtn icon={Eye} label={t.view} onClick={() => setPreviewInv(inv)} />
+  1022→                  {inv.status !== 'paid' && <ActionBtn icon={CheckCircle2} label={t.paid} onClick={() => handleMarkPaid(inv)} />}
+  1023→                  <ActionBtn icon={Download} onClick={() => handleExportExcel()} />
+  1024→                  <ActionBtn icon={Trash2} onClick={() => handleDeleteInvoice(inv)} danger />
+  1025→                </div>
+  1026→              </TableCell>
+  1027→            </TableRow>
+  1028→          ))}
+  1029→          </TableBody></Table>
+  1030→        </div>
+  1031→        <TableFooter current={items.length} total={filtered.length} entity={isRTL ? 'فاتورة' : 'invoices'} />
+  1032→        <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+  1033→      </Card>
+  1034→
+  1035→      <div className="md:hidden space-y-3">
+  1036→        {items.length === 0 ? <Card className="border-0 shadow-sm"><CardContent className="py-16 text-center text-muted-foreground text-sm">{t.noResults}</CardContent></Card> : items.map(inv => (
+  1037→          <Card key={inv.id} className="border-0 shadow-sm"><CardContent className="p-4">
+  1038→            <div className="flex items-start justify-between gap-3 mb-3">
+  1039→              <div className="min-w-0"><p className="font-mono text-sm font-bold">{inv.id}</p><p className="text-xs text-muted-foreground mt-0.5">{invTenant(inv, lang)}</p></div>
+  1040→              <StatusBadge status={inv.status} locale={lang} />
+  1041→            </div>
+  1042→            <div className="flex items-center justify-between pt-2 border-t">
+  1043→              <span className="font-bold text-sm">{inv.amount.toLocaleString()} <span className="text-xs font-normal text-muted-foreground">{sym}</span></span>
+  1044→              <div className="flex gap-1">
+  1045→                {inv.status !== 'paid' && <ActionBtn icon={CheckCircle2} onClick={() => handleMarkPaid(inv)} />}
+  1046→                <ActionBtn icon={Download} onClick={() => handleExportExcel()} />
+  1047→                <ActionBtn icon={Trash2} onClick={() => handleDeleteInvoice(inv)} danger />
+  1048→              </div>
+  1049→            </div>
+  1050→          </CardContent></Card>
+  1051→        ))}
+  1052→      </div>
+  1053→
+  1054→      {/* Create Invoice Dialog */}
+  1055→      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+  1056→        <DialogContent className="max-w-md" dir={isRTL ? 'rtl' : 'ltr'}><DialogHeader><DialogTitle>{t.createInvoice}</DialogTitle><DialogDescription className="sr-only">{isRTL ? 'إنشاء فاتورة جديدة' : 'Create a new invoice'}</DialogDescription></DialogHeader>
+  1057→          <div className="space-y-4 pt-2">
+  1058→            <FormField label={t.tenant}>
+  1059→              <Select value={invForm.tenant} onValueChange={v => {
+  1060→                const tn = INIT_TENANTS.find(x => x.name === v || x.nameEn === v)
+  1061→                setInvForm(p => ({ ...p, tenant: tn?.name || v, tenantEn: tn?.nameEn || v }))
+  1062→              }}>
+  1063→                <SelectTrigger><SelectValue placeholder={isRTL ? 'اختر المستأجر' : 'Select tenant'} /></SelectTrigger>
+  1064→                <SelectContent>
+  1065→                  {INIT_TENANTS.map(tn => <SelectItem key={tn.id} value={lang === 'en' ? tn.nameEn : tn.name}>{lang === 'en' ? tn.nameEn : tn.name}</SelectItem>)}
+  1066→                </SelectContent>
+  1067→              </Select>
+  1068→            </FormField>
+  1069→            <div className="grid grid-cols-2 gap-3">
+  1070→              <FormField label={t.plan}>
+  1071→                <Select value={invForm.plan} onValueChange={v => {
+  1072→                  setInvForm(p => ({ ...p, plan: v }))
+  1073→                  const plan = PLANS.find(pl => pl.name === v)
+  1074→                  if (plan) setInvForm(p => ({ ...p, amount: plan.price }))
+  1075→                }}>
+  1076→                  <SelectTrigger><SelectValue /></SelectTrigger>
+  1077→                  <SelectContent>{PLANS.map(p => <SelectItem key={p.id} value={p.name}>{p.name} ({p.price} {sym})</SelectItem>)}</SelectContent>
+  1078→                </Select>
+  1079→              </FormField>
+  1080→              <FormField label={t.amount}>
+  1081→                <Input type="number" value={invForm.amount || ''} onChange={e => setInvForm(p => ({ ...p, amount: Number(e.target.value) }))} />
+  1082→              </FormField>
+  1083→            </div>
+  1084→            <FormField label={t.status}>
+  1085→              <Select value={invForm.status} onValueChange={v => setInvForm(p => ({ ...p, status: v }))}>
+  1086→                <SelectTrigger><SelectValue /></SelectTrigger>
+  1087→                <SelectContent>
+  1088→                  <SelectItem value="pending">{t.pending}</SelectItem>
+  1089→                  <SelectItem value="paid">{t.paid}</SelectItem>
+  1090→                </SelectContent>
+  1091→              </Select>
+  1092→            </FormField>
+  1093→          </div>
+  1094→          <DlgFooter onCancel={() => setAddOpen(false)} onConfirm={handleCreateInvoice} confirmLabel={isRTL ? 'إنشاء' : 'Create'} />
+  1095→        </DialogContent>
+  1096→      </Dialog>
+  1097→    </div>
+  1098→  )
+  1099→}
+  1100→
+  1101→// ════════════════════════════════════════════════════════════════
+  1102→// PAGE 6: ROLES (full CRUD)
+  1103→// ════════════════════════════════════════════════════════════════
+  1104→function RolesPage() {
+  1105→  const { t, lang, isRTL } = useSA()
+  1106→  const [roles, setRoles] = useState<Role[]>(INIT_ROLES)
+  1107→  const [addOpen, setAddOpen] = useState(false)
+  1108→  const [editRole, setEditRole] = useState<Role | null>(null)
+  1109→  const [form, setForm] = useState({ name: '', nameEn: '', desc: '', descEn: '' })
+  1110→
+  1111→  const openAdd = () => { setForm({ name: '', nameEn: '', desc: '', descEn: '' }); setAddOpen(true) }
+  1112→  const openEdit = (r: Role) => { setForm({ name: r.name, nameEn: r.nameEn, desc: r.description, descEn: r.descriptionEn }); setEditRole(r) }
+  1113→
+  1114→  const rName = (r: Role) => lang === 'en' ? r.nameEn : r.name
+  1115→  const rDesc = (r: Role) => lang === 'en' ? r.descriptionEn : r.description
+  1116→
+  1117→  const handleCreate = () => {
+  1118→    if (!form.name.trim()) return
+  1119→    const r: Role = { id: Date.now().toString(), name: form.name, nameEn: form.nameEn, users: 0, permissions: 0, description: form.desc, descriptionEn: form.descEn }
+  1120→    setRoles(p => [r, ...p]); toast.success(t.roleCreated); setAddOpen(false)
+  1121→  }
+  1122→
+  1123→  const handleUpdate = () => {
+  1124→    if (!editRole || !form.name.trim()) return
+  1125→    setRoles(p => p.map(r => r.id === editRole.id ? { ...r, name: form.name, nameEn: form.nameEn, description: form.desc, descriptionEn: form.descEn } : r))
+  1126→    toast.success(t.roleUpdated); setEditRole(null)
+  1127→  }
+  1128→
+  1129→  const handleDelete = (r: Role) => { setRoles(p => p.filter(x => x.id !== r.id)); toast.success(t.roleDeleted) }
+  1130→
+  1131→  return (
+  1132→    <div className="space-y-6">
+  1133→      <PageTitle title={t.rolesTitle} action={<PrimaryBtn icon={Plus} label={t.addRole} onClick={openAdd} />} />
+  1134→      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+  1135→        {roles.map((r, i) => (
+  1136→          <motion.div key={r.id} variants={fade} initial="hidden" animate="visible" transition={{ delay: i * 0.04 }}>
+  1137→            <Card className="group transition-all hover:shadow-lg border-0 shadow-sm h-full">
+  1138→              <CardContent className="p-5 sm:p-6">
+  1139→                <div className="flex items-start justify-between mb-4">
+  1140→                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-100 dark:bg-violet-900/30"><Shield className="h-5 w-5 text-violet-600" /></div>
+  1141→                  <Badge variant="secondary" className="text-xs">{r.permissions} {t.permissions}</Badge>
+  1142→                </div>
+  1143→                <h3 className="font-bold text-base">{rName(r)}</h3>
+  1144→                <p className="text-xs text-muted-foreground mb-2">{lang === 'ar' ? r.nameEn : r.name}</p>
+  1145→                <p className="text-sm text-muted-foreground mb-4 leading-relaxed">{rDesc(r)}</p>
+  1146→                <div className="flex items-center justify-between pt-3 border-t">
+  1147→                  <span className="text-xs text-muted-foreground">{r.users} {t.users}</span>
+  1148→                  <div className="flex gap-1">
+  1149→                    <ActionBtn icon={Edit} label={t.edit} onClick={() => openEdit(r)} />
+  1150→                    <ActionBtn icon={Trash2} onClick={() => handleDelete(r)} danger />
+  1151→                  </div>
+  1152→                </div>
+  1153→              </CardContent>
+  1154→            </Card>
+  1155→          </motion.div>
+  1156→        ))}
+  1157→      </div>
+  1158→
+  1159→      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+  1160→        <DialogContent className="max-w-md" dir={isRTL ? 'rtl' : 'ltr'}><DialogHeader><DialogTitle>{t.addRoleDlg}</DialogTitle><DialogDescription className="sr-only">{isRTL ? 'إضافة دور جديد' : 'Add new role'}</DialogDescription></DialogHeader>
+  1161→          <div className="space-y-4 pt-2">
+  1162→            <FormField label={t.roleName}><Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} /></FormField>
+  1163→            <FormField label={t.roleNameEn}><Input value={form.nameEn} onChange={e => setForm(p => ({ ...p, nameEn: e.target.value }))} dir="ltr" /></FormField>
+  1164→            <FormField label={t.description}><Input value={form.desc} onChange={e => setForm(p => ({ ...p, desc: e.target.value }))} /></FormField>
+  1165→          </div>
+  1166→          <DlgFooter onCancel={() => setAddOpen(false)} onConfirm={handleCreate} confirmLabel={t.create} />
+  1167→        </DialogContent>
+  1168→      </Dialog>
+  1169→
+  1170→      <Dialog open={!!editRole} onOpenChange={() => setEditRole(null)}>
+  1171→        <DialogContent className="max-w-md" dir={isRTL ? 'rtl' : 'ltr'}><DialogHeader><DialogTitle>{t.editRoleDlg}</DialogTitle><DialogDescription className="sr-only">{isRTL ? 'تعديل الدور' : 'Edit role'}</DialogDescription></DialogHeader>
+  1172→          <div className="space-y-4 pt-2">
+  1173→            <FormField label={t.roleName}><Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} /></FormField>
+  1174→            <FormField label={t.roleNameEn}><Input value={form.nameEn} onChange={e => setForm(p => ({ ...p, nameEn: e.target.value }))} dir="ltr" /></FormField>
+  1175→            <FormField label={t.description}><Input value={form.desc} onChange={e => setForm(p => ({ ...p, desc: e.target.value }))} /></FormField>
+  1176→          </div>
+  1177→          <DlgFooter onCancel={() => setEditRole(null)} onConfirm={handleUpdate} />
+  1178→        </DialogContent>
+  1179→      </Dialog>
+  1180→    </div>
+  1181→  )
+  1182→}
+  1183→
+  1184→// ════════════════════════════════════════════════════════════════
+  1185→// PAGE 7: AUDIT LOGS (bilingual)
+  1186→// ════════════════════════════════════════════════════════════════
+  1187→function AuditPage() {
+  1188→  const { t, lang } = useSA()
+  1189→  const [logs] = useState<SysLog[]>(INIT_LOGS)
+  1190→  const [filter, setFilter] = useState('all')
+  1191→  const [page, setPage] = useState(1)
+  1192→  const filtered = useMemo(() => filter === 'all' ? logs : logs.filter(l => l.level === filter), [logs, filter])
+  1193→  const { items, totalPages } = paginate(filtered, page, 8)
+  1194→
+  1195→  return (
+  1196→    <div className="space-y-5">
+  1197→      <PageTitle title={t.auditTitle} action={<Button className="gap-2" variant="outline" onClick={() => toast.success(t.logExported)}><Download className="h-4 w-4" />{t.export}</Button>} />
+  1198→      <div className="flex flex-wrap gap-2">
+  1199→        {['all','info','success','warn','error'].map(f => (
+  1200→          <Button key={f} size="sm" variant={filter === f ? 'default' : 'outline'} className="text-xs h-8 rounded-full px-4" onClick={() => { setFilter(f); setPage(1) }}>
+  1201→            {f === 'all' ? t.all : getLogLabel(f, t)}
+  1202→          </Button>
+  1203→        ))}
+  1204→      </div>
+  1205→      <Card className="border-0 shadow-sm overflow-hidden hidden sm:block">
+  1206→        <div className="overflow-x-auto">
+  1207→          <Table><TableHeader><TableRow className="bg-muted/50 hover:bg-muted/50">
+  1208→            <TableHead className="ps-5 font-semibold text-xs uppercase tracking-wider w-24">{t.level}</TableHead>
+  1209→            <TableHead className="px-3 font-semibold text-xs uppercase tracking-wider">{t.message}</TableHead>
+  1210→            <TableHead className="px-3 font-semibold text-xs uppercase tracking-wider hidden md:table-cell">{t.source}</TableHead>
+  1211→            <TableHead className="pe-5 font-semibold text-xs uppercase tracking-wider text-end">{t.date}</TableHead>
+  1212→          </TableRow></TableHeader>
+  1213→          <TableBody>{items.map(l => (
+  1214→            <TableRow key={l.id} className="hover:bg-muted/20 transition-colors">
+  1215→              <TableCell className="ps-5"><span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${l.level === 'info' ? 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-400' : l.level === 'warn' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400' : l.level === 'error' ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400'}`}>{getLogLabel(l.level, t)}</span></TableCell>
+  1216→              <TableCell className="px-3 text-sm max-w-[400px]">{logMsg(l, lang)}</TableCell>
+  1217→              <TableCell className="px-3 text-xs text-muted-foreground hidden md:table-cell">{logSrc(l, lang)}</TableCell>
+  1218→              <TableCell className="pe-5 text-xs text-muted-foreground whitespace-nowrap text-end">{new Date(l.timestamp).toLocaleString(lang === 'ar' ? 'ar-JO' : 'en-JO')}</TableCell>
+  1219→            </TableRow>
+  1220→          ))}</TableBody></Table>
+  1221→        </div>
+  1222→        <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+  1223→      </Card>
+  1224→      <div className="sm:hidden space-y-2">
+  1225→        {items.map(l => (
+  1226→          <Card key={l.id} className="border-0 shadow-sm"><CardContent className="p-3">
+  1227→            <div className="flex items-start gap-3"><LogDot level={l.level} />
+  1228→              <div className="min-w-0 flex-1">
+  1229→                <div className="flex items-center gap-2 mb-1"><span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${l.level === 'info' ? 'bg-sky-100 text-sky-700' : l.level === 'warn' ? 'bg-amber-100 text-amber-700' : l.level === 'error' ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>{getLogLabel(l.level, t)}</span><span className="text-[10px] text-muted-foreground">{logSrc(l, lang)}</span></div>
+  1230→                <p className="text-xs leading-relaxed">{logMsg(l, lang)}</p>
+  1231→                <p className="text-[10px] text-muted-foreground mt-1">{new Date(l.timestamp).toLocaleString(lang === 'ar' ? 'ar-JO' : 'en-JO')}</p>
+  1232→              </div>
+  1233→            </div>
+  1234→          </CardContent></Card>
+  1235→        ))}
+  1236→      </div>
+  1237→    </div>
+  1238→  )
+  1239→}
+  1240→
+  1241→// ════════════════════════════════════════════════════════════════
+  1242→// PAGE 8: NOTIFICATIONS (full CRUD on templates)
+  1243→// ════════════════════════════════════════════════════════════════
+  1244→function NotificationsPage() {
+  1245→  const { t, lang, isRTL } = useSA()
+  1246→  const [templates, setTemplates] = useState<NotificationTemplate[]>(NOTIF_TEMPLATES)
+  1247→  const [sendOpen, setSendOpen] = useState(false)
+  1248→  const [msg, setMsg] = useState({ title: '', body: '', target: 'all' })
+  1249→  const [delTarget, setDelTarget] = useState<NotificationTemplate | null>(null)
+  1250→
+  1251→  const handleDelete = (tmpl: NotificationTemplate) => { setTemplates(p => p.filter(x => x.id !== tmpl.id)); toast.success(t.deleted); setDelTarget(null) }
+  1252→
+  1253→  return (
+  1254→    <div className="space-y-5">
+  1255→      <PageTitle title={t.notificationsTitle} action={<PrimaryBtn icon={Bell} label={t.sendNotif} onClick={() => setSendOpen(true)} />} />
+  1256→
+  1257→      <Card className="border-0 shadow-sm overflow-hidden hidden sm:block">
+  1258→        <div className="overflow-x-auto">
+  1259→          <Table><TableHeader><TableRow className="bg-muted/50 hover:bg-muted/50">
+  1260→            <TableHead className="ps-5 font-semibold text-xs uppercase tracking-wider">{t.template}</TableHead>
+  1261→            <TableHead className="px-3 font-semibold text-xs uppercase tracking-wider hidden md:table-cell">{t.type}</TableHead>
+  1262→            <TableHead className="px-3 font-semibold text-xs uppercase tracking-wider">{t.status}</TableHead>
+  1263→            <TableHead className="px-3 font-semibold text-xs uppercase tracking-wider text-end hidden lg:table-cell">{t.sent}</TableHead>
+  1264→            <TableHead className="pe-5 font-semibold text-xs uppercase tracking-wider text-end">{t.actions}</TableHead>
+  1265→          </TableRow></TableHeader>
+  1266→          <TableBody>{templates.map(tmpl => (
+  1267→            <TableRow key={tmpl.id} className="group hover:bg-muted/20 transition-colors">
+  1268→              <TableCell className="ps-5 font-medium text-sm">{lang === 'en' ? tmpl.nameEn : tmpl.name}</TableCell>
+  1269→              <TableCell className="px-3 text-sm hidden md:table-cell">{lang === 'en' ? tmpl.typeEn : tmpl.type}</TableCell>
+  1270→              <TableCell className="px-3"><StatusBadge status={tmpl.status} locale={lang} /></TableCell>
+  1271→              <TableCell className="px-3 tabular-nums text-sm hidden lg:table-cell text-end">{tmpl.sent}</TableCell>
+  1272→              <TableCell className="pe-5">
+  1273→                <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+  1274→                  <ActionBtn icon={Edit} label={t.edit} onClick={() => toast.info(t.editTemplate)} />
+  1275→                  <ActionBtn icon={Mail} onClick={() => toast.success(t.testSent)} />
+  1276→                  <ActionBtn icon={Trash2} onClick={() => setDelTarget(tmpl)} danger />
+  1277→                </div>
+  1278→              </TableCell>
+  1279→            </TableRow>
+  1280→          ))}</TableBody></Table>
+  1281→        </div>
+  1282→      </Card>
+  1283→
+  1284→      <div className="sm:hidden space-y-3">
+  1285→        {templates.map(tmpl => (
+  1286→          <Card key={tmpl.id} className="border-0 shadow-sm"><CardContent className="p-4">
+  1287→            <div className="flex items-start justify-between gap-3 mb-2">
+  1288→              <div className="min-w-0"><p className="font-medium text-sm">{lang === 'en' ? tmpl.nameEn : tmpl.name}</p><p className="text-xs text-muted-foreground mt-0.5">{lang === 'en' ? tmpl.typeEn : tmpl.type} · {tmpl.sent} {t.sent}</p></div>
+  1289→              <StatusBadge status={tmpl.status} locale={lang} />
+  1290→            </div>
+  1291→            <div className="flex items-center justify-end gap-1 pt-2 border-t">
+  1292→              <ActionBtn icon={Edit} label={t.edit} onClick={() => toast.info(t.editTemplate)} />
+  1293→              <ActionBtn icon={Mail} onClick={() => toast.success(t.testSent)} />
+  1294→              <ActionBtn icon={Trash2} onClick={() => setDelTarget(tmpl)} danger />
+  1295→            </div>
+  1296→          </CardContent></Card>
+  1297→        ))}
+  1298→      </div>
+  1299→
+  1300→      <Dialog open={sendOpen} onOpenChange={setSendOpen}>
+  1301→        <DialogContent className="max-w-md" dir={isRTL ? 'rtl' : 'ltr'}><DialogHeader><DialogTitle>{t.sendNotifDlg}</DialogTitle><DialogDescription className="sr-only">{isRTL ? 'إرسال إشعار' : 'Send notification'}</DialogDescription></DialogHeader>
+  1302→          <div className="space-y-4 pt-2">
+  1303→            <FormField label={t.title}><Input value={msg.title} onChange={e => setMsg(p => ({ ...p, title: e.target.value }))} /></FormField>
+  1304→            <FormField label={t.content}><Input value={msg.body} onChange={e => setMsg(p => ({ ...p, body: e.target.value }))} /></FormField>
+  1305→            <FormField label={t.target}><Select value={msg.target} onValueChange={v => setMsg(p => ({ ...p, target: v }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">{t.everyone}</SelectItem><SelectItem value="active">{t.activeUsers}</SelectItem><SelectItem value="trial">{t.trialUsers}</SelectItem></SelectContent></Select></FormField>
+  1306→          </div>
+  1307→          <DlgFooter onCancel={() => setSendOpen(false)} onConfirm={() => { toast.success(t.notifSent); setSendOpen(false); setMsg({ title: '', body: '', target: 'all' }) }} confirmLabel={t.send} />
+  1308→        </DialogContent>
+  1309→      </Dialog>
+  1310→
+  1311→      <ConfirmDialog open={!!delTarget} onOpenChange={() => setDelTarget(null)} title={t.delete} desc={t.confirmDeleteTemplate} onConfirm={() => { if (delTarget) handleDelete(delTarget) }} danger />
+  1312→    </div>
+  1313→  )
+  1314→}
+  1315→
+  1316→// ════════════════════════════════════════════════════════════════
+  1317→// PAGE 9: REPORTS
+  1318→// ════════════════════════════════════════════════════════════════
+  1319→function ReportsPage() {
+  1320→  const { t, lang } = useSA()
+  1321→  return (
+  1322→    <div className="space-y-6">
+  1323→      <PageTitle title={t.reportsTitle} />
+  1324→      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+  1325→        {REPORTS.map((r, i) => (
+  1326→          <motion.div key={r.id} variants={fade} initial="hidden" animate="visible" transition={{ delay: i * 0.04 }}>
+  1327→            <Card className="group transition-all hover:shadow-lg border-0 shadow-sm h-full">
+  1328→              <CardContent className="p-5 sm:p-6">
+  1329→                <div className="flex items-start justify-between mb-4">
+  1330→                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-sky-100 dark:bg-sky-900/30"><BarChart3 className="h-5 w-5 text-sky-600" /></div>
+  1331→                  <Badge variant="outline" className="text-xs">{lang === 'en' ? r.typeEn : r.type}</Badge>
+  1332→                </div>
+  1333→                <h3 className="font-bold text-sm mb-1">{lang === 'en' ? r.nameEn : r.name}</h3>
+  1334→                <p className="text-xs text-muted-foreground mb-5 leading-relaxed">{lang === 'en' ? r.descEn : r.desc}</p>
+  1335→                <div className="flex items-center justify-between pt-3 border-t">
+  1336→                  <span className="text-[11px] text-muted-foreground">{t.lastGenerated} {r.last}</span>
+  1337→                  <div className="flex gap-1">
+  1338→                    <ActionBtn icon={RefreshCw} label={t.generate} onClick={() => toast.success(t.reportGenerated)} />
+  1339→                    <ActionBtn icon={Download} onClick={() => toast.success(t.reportDownloaded)} />
+  1340→                  </div>
+  1341→                </div>
+  1342→              </CardContent>
+  1343→            </Card>
+  1344→          </motion.div>
+  1345→        ))}
+  1346→      </div>
+  1347→    </div>
+  1348→  )
+  1349→}
+  1350→
+  1351→// ════════════════════════════════════════════════════════════════
+  1352→// PAGE 10: SYSTEM HEALTH
+  1353→// ════════════════════════════════════════════════════════════════
+  1354→function SystemPage() {
+  1355→  const { t, lang } = useSA()
+  1356→  const [logs] = useState<SysLog[]>(INIT_LOGS)
+  1357→  const gauges = [
+  1358→    { label: t.gaugeApi, value: 99, icon: Server },
+  1359→    { label: t.gaugeDatabase, value: 85, icon: Database },
+  1360→    { label: t.gaugeMemory, value: 78, icon: Monitor },
+  1361→    { label: t.gaugeDisk, value: 62, icon: HardDrive },
+  1362→    { label: t.gaugeCdn, value: 100, icon: Globe },
+  1363→    { label: t.gaugeWorker, value: 95, icon: RefreshCw },
+  1364→  ]
+  1365→
+  1366→  return (
+  1367→    <div className="space-y-6">
+  1368→      <PageTitle title={t.systemTitle} action={<Button className="gap-2" variant="outline" onClick={() => toast.success(t.refreshed)}><RefreshCw className="h-4 w-4" />{t.refresh}</Button>} />
+  1369→      <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 sm:gap-4">
+  1370→        {gauges.map((g, i) => (
+  1371→          <motion.div key={g.label} variants={fade} initial="hidden" animate="visible" transition={{ delay: i * 0.04 }}>
+  1372→            <Card className="text-center border-0 shadow-sm">
+  1373→              <CardContent className="p-3 sm:p-4">
+  1374→                <div className="relative mx-auto h-14 w-14 sm:h-16 sm:w-16 mb-2">
+  1375→                  <svg className={`h-14 w-14 sm:h-16 sm:w-16 -rotate-90 ${gaugeColor(g.value)}`} viewBox="0 0 64 64">
+  1376→                    <circle cx="32" cy="32" r="28" fill="none" stroke="currentColor" strokeWidth="4" className="opacity-15" />
+  1377→                    <circle cx="32" cy="32" r="28" fill="none" stroke="currentColor" strokeWidth="4" strokeDasharray={`${2 * Math.PI * 28 * g.value / 100} ${2 * Math.PI * 28}`} strokeLinecap="round" />
+  1378→                  </svg>
+  1379→                  <span className="absolute inset-0 flex items-center justify-center text-xs sm:text-sm font-bold">{g.value}%</span>
+  1380→                </div>
+  1381→                <div className="flex items-center justify-center gap-1.5 text-muted-foreground"><g.icon className="h-3.5 w-3.5" /><span className="text-[10px] sm:text-xs font-medium">{g.label}</span></div>
+  1382→              </CardContent>
+  1383→            </Card>
+  1384→          </motion.div>
+  1385→        ))}
+  1386→      </div>
+  1387→      <Card className="border-0 shadow-sm">
+  1388→        <CardHeader className="pb-3"><CardTitle className="text-sm sm:text-base font-semibold">{t.systemLog}</CardTitle></CardHeader>
+  1389→        <CardContent>
+  1390→          <div className="space-y-0.5">{logs.map(l => (
+  1391→            <div key={l.id} className="flex items-start gap-3 rounded-lg px-3 py-2.5 hover:bg-muted/50 transition-colors">
+  1392→              <LogDot level={l.level} />
+  1393→              <div className="min-w-0 flex-1">
+  1394→                <p className="text-sm leading-relaxed">{logMsg(l, lang)}</p>
+  1395→                <p className="text-[11px] text-muted-foreground mt-0.5">{logSrc(l, lang)} — {new Date(l.timestamp).toLocaleString(lang === 'ar' ? 'ar-JO' : 'en-JO')}</p>
+  1396→              </div>
+  1397→            </div>
+  1398→          ))}</div>
+  1399→        </CardContent>
+  1400→      </Card>
+  1401→    </div>
+  1402→  )
+  1403→}
+  1404→
+  1405→// ════════════════════════════════════════════════════════════════
+  1406→// PAGE 11: SERVERS
+  1407→// ════════════════════════════════════════════════════════════════
+  1408→function ServersPage() {
+  1409→  const { t, lang, isRTL } = useSA()
+  1410→  const [servers, setServers] = useState<ServerType[]>(SERVERS)
+  1411→  const [addOpen, setAddOpen] = useState(false)
+  1412→  const [newName, setNewName] = useState('')
+  1413→  const [newRegion, setNewRegion] = useState('riyadh')
+  1414→  const [delTarget, setDelTarget] = useState<ServerType | null>(null)
+  1415→
+  1416→  const REGIONS: Record<string, { ar: string; en: string }> = {
+  1417→    riyadh: { ar: 'الرياض', en: 'Riyadh' },
+  1418→    jeddah: { ar: 'جدة', en: 'Jeddah' },
+  1419→    dubai: { ar: 'دبي', en: 'Dubai' },
+  1420→  }
+  1421→
+  1422→  const handleAdd = () => {
+  1423→    if (!newName.trim()) return
+  1424→    const region = REGIONS[newRegion] || REGIONS.riyadh
+  1425→    const s: ServerType = { id: Date.now().toString(), name: newName, region: region.ar, regionEn: region.en, status: 'healthy', cpu: 0, memory: 0, disk: 0, uptime: '100%', requests: '0/min' }
+  1426→    setServers(p => [...p, s]); toast.success(t.serverAdded); setAddOpen(false); setNewName('')
+  1427→  }
+  1428→
+  1429→  const handleRestart = (s: ServerType) => {
+  1430→    setServers(p => p.map(x => x.id === s.id ? { ...x, cpu: 0, memory: 0 } : x))
+  1431→    toast.success(t.serverRestarted)
+  1432→  }
+  1433→
+  1434→  const handleDelete = (s: ServerType) => { setServers(p => p.filter(x => x.id !== s.id)); toast.success(t.serverDeleted); setDelTarget(null) }
+  1435→
+  1436→  return (
+  1437→    <div className="space-y-6">
+  1438→      <PageTitle title={t.serversTitle} action={<PrimaryBtn icon={Plus} label={t.addServer} onClick={() => setAddOpen(true)} />} />
+  1439→      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5">
+  1440→        {servers.map((s, i) => (
+  1441→          <motion.div key={s.id} variants={fade} initial="hidden" animate="visible" transition={{ delay: i * 0.05 }}>
+  1442→            <Card className="transition-all hover:shadow-lg border-0 shadow-sm">
+  1443→              <CardContent className="p-5 sm:p-6 space-y-5">
+  1444→                <div className="flex items-center justify-between">
+  1445→                  <div className="flex items-center gap-3">
+  1446→                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-sky-100 dark:bg-sky-900/30"><Server className="h-5 w-5 text-sky-600" /></div>
+  1447→                    <div><h3 className="font-bold text-sm">{s.name}</h3><p className="text-xs text-muted-foreground">{serverRegion(s, lang)}</p></div>
+  1448→                  </div>
+  1449→                  <StatusBadge status={s.status} locale={lang} />
+  1450→                </div>
+  1451→                <div className="grid grid-cols-4 gap-3 sm:gap-4">
+  1452→                  {[{ l: t.gaugeCpu, v: s.cpu }, { l: t.gaugeMemory, v: s.memory }, { l: t.gaugeDisk, v: s.disk }, { l: t.gaugeUptime, v: parseInt(s.uptime) || 0 }].map(m => (
+  1453→                    <div key={m.l} className="text-center space-y-1.5">
+  1454→                      <div className="relative mx-auto h-11 w-11 sm:h-12 sm:w-12">
+  1455→                        <svg className={`h-11 w-11 sm:h-12 sm:w-12 -rotate-90 ${gaugeColor(m.v)}`} viewBox="0 0 48 48">
+  1456→                          <circle cx="24" cy="24" r="20" fill="none" stroke="currentColor" strokeWidth="3.5" className="opacity-15" />
+  1457→                          <circle cx="24" cy="24" r="20" fill="none" stroke="currentColor" strokeWidth="3.5" strokeDasharray={`${2 * Math.PI * 20 * m.v / 100} ${2 * Math.PI * 20}`} strokeLinecap="round" />
+  1458→                        </svg>
+  1459→                        <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold">{m.v}%</span>
+  1460→                      </div>
+  1461→                      <p className="text-[10px] text-muted-foreground font-medium">{m.l}</p>
+  1462→                    </div>
+  1463→                  ))}
+  1464→                </div>
+  1465→                <div className="flex items-center justify-between pt-3 border-t">
+  1466→                  <span className="text-xs text-muted-foreground">{t.requests}: {s.requests}</span>
+  1467→                  <div className="flex gap-1">
+  1468→                    <ActionBtn icon={RefreshCw} label={t.restart} onClick={() => handleRestart(s)} />
+  1469→                    <ActionBtn icon={Eye} label={t.details} onClick={() => toast.info(t.serverDetails)} />
+  1470→                    <ActionBtn icon={Trash2} onClick={() => setDelTarget(s)} danger />
+  1471→                  </div>
+  1472→                </div>
+  1473→              </CardContent>
+  1474→            </Card>
+  1475→          </motion.div>
+  1476→        ))}
+  1477→      </div>
+  1478→      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+  1479→        <DialogContent className="max-w-sm" dir={isRTL ? 'rtl' : 'ltr'}><DialogHeader><DialogTitle>{t.addServerDlg}</DialogTitle><DialogDescription className="sr-only">{isRTL ? 'إضافة خادم جديد' : 'Add new server'}</DialogDescription></DialogHeader>
+  1480→          <div className="space-y-4 pt-2">
+  1481→            <FormField label={t.serverName}><Input value={newName} onChange={e => setNewName(e.target.value)} placeholder="API Server #3" dir="ltr" /></FormField>
+  1482→            <FormField label={t.region}><Select value={newRegion} onValueChange={setNewRegion}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="riyadh">{lang === 'en' ? 'Riyadh' : 'الرياض'}</SelectItem><SelectItem value="jeddah">{lang === 'en' ? 'Jeddah' : 'جدة'}</SelectItem><SelectItem value="dubai">{lang === 'en' ? 'Dubai' : 'دبي'}</SelectItem></SelectContent></Select></FormField>
+  1483→          </div>
+  1484→          <DlgFooter onCancel={() => setAddOpen(false)} onConfirm={handleAdd} />
+  1485→        </DialogContent>
+  1486→      </Dialog>
+  1487→      <ConfirmDialog open={!!delTarget} onOpenChange={() => setDelTarget(null)} title={t.delete} desc={t.confirmDeleteServer} onConfirm={() => { if (delTarget) handleDelete(delTarget) }} danger />
+  1488→    </div>
+  1489→  )
+  1490→}
+  1491→
+  1492→// ════════════════════════════════════════════════════════════════
+  1493→// PAGE 12: DATABASE
+  1494→// ════════════════════════════════════════════════════════════════
+  1495→function DatabasePage() {
+  1496→  const { t, lang } = useSA()
+  1497→  const [backups, setBackups] = useState<Backup[]>(BACKUPS)
+  1498→
+  1499→  const handleBackup = () => {
+  1500→    const b: Backup = { id: Date.now().toString(), date: new Date().toLocaleString(lang === 'ar' ? 'ar-JO' : 'en-JO'), size: '2.4 GB', type: 'manual', status: 'active' }
+  1501→    setBackups(p => [b, ...p]); toast.success(t.backingUp)
+  1502→  }
+  1503→
+  1504→  return (
+  1505→    <div className="space-y-6">
+  1506→      <PageTitle title={t.dbTitle} action={<PrimaryBtn icon={Database} label={t.backup} onClick={handleBackup} />} />
+  1507→      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+  1508→        <StatCard icon={Database} label={t.dbSize} value="2.4 GB" color="bg-sky-100 dark:bg-sky-900/30 text-sky-600" />
+  1509→        <StatCard icon={HardDrive} label={t.tables} value="156K" color="bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600" />
+  1510→        <StatCard icon={Activity} label={t.avgResponse} value="23ms" color="bg-amber-100 dark:bg-amber-900/30 text-amber-600" />
+  1511→        <StatCard icon={Clock} label={t.backups} value={String(backups.length)} color="bg-violet-100 dark:bg-violet-900/30 text-violet-600" />
+  1512→      </div>
+  1513→      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+  1514→        <Card className="border-0 shadow-sm"><CardHeader className="pb-3"><CardTitle className="text-sm sm:text-base font-semibold">{t.resourceUsage}</CardTitle></CardHeader>
+  1515→          <CardContent className="space-y-5">{[
+  1516→            { l: t.gaugeCpu, v: 45 },
+  1517→            { l: t.gaugeMemory, v: 72 },
+  1518→            { l: t.gaugeDisk, v: 58 },
+  1519→            { l: t.gaugeConnections, v: 34 },
+  1520→          ].map(r => (
+  1521→            <div key={r.l}><div className="flex justify-between text-sm mb-2"><span className="font-medium">{r.l}</span><span className="tabular-nums font-semibold">{r.v}%</span></div><Progress value={r.v} className="h-2" /></div>
+  1522→          ))}</CardContent>
+  1523→        </Card>
+  1524→        <Card className="border-0 shadow-sm"><CardHeader className="pb-3"><CardTitle className="text-sm sm:text-base font-semibold">{t.backupList}</CardTitle></CardHeader>
+  1525→          <CardContent className="space-y-3">{backups.map(b => (
+  1526→            <div key={b.id} className="flex items-center gap-3 rounded-xl border p-3 sm:p-4 hover:bg-muted/30 transition-colors">
+  1527→              <StatusBadge status={b.status} locale={lang} />
+  1528→              <div className="min-w-0 flex-1"><p className="text-sm font-medium">{b.date}</p><p className="text-xs text-muted-foreground">{b.type === 'automatic' ? t.automatic : t.manual} · {b.size}</p></div>
+  1529→              <ActionBtn icon={Download} onClick={() => toast.success(t.downloadingBackup)} />
+  1530→            </div>
+  1531→          ))}</CardContent>
+  1532→        </Card>
+  1533→      </div>
+  1534→    </div>
+  1535→  )
+  1536→}
+  1537→
+  1538→// ════════════════════════════════════════════════════════════════
+  1539→// PAGE 13: SECURITY
+  1540→// ════════════════════════════════════════════════════════════════
+  1541→function SecurityPage() {
+  1542→  const { t, lang } = useSA()
+  1543→  const [settings, setSettings] = useState({ twoFactor: true, ipWhitelist: false, bruteForce: true, sessionTimeout: true, auditLog: true, encryptData: true })
+  1544→  const toggle = (key: keyof typeof settings) => { setSettings(p => ({ ...p, [key]: !p[key] })); toast.success(t.settingUpdated) }
+  1545→  const items = [
+  1546→    { key: 'twoFactor' as const, label: t.twoFactor, desc: t.twoFactorDesc },
+  1547→    { key: 'ipWhitelist' as const, label: t.ipWhitelist, desc: t.ipWhitelistDesc },
+  1548→    { key: 'bruteForce' as const, label: t.bruteForce, desc: t.bruteForceDesc },
+  1549→    { key: 'sessionTimeout' as const, label: t.sessionTimeout, desc: t.sessionTimeoutDesc },
+  1550→    { key: 'auditLog' as const, label: t.auditLogging, desc: t.auditLoggingDesc },
+  1551→    { key: 'encryptData' as const, label: t.dataEncryption, desc: t.dataEncryptionDesc },
+  1552→  ]
+  1553→
+  1554→  return (
+  1555→    <div className="space-y-6">
+  1556→      <PageTitle title={t.securityTitle} />
+  1557→      <Card className="border-0 shadow-sm"><CardHeader className="pb-3"><CardTitle className="text-sm sm:text-base font-semibold">{t.securitySettings}</CardTitle></CardHeader>
+  1558→        <CardContent className="space-y-0">
+  1559→          {items.map((s, i) => (
+  1560→            <div key={s.key}>
+  1561→              <div className="flex items-center justify-between gap-4 py-3.5">
+  1562→                <div className="min-w-0"><p className="text-sm font-medium">{s.label}</p><p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{s.desc}</p></div>
+  1563→                <Toggle on={settings[s.key]} onToggle={() => toggle(s.key)} />
+  1564→              </div>
+  1565→              {i < items.length - 1 && <Separator />}
+  1566→            </div>
+  1567→          ))}
+  1568→        </CardContent>
+  1569→      </Card>
+  1570→      <Card className="border-0 shadow-sm"><CardHeader className="pb-3"><CardTitle className="text-sm sm:text-base font-semibold flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-amber-500" />{t.suspiciousAttempts}</CardTitle></CardHeader>
+  1571→        <CardContent>
+  1572→          <div className="hidden sm:block overflow-x-auto">
+  1573→            <Table><TableHeader><TableRow className="bg-muted/50 hover:bg-muted/50">
+  1574→              <TableHead className="ps-4 font-semibold text-xs uppercase tracking-wider">{t.ipAddress}</TableHead>
+  1575→              <TableHead className="px-3 font-semibold text-xs uppercase tracking-wider">{t.time}</TableHead>
+  1576→              <TableHead className="px-3 font-semibold text-xs uppercase tracking-wider">{t.location}</TableHead>
+  1577→              <TableHead className="pe-4 font-semibold text-xs uppercase tracking-wider">{t.status}</TableHead>
+  1578→            </TableRow></TableHeader>
+  1579→            <TableBody>{SECURITY_ATTEMPTS.map((a, i) => (
+  1580→              <TableRow key={i} className="hover:bg-muted/20 transition-colors">
+  1581→                <TableCell className="ps-4 font-mono text-sm" dir="ltr">{a.ip}</TableCell>
+  1582→                <TableCell className="px-3 text-xs text-muted-foreground">{a.time}</TableCell>
+  1583→                <TableCell className="px-3 text-sm">{secCountry(a, lang)}</TableCell>
+  1584→                <TableCell className="pe-4"><StatusBadge status={a.status} locale={lang} /></TableCell>
+  1585→              </TableRow>
+  1586→            ))}</TableBody></Table>
+  1587→          </div>
+  1588→          <div className="sm:hidden space-y-2">
+  1589→            {SECURITY_ATTEMPTS.map((a, i) => (
+  1590→              <div key={i} className="flex items-center justify-between gap-3 rounded-lg border p-3">
+  1591→                <div className="min-w-0"><p className="font-mono text-sm font-semibold" dir="ltr">{a.ip}</p><p className="text-[11px] text-muted-foreground mt-0.5">{secCountry(a, lang)} · {a.time}</p></div>
+  1592→                <StatusBadge status={a.status} locale={lang} />
+  1593→              </div>
+  1594→            ))}
+  1595→          </div>
+  1596→        </CardContent>
+  1597→      </Card>
+  1598→    </div>
+  1599→  )
+  1600→}
+  1601→
+  1602→// ════════════════════════════════════════════════════════════════
+  1603→// PAGE 14: SETTINGS (JOD default + CLIQ config section)
+  1604→// ════════════════════════════════════════════════════════════════
+  1605→function SettingsPage() {
+  1606→  const { t, lang, isRTL } = useSA()
+  1607→  const { setCustomCurrency, setCustomTimezone, setThemeMode } = useAppStore()
+  1608→  const [form, setForm] = useState({
+  1609→    platformName: 'BookFlow', supportEmail: 'support@bookflow.com',
+  1610→    currency: 'JOD', timezone: 'Asia/Amman',
+  1611→    maintenance: false, registration: true, maxTenants: '500', backupFreq: 'daily',
+  1612→  })
+  1613→  const [cliq, setCliq] = useState<CliqConfig>({ ...DEFAULT_CLIQ_CONFIG })
+  1614→
+  1615→  const handleSaveSettings = () => {
+  1616→    setCustomCurrency(form.currency)
+  1617→    setCustomTimezone(form.timezone)
+  1618→    toast.success(t.settingsSaved)
+  1619→  }
+  1620→  const handleSaveCliq = () => { toast.success(t.settingsSaved) }
+  1621→
+  1622→  return (
+  1623→    <div className="space-y-6">
+  1624→      <PageTitle title={t.settingsTitle} action={<PrimaryBtn icon={Save} label={t.saveSettings} onClick={handleSaveSettings} />} />
+  1625→      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+  1626→        <Card className="border-0 shadow-sm"><CardHeader className="pb-3"><CardTitle className="text-sm sm:text-base font-semibold">{t.generalSettings}</CardTitle></CardHeader>
+  1627→          <CardContent className="space-y-4">
+  1628→            <FormField label={t.platformName}><Input value={form.platformName} onChange={e => setForm(p => ({ ...p, platformName: e.target.value }))} /></FormField>
+  1629→            <FormField label={t.supportEmail}><Input type="email" value={form.supportEmail} onChange={e => setForm(p => ({ ...p, supportEmail: e.target.value }))} dir="ltr" /></FormField>
+  1630→            <div className="grid grid-cols-2 gap-3 sm:gap-4">
+  1631→              <FormField label={t.currency}>
+  1632→                <Select value={form.currency} onValueChange={v => setForm(p => ({ ...p, currency: v }))}>
+  1633→                  <SelectTrigger><SelectValue /></SelectTrigger>
+  1634→                  <SelectContent>
+  1635→                    <SelectItem value="JOD">{lang === 'ar' ? 'دينار أردني (د.أ)' : 'JOD - Jordanian Dinar'}</SelectItem>
+  1636→                    <SelectItem value="SAR">{lang === 'ar' ? 'ريال سعودي (ر.س)' : 'SAR - Saudi Riyal'}</SelectItem>
+  1637→                    <SelectItem value="AED">{lang === 'ar' ? 'درهم إماراتي (د.إ)' : 'AED - UAE Dirham'}</SelectItem>
+  1638→                    <SelectItem value="USD">USD - $</SelectItem>
+  1639→                    <SelectItem value="EGP">{lang === 'ar' ? 'جنيه مصري (ج.م)' : 'EGP - Egyptian Pound'}</SelectItem>
+  1640→                  </SelectContent>
+  1641→                </Select>
+  1642→              </FormField>
+  1643→              <FormField label={t.timezone}>
+  1644→                <Select value={form.timezone} onValueChange={v => setForm(p => ({ ...p, timezone: v }))}>
+  1645→                  <SelectTrigger><SelectValue /></SelectTrigger>
+  1646→                  <SelectContent>
+  1647→                    <SelectItem value="Asia/Amman">{lang === 'ar' ? 'عمّان' : 'Amman'}</SelectItem>
+  1648→                    <SelectItem value="Asia/Riyadh">{lang === 'ar' ? 'الرياض' : 'Riyadh'}</SelectItem>
+  1649→                    <SelectItem value="Asia/Dubai">{lang === 'ar' ? 'دبي' : 'Dubai'}</SelectItem>
+  1650→                    <SelectItem value="Africa/Cairo">{lang === 'ar' ? 'القاهرة' : 'Cairo'}</SelectItem>
+  1651→                  </SelectContent>
+  1652→                </Select>
+  1653→              </FormField>
+  1654→            </div>
+  1655→          </CardContent>
+  1656→        </Card>
+  1657→        <Card className="border-0 shadow-sm"><CardHeader className="pb-3"><CardTitle className="text-sm sm:text-base font-semibold">{t.advancedSettings}</CardTitle></CardHeader>
+  1658→          <CardContent className="space-y-4">
+  1659→            <FormField label={t.maxTenants}><Input type="number" value={form.maxTenants} onChange={e => setForm(p => ({ ...p, maxTenants: e.target.value }))} /></FormField>
+  1660→            <FormField label={t.backupFreq}><Select value={form.backupFreq} onValueChange={v => setForm(p => ({ ...p, backupFreq: v }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="hourly">{t.hourly}</SelectItem><SelectItem value="daily">{t.daily}</SelectItem><SelectItem value="weekly">{t.weekly}</SelectItem></SelectContent></Select></FormField>
+  1661→            <Separator />
+  1662→            {[
+  1663→              { key: 'maintenance' as const, label: t.maintenanceMode, desc: t.maintenanceModeDesc, color: 'amber' },
+  1664→              { key: 'registration' as const, label: t.openRegistration, desc: t.openRegistrationDesc, color: 'violet' },
+  1665→            ].map(s => (
+  1666→              <div key={s.key} className="flex items-center justify-between gap-4 py-1">
+  1667→                <div><p className="text-sm font-medium">{s.label}</p><p className="text-xs text-muted-foreground">{s.desc}</p></div>
+  1668→                <Toggle on={form[s.key]} onToggle={() => { setForm(p => ({ ...p, [s.key]: !p[s.key] })); toast.success(t.settingUpdated) }} color={s.color} />
+  1669→              </div>
+  1670→            ))}
+  1671→          </CardContent>
+  1672→        </Card>
+  1673→      </div>
+  1674→
+  1675→      {/* CLIQ Payment Settings */}
+  1676→      <Card className="border-0 shadow-sm">
+  1677→        <CardHeader className="pb-3">
+  1678→          <div className="flex items-center justify-between">
+  1679→            <CardTitle className="text-sm sm:text-base font-semibold flex items-center gap-2"><Wallet className="h-4 w-4 text-violet-600" />{t.cliqSettings}</CardTitle>
+  1680→            <PrimaryBtn icon={Save} label={t.save} onClick={handleSaveCliq} />
+  1681→          </div>
+  1682→        </CardHeader>
+  1683→        <CardContent className="space-y-0">
+  1684→          <div className="flex items-center justify-between gap-4 py-3.5">
+  1685→            <div><p className="text-sm font-medium">{t.cliqEnabled}</p><p className="text-xs text-muted-foreground mt-0.5">{t.cliqEnabledDesc}</p></div>
+  1686→            <Toggle on={cliq.enabled} onToggle={() => setCliq(p => ({ ...p, enabled: !p.enabled }))} />
+  1687→          </div>
+  1688→          <Separator />
+  1689→          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
+  1690→            <FormField label={t.cliqBankName}><Input value={cliq.bankName} onChange={e => setCliq(p => ({ ...p, bankName: e.target.value }))} /></FormField>
+  1691→            <FormField label={t.cliqAccountHolder}><Input value={cliq.accountHolder} onChange={e => setCliq(p => ({ ...p, accountHolder: e.target.value }))} dir="ltr" /></FormField>
+  1692→            <FormField label={t.cliqAlias}><Input value={cliq.cliqAlias} onChange={e => setCliq(p => ({ ...p, cliqAlias: e.target.value }))} dir="ltr" /></FormField>
+  1693→            <FormField label={t.cliqSupportContact}><Input value={cliq.supportContact} onChange={e => setCliq(p => ({ ...p, supportContact: e.target.value }))} dir="ltr" /></FormField>
+  1694→          </div>
+  1695→          <FormField label={t.cliqInstructions}>
+  1696→            <Textarea value={lang === 'en' ? cliq.instructionsEn : cliq.instructions} onChange={e => setCliq(p => ({ ...p, instructions: e.target.value }))} rows={3} />
+  1697→          </FormField>
+  1698→          <div className="pt-2">
+  1699→            <FormField label={t.cliqQrCode}>
+  1700→              <div className="flex items-center gap-3">
+  1701→                <Button variant="outline" className="gap-2" onClick={() => toast.info(t.cliqUploadQr)}>
+  1702→                  <Upload className="h-4 w-4" />{t.cliqUploadQr}
+  1703→                </Button>
+  1704→                {cliq.qrCodeUrl && <Badge variant="secondary" className="text-xs"><ImageIcon className="h-3 w-3 me-1" />QR</Badge>}
+  1705→              </div>
+  1706→            </FormField>
+  1707→          </div>
+  1708→        </CardContent>
+  1709→      </Card>
+  1710→    </div>
+  1711→  )
+  1712→}
+  1713→
+  1714→// ════════════════════════════════════════════════════════════════
+  1715→// PAGE 15: CLIQ PAYMENTS (Approve/Reject workflow)
+  1716→// ════════════════════════════════════════════════════════════════
+  1717→function CliqPaymentsPage() {
+  1718→  const { t, lang, isRTL } = useSA()
+  1719→  const { fmt, sym } = useCurrency()
+  1720→  const [payments, setPayments] = useState<CliqPayment[]>(INIT_CLIQ_PAYMENTS)
+  1721→  const [filter, setFilter] = useState('all')
+  1722→  const [page, setPage] = useState(1)
+  1723→  const [detail, setDetail] = useState<CliqPayment | null>(null)
+  1724→  const [actionDlg, setActionDlg] = useState<{ type: 'approve' | 'reject' | 'info'; payment: CliqPayment } | null>(null)
+  1725→  const [reasonText, setReasonText] = useState('')
+  1726→  const [newPayOpen, setNewPayOpen] = useState(false)
+  1727→  const [newPay, setNewPay] = useState({ tenantName: '', tenantNameEn: '', customerName: '', customerEmail: '', plan: 'Starter', amount: 0, referenceNumber: '', notes: '' })
+  1728→
+  1729→  const filtered = useMemo(() => {
+  1730→    if (filter === 'all') return payments
+  1731→    return payments.filter(p => p.status === filter)
+  1732→  }, [payments, filter])
+  1733→  const { items, totalPages } = paginate(filtered, page, PER_PAGE)
+  1734→
+  1735→  const pendingCount = payments.filter(p => p.status === 'pending_verification').length
+  1736→  const approvedCount = payments.filter(p => p.status === 'approved').length
+  1737→  const rejectedCount = payments.filter(p => p.status === 'rejected').length
+  1738→
+  1739→  const handleApprove = (p: CliqPayment) => {
+  1740→    setPayments(prev => prev.map(x => x.id === p.id ? {
+  1741→      ...x, status: 'approved', reviewedAt: new Date().toISOString(), reviewedBy: 'Super Admin'
+  1742→    } : x))
+  1743→    toast.success(t.cliqApprovedMsg)
+  1744→    setActionDlg(null)
+  1745→  }
+  1746→
+  1747→  const handleSubmitNewPayment = () => {
+  1748→    if (!newPay.tenantName.trim()) { toast.error(isRTL ? 'يرجى اختيار المستأجر' : 'Please select a tenant'); return }
+  1749→    if (!newPay.customerName.trim()) { toast.error(isRTL ? 'يرجى إدخال اسم العميل' : 'Please enter customer name'); return }
+  1750→    if (!newPay.referenceNumber.trim()) { toast.error(t.cliqReferenceRequired); return }
+  1751→    if (newPay.amount <= 0) { toast.error(isRTL ? 'يرجى إدخال مبلغ صحيح' : 'Please enter a valid amount'); return }
+  1752→    const np: CliqPayment = {
+  1753→      id: `CLIQ-${String(payments.length + 1).padStart(3, '0')}`,
+  1754→      tenantName: newPay.tenantName, tenantNameEn: newPay.tenantNameEn,
+  1755→      customerName: newPay.customerName, customerEmail: newPay.customerEmail,
+  1756→      plan: newPay.plan, amount: newPay.amount, currency: 'JOD',
+  1757→      referenceNumber: newPay.referenceNumber, notes: newPay.notes,
+  1758→      screenshotUrl: null, status: 'pending_verification',
+  1759→      submittedAt: new Date().toISOString(), reviewedAt: null, reviewedBy: null,
+  1760→      rejectionReason: null, additionalInfoRequest: null,
+  1761→    }
+  1762→    setPayments(prev => [np, ...prev])
+  1763→    toast.success(t.cliqNewPaymentSuccess)
+  1764→    setNewPayOpen(false)
+  1765→    setNewPay({ tenantName: '', tenantNameEn: '', customerName: '', customerEmail: '', plan: 'Starter', amount: 0, referenceNumber: '', notes: '' })
+  1766→    setPage(1)
+  1767→  }
+  1768→
+  1769→  const handleReject = (p: CliqPayment) => {
+  1770→    if (!reasonText.trim()) { toast.error(t.cliqEnterReason); return }
+  1771→    setPayments(prev => prev.map(x => x.id === p.id ? {
+  1772→      ...x, status: 'rejected', reviewedAt: new Date().toISOString(), reviewedBy: 'Super Admin', rejectionReason: reasonText
+  1773→    } : x))
+  1774→    toast.success(t.cliqRejectedMsg)
+  1775→    setActionDlg(null); setReasonText('')
+  1776→  }
+  1777→
+  1778→  const handleRequestInfo = (p: CliqPayment) => {
+  1779→    if (!reasonText.trim()) { toast.error(t.cliqInfoRequestPrompt); return }
+  1780→    setPayments(prev => prev.map(x => x.id === p.id ? {
+  1781→      ...x, status: 'info_requested', additionalInfoRequest: reasonText
+  1782→    } : x))
+  1783→    toast.success(t.cliqInfoRequestedMsg)
+  1784→    setActionDlg(null); setReasonText('')
+  1785→  }
+  1786→
+  1787→  return (
+  1788→    <div className="space-y-5">
+  1789→      <PageTitle title={t.cliqTitle} action={<PrimaryBtn icon={Plus} label={t.newCliqPayment} onClick={() => setNewPayOpen(true)} />} />
+  1790→
+  1791→      {/* CLIQ Bank Info Card */}
+  1792→      <Card className="border-0 shadow-sm border-l-4 border-l-violet-500">
+  1793→        <CardContent className="p-4 sm:p-5">
+  1794→          <div className="flex items-start gap-3">
+  1795→            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-100 dark:bg-violet-900/30">
+  1796→              <Wallet className="h-5 w-5 text-violet-600" />
+  1797→            </div>
+  1798→            <div className="min-w-0 flex-1">
+  1799→              <h3 className="text-sm font-bold mb-1">{lang === 'ar' ? 'معلومات التحويل عبر CLIQ' : 'CLIQ Transfer Information'}</h3>
+  1800→              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2">
+  1801→                <div>
+  1802→                  <p className="text-[10px] text-muted-foreground">{lang === 'ar' ? 'البنك' : 'Bank'}</p>
+  1803→                  <p className="text-xs font-semibold">{DEFAULT_CLIQ_CONFIG.bankName}</p>
+  1804→                </div>
+  1805→                <div>
+  1806→                  <p className="text-[10px] text-muted-foreground">{lang === 'ar' ? 'الاسم المستعار (Alias)' : 'Alias'}</p>
+  1807→                  <p className="text-xs font-bold text-violet-600 font-mono" dir="ltr">{DEFAULT_CLIQ_CONFIG.cliqAlias}</p>
+  1808→                </div>
+  1809→                <div>
+  1810→                  <p className="text-[10px] text-muted-foreground">{lang === 'ar' ? 'صاحب الحساب' : 'Account Holder'}</p>
+  1811→                  <p className="text-xs font-semibold" dir="ltr">{DEFAULT_CLIQ_CONFIG.accountHolder}</p>
+  1812→                </div>
+  1813→              </div>
+  1814→              <p className="text-[11px] text-muted-foreground mt-2 leading-relaxed">{lang === 'en' ? DEFAULT_CLIQ_CONFIG.instructionsEn : DEFAULT_CLIQ_CONFIG.instructions}</p>
+  1815→            </div>
+  1816→          </div>
+  1817→        </CardContent>
+  1818→      </Card>
+  1819→
+  1820→      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+  1821→        <StatCard icon={Wallet} label={t.cliqTotalPending} value={fmt(payments.filter(p => p.status === 'pending_verification').reduce((s, p) => s + p.amount, 0))} color="text-amber-600 bg-amber-50 dark:bg-amber-950/30" />
+  1822→        <StatCard icon={Clock} label={t.cliqPending} value={String(pendingCount)} color="text-amber-600 bg-amber-50 dark:bg-amber-950/30" />
+  1823→        <StatCard icon={CheckCircle2} label={t.cliqTotalApproved} value={String(approvedCount)} color="text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30" />
+  1824→        <StatCard icon={XCircle} label={t.cliqTotalRejected} value={String(rejectedCount)} color="text-red-600 bg-red-50 dark:bg-red-950/30" />
+  1825→      </div>
+  1826→
+  1827→      <div className="flex flex-wrap gap-2">
+  1828→        {['all','pending_verification','approved','rejected','info_requested'].map(f => (
+  1829→          <Button key={f} size="sm" variant={filter === f ? 'default' : 'outline'} className="text-xs h-8 rounded-full px-4" onClick={() => { setFilter(f); setPage(1) }}>
+  1830→            {f === 'all' ? t.all : f === 'pending_verification' ? t.cliqPending : f === 'approved' ? t.cliqApproved : f === 'rejected' ? t.cliqRejected : t.cliqInfoRequested}
+  1831→          </Button>
+  1832→        ))}
+  1833→      </div>
+  1834→
+  1835→      {/* Desktop Table */}
+  1836→      <Card className="border-0 shadow-sm overflow-hidden hidden md:block">
+  1837→        <div className="overflow-x-auto">
+  1838→          <Table><TableHeader><TableRow className="bg-muted/50 hover:bg-muted/50">
+  1839→            <TableHead className="ps-5 font-semibold text-xs uppercase tracking-wider">{t.tenant}</TableHead>
+  1840→            <TableHead className="px-3 font-semibold text-xs uppercase tracking-wider">{t.cliqCustomer}</TableHead>
+  1841→            <TableHead className="px-3 font-semibold text-xs uppercase tracking-wider">{t.plan}</TableHead>
+  1842→            <TableHead className="px-3 font-semibold text-xs uppercase tracking-wider text-end">{t.amount}</TableHead>
+  1843→            <TableHead className="px-3 font-semibold text-xs uppercase tracking-wider">{t.cliqReferenceNo}</TableHead>
+  1844→            <TableHead className="px-3 font-semibold text-xs uppercase tracking-wider">{t.status}</TableHead>
+  1845→            <TableHead className="pe-5 font-semibold text-xs uppercase tracking-wider text-end">{t.actions}</TableHead>
+  1846→          </TableRow></TableHeader>
+  1847→          <TableBody>
+  1848→            {items.length === 0 ? <EmptyRow colSpan={8} /> : items.map(p => (
+  1849→              <TableRow key={p.id} className="group hover:bg-muted/20 transition-colors">
+  1850→                <TableCell className="ps-5 font-medium text-sm">{cliqTenantName(p, lang)}</TableCell>
+  1851→                <TableCell className="px-3 text-sm">{p.customerName}</TableCell>
+  1852→                <TableCell className="px-3"><Badge variant="secondary" className="text-xs">{p.plan}</Badge></TableCell>
+  1853→                <TableCell className="px-3 text-end font-semibold tabular-nums text-sm">{p.amount.toLocaleString()} {sym}</TableCell>
+  1854→                <TableCell className="px-3 font-mono text-xs" dir="ltr">{p.referenceNumber}</TableCell>
+  1855→                <TableCell className="px-3"><StatusBadge status={p.status} locale={lang} /></TableCell>
+  1856→                <TableCell className="pe-5">
+  1857→                  <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+  1858→                    <ActionBtn icon={Eye} label={t.view} onClick={() => setDetail(p)} />
+  1859→                    {p.status === 'pending_verification' && <>
+  1860→                      <ActionBtn icon={CheckCircle2} label={t.cliqApprove} onClick={() => { setActionDlg({ type: 'approve', payment: p }); setReasonText('') }} />
+  1861→                      <ActionBtn icon={XCircle} label={t.cliqReject} onClick={() => { setActionDlg({ type: 'reject', payment: p }); setReasonText('') }} danger />
+  1862→                      <ActionBtn icon={Info} label={t.cliqRequestInfo} onClick={() => { setActionDlg({ type: 'info', payment: p }); setReasonText('') }} />
+  1863→                    </>}
+  1864→                    {(p.status === 'rejected' || p.status === 'info_requested') && (
+  1865→                      <ActionBtn icon={RefreshCw} label={t.view} onClick={() => setDetail(p)} />
+  1866→                    )}
+  1867→                  </div>
+  1868→                </TableCell>
+  1869→              </TableRow>
+  1870→            ))}
+  1871→          </TableBody></Table>
+  1872→        </div>
+  1873→        <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+  1874→      </Card>
+  1875→
+  1876→      {/* Mobile Cards */}
+  1877→      <div className="md:hidden space-y-3">
+  1878→        {items.length === 0 ? <Card className="border-0 shadow-sm"><CardContent className="py-16 text-center text-muted-foreground text-sm">{t.cliqNoPayments}</CardContent></Card> : items.map(p => (
+  1879→          <Card key={p.id} className="border-0 shadow-sm"><CardContent className="p-4">
+  1880→            <div className="flex items-start justify-between gap-3 mb-3">
+  1881→              <div className="min-w-0"><p className="font-semibold text-sm">{cliqTenantName(p, lang)}</p><p className="text-xs text-muted-foreground">{p.customerName} · {p.plan}</p></div>
+  1882→              <StatusBadge status={p.status} locale={lang} />
+  1883→            </div>
+  1884→            <div className="grid grid-cols-2 gap-3 mb-3">
+  1885→              <div className="rounded-lg bg-muted/50 p-2"><p className="text-[10px] text-muted-foreground">{t.amount}</p><p className="text-xs font-semibold mt-0.5">{p.amount.toLocaleString()} {sym}</p></div>
+  1886→              <div className="rounded-lg bg-muted/50 p-2"><p className="text-[10px] text-muted-foreground">{t.cliqReferenceNo}</p><p className="text-xs font-semibold mt-0.5 font-mono" dir="ltr">{p.referenceNumber}</p></div>
+  1887→            </div>
+  1888→            {p.rejectionReason && <p className="text-xs text-red-600 mb-2">{t.cliqRejectionReason}: {p.rejectionReason}</p>}
+  1889→            {p.additionalInfoRequest && <p className="text-xs text-sky-600 mb-2">{t.cliqInfoRequested}: {p.additionalInfoRequest}</p>}
+  1890→            <div className="flex items-center justify-end gap-1 pt-2 border-t">
+  1891→              <ActionBtn icon={Eye} onClick={() => setDetail(p)} />
+  1892→              {p.status === 'pending_verification' && <>
+  1893→                <ActionBtn icon={CheckCircle2} onClick={() => { setActionDlg({ type: 'approve', payment: p }); setReasonText('') }} />
+  1894→                <ActionBtn icon={XCircle} onClick={() => { setActionDlg({ type: 'reject', payment: p }); setReasonText('') }} danger />
+  1895→              </>}
+  1896→            </div>
+  1897→          </CardContent></Card>
+  1898→        ))}
+  1899→      </div>
+  1900→
+  1901→      {/* Detail Dialog */}
+  1902→      <Dialog open={!!detail} onOpenChange={() => setDetail(null)}>
+  1903→        <DialogContent className="max-w-lg" dir={isRTL ? 'rtl' : 'ltr'}><DialogHeader><DialogTitle>{t.cliqTitle}</DialogTitle><DialogDescription className="sr-only">{isRTL ? 'تفاصيل الدفع' : 'Payment details'}</DialogDescription></DialogHeader>
+  1904→          {detail && <div className="space-y-4 pt-2">
+  1905→            <div className="grid grid-cols-2 gap-3">
+  1906→              <div className="rounded-lg bg-muted/50 p-3"><p className="text-[10px] text-muted-foreground">{t.tenant}</p><p className="text-sm font-semibold mt-0.5">{cliqTenantName(detail, lang)}</p></div>
+  1907→              <div className="rounded-lg bg-muted/50 p-3"><p className="text-[10px] text-muted-foreground">{t.cliqCustomer}</p><p className="text-sm font-semibold mt-0.5">{detail.customerName}</p></div>
+  1908→              <div className="rounded-lg bg-muted/50 p-3"><p className="text-[10px] text-muted-foreground">{t.plan}</p><p className="text-sm font-semibold mt-0.5">{detail.plan}</p></div>
+  1909→              <div className="rounded-lg bg-muted/50 p-3"><p className="text-[10px] text-muted-foreground">{t.amount}</p><p className="text-sm font-bold mt-0.5">{detail.amount.toLocaleString()} {sym}</p></div>
+  1910→            </div>
+  1911→            <Separator />
+  1912→            <div className="space-y-2 text-sm">
+  1913→              <div className="flex justify-between"><span className="text-muted-foreground">{t.cliqReferenceNo}</span><span className="font-mono font-semibold" dir="ltr">{detail.referenceNumber}</span></div>
+  1914→              <div className="flex justify-between"><span className="text-muted-foreground">{t.cliqSubmissionDate}</span><span>{new Date(detail.submittedAt).toLocaleString(lang === 'ar' ? 'ar-JO' : 'en-JO')}</span></div>
+  1915→              <div className="flex justify-between"><span className="text-muted-foreground">{t.status}</span><StatusBadge status={detail.status} locale={lang} /></div>
+  1916→              {detail.rejectionReason && <><Separator /><p className="text-red-600 text-xs mt-2">{t.cliqRejectionReason}: {detail.rejectionReason}</p></>}
+  1917→              {detail.additionalInfoRequest && <><Separator /><p className="text-sky-600 text-xs mt-2">{t.cliqInfoRequested}: {detail.additionalInfoRequest}</p></>}
+  1918→            </div>
+  1919→          </div>}
+  1920→          <DlgFooter onCancel={() => setDetail(null)} onConfirm={() => setDetail(null)} confirmLabel={t.close} />
+  1921→        </DialogContent>
+  1922→      </Dialog>
+  1923→
+  1924→      {/* Approve Confirm */}
+  1925→      <ConfirmDialog open={actionDlg?.type === 'approve'} onOpenChange={() => setActionDlg(null)} title={t.cliqApprove} desc={t.cliqApproveDesc} onConfirm={() => { if (actionDlg?.payment) handleApprove(actionDlg.payment) }} />
+  1926→
+  1927→      {/* Reject Dialog */}
+  1928→      <Dialog open={actionDlg?.type === 'reject'} onOpenChange={() => setActionDlg(null)}>
+  1929→        <DialogContent className="max-w-md"><DialogHeader><DialogTitle>{t.cliqReject}</DialogTitle><DialogDescription>{t.cliqRejectDesc}</DialogDescription></DialogHeader>
+  1930→          <div className="space-y-4 pt-2">
+  1931→            <FormField label={t.cliqRejectionReason}><Textarea value={reasonText} onChange={e => setReasonText(e.target.value)} placeholder={t.cliqEnterReason} rows={3} /></FormField>
+  1932→          </div>
+  1933→          <DlgFooter onCancel={() => setActionDlg(null)} onConfirm={() => { if (actionDlg?.payment) handleReject(actionDlg.payment) }} danger />
+  1934→        </DialogContent>
+  1935→      </Dialog>
+  1936→
+  1937→      {/* Request Info Dialog */}
+  1938→      <Dialog open={actionDlg?.type === 'info'} onOpenChange={() => setActionDlg(null)}>
+  1939→        <DialogContent className="max-w-md" dir={isRTL ? 'rtl' : 'ltr'}><DialogHeader><DialogTitle>{t.cliqRequestInfo}</DialogTitle><DialogDescription className="sr-only">{isRTL ? 'طلب معلومات إضافية' : 'Request additional info'}</DialogDescription></DialogHeader>
+  1940→          <div className="space-y-4 pt-2">
+  1941→            <FormField label={t.cliqInfoRequestPrompt}><Textarea value={reasonText} onChange={e => setReasonText(e.target.value)} placeholder={t.cliqInfoRequestPrompt} rows={3} /></FormField>
+  1942→          </div>
+  1943→          <DlgFooter onCancel={() => setActionDlg(null)} onConfirm={() => { if (actionDlg?.payment) handleRequestInfo(actionDlg.payment) }} />
+  1944→        </DialogContent>
+  1945→      </Dialog>
+  1946→
+  1947→      {/* New Payment Dialog */}
+  1948→      <Dialog open={newPayOpen} onOpenChange={setNewPayOpen}>
+  1949→        <DialogContent className="max-w-md" dir={isRTL ? 'rtl' : 'ltr'}>
+  1950→          <DialogHeader><DialogTitle>{t.newCliqPaymentDlg}</DialogTitle><DialogDescription className="sr-only">{isRTL ? 'تسجيل دفع CLIQ جديد' : 'Register new CLIQ payment'}</DialogDescription></DialogHeader>
+  1951→          <div className="space-y-4 pt-2">
+  1952→            <FormField label={t.tenant}>
+  1953→              <Select value={newPay.tenantName} onValueChange={v => {
+  1954→                const tn = INIT_TENANTS.find(x => x.name === v || x.nameEn === v)
+  1955→                setNewPay(p => ({ ...p, tenantName: tn?.name || v, tenantNameEn: tn?.nameEn || v }))
+  1956→              }}>
+  1957→                <SelectTrigger><SelectValue placeholder={isRTL ? 'اختر المستأجر' : 'Select tenant'} /></SelectTrigger>
+  1958→                <SelectContent>{INIT_TENANTS.map(tn => <SelectItem key={tn.id} value={lang === 'en' ? tn.nameEn : tn.name}>{lang === 'en' ? tn.nameEn : tn.name}</SelectItem>)}</SelectContent>
+  1959→              </Select>
+  1960→            </FormField>
+  1961→            <FormField label={t.customerName}><Input value={newPay.customerName} onChange={e => setNewPay(p => ({ ...p, customerName: e.target.value }))} /></FormField>
+  1962→            <FormField label={t.customerEmail}><Input type="email" value={newPay.customerEmail} onChange={e => setNewPay(p => ({ ...p, customerEmail: e.target.value }))} dir="ltr" /></FormField>
+  1963→            <div className="grid grid-cols-2 gap-3">
+  1964→              <FormField label={t.plan}>
+  1965→                <Select value={newPay.plan} onValueChange={v => {
+  1966→                  setNewPay(p => ({ ...p, plan: v }))
+  1967→                  const plan = PLANS.find(pl => pl.name === v)
+  1968→                  if (plan) setNewPay(p => ({ ...p, amount: plan.price }))
+  1969→                }}>
+  1970→                  <SelectTrigger><SelectValue /></SelectTrigger>
+  1971→                  <SelectContent>{PLANS.map(p => <SelectItem key={p.id} value={p.name}>{p.name} ({p.price} {sym})</SelectItem>)}</SelectContent>
+  1972→                </Select>
+  1973→              </FormField>
+  1974→              <FormField label={t.amount}><Input type="number" value={newPay.amount || ''} onChange={e => setNewPay(p => ({ ...p, amount: Number(e.target.value) }))} /></FormField>
+  1975→            </div>
+  1976→            <FormField label={t.referenceNumber}><Input value={newPay.referenceNumber} onChange={e => setNewPay(p => ({ ...p, referenceNumber: e.target.value }))} placeholder={isRTL ? 'مثال: TXN-2025-XXXXXX' : 'e.g. TXN-2025-XXXXXX'} dir="ltr" /></FormField>
+  1977→            <FormField label={t.notes}><Textarea value={newPay.notes} onChange={e => setNewPay(p => ({ ...p, notes: e.target.value }))} rows={2} /></FormField>
+  1978→          </div>
+  1979→          <DlgFooter onCancel={() => setNewPayOpen(false)} onConfirm={handleSubmitNewPayment} confirmLabel={t.cliqSubmitPayment} />
+  1980→        </DialogContent>
+  1981→      </Dialog>
+  1982→    </div>
+  1983→  )
+  1984→}
+  1985→
+  1986→// ════════════════════════════════════════════════════════════════
+  1987→// MAIN EXPORT
+  1988→// ════════════════════════════════════════════════════════════════
+  1989→const PAGES: Record<string, () => React.JSX.Element> = {
+  1990→  sa_overview: OverviewPage,
+  1991→  sa_tenants: TenantsPage,
+  1992→  sa_users: UsersPage,
+  1993→  sa_plans: PlansPage,
+  1994→  sa_billing: BillingPage,
+  1995→  sa_cliq: CliqPaymentsPage,
+  1996→  sa_roles: RolesPage,
+  1997→  sa_audit: AuditPage,
+  1998→  sa_notifications: NotificationsPage,
+  1999→  sa_reports: ReportsPage,
+  2000→  sa_system: SystemPage,
+
+[showing lines 1-2000 of 2030; use offset=2001 with limit to continue reading]

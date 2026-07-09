@@ -52,6 +52,8 @@ const STATUS_MAP: Record<string, { cls: string; ar: string; en: string }> = {
   approved:  { cls: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400', ar: 'مقبول', en: 'Approved' },
   rejected:  { cls: 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-400', ar: 'مرفوض', en: 'Rejected' },
   info_requested: { cls: 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/40 dark:text-sky-400', ar: 'مطلوب معلومات', en: 'Info Requested' },
+  refunded: { cls: 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/40 dark:text-orange-400', ar: 'مرتجع', en: 'Refunded' },
+  cancelled: { cls: 'bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800/40 dark:text-gray-400', ar: 'ملغي', en: 'Cancelled' },
 }
 
 export function StatusBadge({ status, locale }: { status: string; locale?: string }) {

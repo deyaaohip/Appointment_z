@@ -411,6 +411,90 @@ interface T {
   notes: string
   cliqNewPaymentSuccess: string
   cliqInfoRequested2: string
+
+  // Invoice enhancements
+  invoiceDueDate: string
+  invoicePaidDate: string
+  invoiceTaxRate: string
+  invoiceNotes: string
+  invoicePaymentMethod: string
+  invoiceHistory: string
+  invoiceMarkPaid: string
+  invoiceRefund: string
+  invoiceSendReminder: string
+  invoiceCancel: string
+  invoiceStatusChanged: string
+  invoiceMarkPaidDesc: string
+  invoiceRefundDesc: string
+  invoiceSendReminderDesc: string
+  invoiceCreatedBy: string
+  invoiceCliq: string
+  invoiceCard: string
+  invoiceBankTransfer: string
+  invoiceDaysOverdue: string
+  invoiceDueIn: string
+  invoicePaymentStatus: string
+  invoiceSelectMethod: string
+  invoiceConfirmPayment: string
+
+  // Plans enhancements
+  planCompare: string
+  planSyncBanner: string
+  planNumericLimit: string
+  planEnableFeature: string
+  planCompareSelect: string
+  planNoCompare: string
+  planEditLimits: string
+  planSubscribedTenants: string
+  planValue: string
+
+  // RBAC
+  rbacTitle: string
+  rbacMatrix: string
+  rbacPermissions: string
+  rbacInheritance: string
+  rbacTemplates: string
+  rbacCloneRole: string
+  rbacApplyTemplate: string
+  rbacSaveAsTemplate: string
+  rbacEffectivePerms: string
+  rbacInherited: string
+  rbacOwnPerms: string
+  rbacSystemRole: string
+  rbacParentRole: string
+  rbacNoParent: string
+  rbacCloneSuffix: string
+  rbacRoleCloned: string
+  rbacSelectParent: string
+  rbacTotalPermissions: string
+  rbacModule: string
+  rbacAction: string
+  rbacView: string
+  rbacCreate: string
+  rbacEdit: string
+  rbacDelete: string
+  rbacExport: string
+  rbacImport: string
+  rbacPrint: string
+  rbacApprove: string
+  rbacReject: string
+  rbacRestore: string
+  rbacArchive: string
+  rbacReadOnly: string
+  rbacStandardUser: string
+  rbacManager: string
+  rbacFullAccess: string
+  rbacTemplateApplied: string
+  rbacTemplateSaved: string
+  rbacHidePage: string
+  rbacForbidden: string
+  rbacJwtClaims: string
+  rbacMenuVisibility: string
+  rbacCloneFromRole: string
+  rbacViewDetails: string
+  rbacPermissionCount: string
+  rbacUserCount: string
+  rbacDescription: string
 }
 
 const ar: T = {
@@ -794,6 +878,87 @@ const ar: T = {
   notes: 'ملاحظات',
   cliqNewPaymentSuccess: 'تم إرسال طلب الدفع بنجاح',
   cliqInfoRequested2: 'طلب معلومات',
+  // Invoice enhancements
+  invoiceDueDate: 'تاريخ الاستحقاق',
+  invoicePaidDate: 'تاريخ الدفع',
+  invoiceTaxRate: 'نسبة الضريبة',
+  invoiceNotes: 'ملاحظات',
+  invoicePaymentMethod: 'طريقة الدفع',
+  invoiceHistory: 'سجل الفاتورة',
+  invoiceMarkPaid: 'تحديد كمدفوع',
+  invoiceRefund: 'إرجاع',
+  invoiceSendReminder: 'إرسال تذكير',
+  invoiceCancel: 'إلغاء',
+  invoiceStatusChanged: 'تم تغيير حالة الفاتورة',
+  invoiceMarkPaidDesc: 'تحديد الفاتورة كمدفوعة؟',
+  invoiceRefundDesc: 'إرجاع مبلغ هذه الفاتورة؟',
+  invoiceSendReminderDesc: 'إرسال تذكير دفع للعميل؟',
+  invoiceCreatedBy: 'بواسطة',
+  invoiceCliq: 'CLIQ',
+  invoiceCard: 'بطاقة',
+  invoiceBankTransfer: 'تحويل بنكي',
+  invoiceDaysOverdue: 'يوم متأخر',
+  invoiceDueIn: 'مستحق خلال',
+  invoicePaymentStatus: 'حالة الدفع',
+  invoiceSelectMethod: 'اختر طريقة الدفع',
+  invoiceConfirmPayment: 'تأكيد الدفع',
+  // Plans enhancements
+  planCompare: 'مقارنة الباقات',
+  planSyncBanner: 'المستأجرون المشتركون سيتم تحديث صلاحياتهم تلقائياً',
+  planNumericLimit: 'الحد الرقمي',
+  planEnableFeature: 'تفعيل الميزة',
+  planCompareSelect: 'اختر باقات للمقارنة',
+  planNoCompare: 'اختر باقتين أو أكثر للمقارنة',
+  planEditLimits: 'تعديل الحدود',
+  planSubscribedTenants: 'مستأجرون مشتركون',
+  planValue: 'القيمة',
+  // RBAC
+  rbacTitle: 'نظام الصلاحيات (RBAC)',
+  rbacMatrix: 'مصفوفة الصلاحيات',
+  rbacPermissions: 'الصلاحيات',
+  rbacInheritance: 'توريث الصلاحيات',
+  rbacTemplates: 'قوالب الصلاحيات',
+  rbacCloneRole: 'استنساخ الدور',
+  rbacApplyTemplate: 'تطبيق القالب',
+  rbacSaveAsTemplate: 'حفظ كقالب',
+  rbacEffectivePerms: 'الصلاحيات الفعالة',
+  rbacInherited: 'موروث',
+  rbacOwnPerms: 'خاصة',
+  rbacSystemRole: 'دور نظام',
+  rbacParentRole: 'الدور الأب',
+  rbacNoParent: 'بدون أب',
+  rbacCloneSuffix: '(نسخة)',
+  rbacRoleCloned: 'تم استنساخ الدور',
+  rbacSelectParent: 'اختر الدور الأب للتوريث',
+  rbacTotalPermissions: 'إجمالي الصلاحيات',
+  rbacModule: 'الوحدة',
+  rbacAction: 'الإجراء',
+  rbacView: 'عرض',
+  rbacCreate: 'إنشاء',
+  rbacEdit: 'تعديل',
+  rbacDelete: 'حذف',
+  rbacExport: 'تصدير',
+  rbacImport: 'استيراد',
+  rbacPrint: 'طباعة',
+  rbacApprove: 'موافقة',
+  rbacReject: 'رفض',
+  rbacRestore: 'استعادة',
+  rbacArchive: 'أرشفة',
+  rbacReadOnly: 'قراءة فقط',
+  rbacStandardUser: 'مستخدم عادي',
+  rbacManager: 'مدير',
+  rbacFullAccess: 'صلاحيات كاملة',
+  rbacTemplateApplied: 'تم تطبيق القالب',
+  rbacTemplateSaved: 'تم حفظ القالب',
+  rbacHidePage: 'إخفاء الصفحة',
+  rbacForbidden: 'ممنوع الوصول (403)',
+  rbacJwtClaims: 'تضمين JWT Claims',
+  rbacMenuVisibility: 'إظهار/إخفاء القوائم',
+  rbacCloneFromRole: 'استنساخ من دور',
+  rbacViewDetails: 'عرض التفاصيل',
+  rbacPermissionCount: 'عدد الصلاحيات',
+  rbacUserCount: 'عدد المستخدمين',
+  rbacDescription: 'الوصف',
 }
 
 const en: T = {
@@ -1155,6 +1320,87 @@ const en: T = {
   notes: 'Notes',
   cliqNewPaymentSuccess: 'Payment request submitted successfully',
   cliqInfoRequested2: 'Request Info',
+  // Invoice enhancements
+  invoiceDueDate: 'Due Date',
+  invoicePaidDate: 'Paid Date',
+  invoiceTaxRate: 'Tax Rate',
+  invoiceNotes: 'Notes',
+  invoicePaymentMethod: 'Payment Method',
+  invoiceHistory: 'Invoice History',
+  invoiceMarkPaid: 'Mark as Paid',
+  invoiceRefund: 'Refund',
+  invoiceSendReminder: 'Send Reminder',
+  invoiceCancel: 'Cancel',
+  invoiceStatusChanged: 'Invoice status changed',
+  invoiceMarkPaidDesc: 'Mark this invoice as paid?',
+  invoiceRefundDesc: 'Refund this invoice amount?',
+  invoiceSendReminderDesc: 'Send payment reminder to customer?',
+  invoiceCreatedBy: 'By',
+  invoiceCliq: 'CLIQ',
+  invoiceCard: 'Card',
+  invoiceBankTransfer: 'Bank Transfer',
+  invoiceDaysOverdue: 'days overdue',
+  invoiceDueIn: 'due in',
+  invoicePaymentStatus: 'Payment Status',
+  invoiceSelectMethod: 'Select Payment Method',
+  invoiceConfirmPayment: 'Confirm Payment',
+  // Plans enhancements
+  planCompare: 'Compare Plans',
+  planSyncBanner: 'Subscribed tenants will have their permissions auto-updated',
+  planNumericLimit: 'Numeric Limit',
+  planEnableFeature: 'Enable Feature',
+  planCompareSelect: 'Select plans to compare',
+  planNoCompare: 'Select 2 or more plans to compare',
+  planEditLimits: 'Edit Limits',
+  planSubscribedTenants: 'subscribed tenants',
+  planValue: 'Value',
+  // RBAC
+  rbacTitle: 'RBAC Permission System',
+  rbacMatrix: 'Permission Matrix',
+  rbacPermissions: 'Permissions',
+  rbacInheritance: 'Permission Inheritance',
+  rbacTemplates: 'Permission Templates',
+  rbacCloneRole: 'Clone Role',
+  rbacApplyTemplate: 'Apply Template',
+  rbacSaveAsTemplate: 'Save as Template',
+  rbacEffectivePerms: 'Effective Permissions',
+  rbacInherited: 'Inherited',
+  rbacOwnPerms: 'Own',
+  rbacSystemRole: 'System Role',
+  rbacParentRole: 'Parent Role',
+  rbacNoParent: 'No Parent',
+  rbacCloneSuffix: '(Copy)',
+  rbacRoleCloned: 'Role cloned',
+  rbacSelectParent: 'Select parent role for inheritance',
+  rbacTotalPermissions: 'Total Permissions',
+  rbacModule: 'Module',
+  rbacAction: 'Action',
+  rbacView: 'View',
+  rbacCreate: 'Create',
+  rbacEdit: 'Edit',
+  rbacDelete: 'Delete',
+  rbacExport: 'Export',
+  rbacImport: 'Import',
+  rbacPrint: 'Print',
+  rbacApprove: 'Approve',
+  rbacReject: 'Reject',
+  rbacRestore: 'Restore',
+  rbacArchive: 'Archive',
+  rbacReadOnly: 'Read Only',
+  rbacStandardUser: 'Standard User',
+  rbacManager: 'Manager',
+  rbacFullAccess: 'Full Access',
+  rbacTemplateApplied: 'Template applied',
+  rbacTemplateSaved: 'Template saved',
+  rbacHidePage: 'Hide Page',
+  rbacForbidden: 'Forbidden (403)',
+  rbacJwtClaims: 'Include JWT Claims',
+  rbacMenuVisibility: 'Show/Hide Menus',
+  rbacCloneFromRole: 'Clone from Role',
+  rbacViewDetails: 'View Details',
+  rbacPermissionCount: 'Permission Count',
+  rbacUserCount: 'User Count',
+  rbacDescription: 'Description',
 }
 
 const translations: Record<Lang, T> = { ar, en }

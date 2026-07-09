@@ -52,6 +52,15 @@ export interface SysLog {
   timestamp: string
 }
 
+export interface InvoiceHistoryItem {
+  date: string
+  action: string
+  actionEn: string
+  details: string
+  detailsEn: string
+  by: string
+}
+
 export interface Invoice {
   id: string
   tenant: string
@@ -59,8 +68,14 @@ export interface Invoice {
   amount: number
   status: string
   date: string
+  dueDate: string
+  paidDate: string | null
   plan: string
   currency: string
+  taxRate: number
+  notes: string
+  paymentMethod: string
+  history: InvoiceHistoryItem[]
 }
 
 export interface Role {
@@ -71,6 +86,10 @@ export interface Role {
   permissions: number
   description: string
   descriptionEn: string
+  // RBAC fields
+  isSystem?: boolean
+  parentId?: string | null
+  rbacPermissions?: Record<string, string[]>
 }
 
 export interface Plan {
@@ -232,12 +251,12 @@ export const SERVERS: Server[] = [
 ]
 
 export const INVOICES: Invoice[] = [
-  { id: 'INV-001', tenant: 'مركز النور الطبي', tenantEn: 'Al Noor Medical', amount: 250, status: 'paid', date: '2025-06-01', plan: 'Enterprise', currency: 'JOD' },
-  { id: 'INV-002', tenant: 'صالون ياسمين', tenantEn: 'Yasmin Beauty', amount: 75, status: 'paid', date: '2025-06-01', plan: 'Professional', currency: 'JOD' },
-  { id: 'INV-003', tenant: 'أكاديمية المستقبل', tenantEn: 'Future Academy', amount: 75, status: 'pending', date: '2025-06-01', plan: 'Professional', currency: 'JOD' },
-  { id: 'INV-004', tenant: 'عيادة العيون المتقدمة', tenantEn: 'Advanced Eye Clinic', amount: 150, status: 'paid', date: '2025-06-01', plan: 'Business', currency: 'JOD' },
-  { id: 'INV-005', tenant: 'مركز التجميل الملكي', tenantEn: 'Royal Beauty', amount: 250, status: 'overdue', date: '2025-05-01', plan: 'Enterprise', currency: 'JOD' },
-  { id: 'INV-006', tenant: 'نادي اللياقة الذهبية', tenantEn: 'Golden Fitness', amount: 75, status: 'failed', date: '2025-06-01', plan: 'Professional', currency: 'JOD' },
+  { id: 'INV-001', tenant: 'مركز النور الطبي', tenantEn: 'Al Noor Medical', amount: 250, status: 'paid', date: '2025-06-01', dueDate: '2025-07-01', paidDate: '2025-06-03', plan: 'Enterprise', currency: 'JOD', taxRate: 16, notes: '', paymentMethod: 'cliq', history: [{ date: '2025-06-01T10:00:00Z', action: 'إنشاء الفاتورة', actionEn: 'Invoice created', details: 'تم إنشاء فاتورة اشتراك Enterprise', detailsEn: 'Enterprise subscription invoice created', by: 'System' }, { date: '2025-06-02T09:00:00Z', action: 'إرسال تذكير', actionEn: 'Reminder sent', details: 'تم إرسال تذكير بالبريد الإلكتروني', detailsEn: 'Email reminder sent', by: 'System' }, { date: '2025-06-03T14:30:00Z', action: 'دفعة ناجحة', actionEn: 'Payment received', details: 'تم الاستلام عبر CLIQ — TXN-2025-881234', detailsEn: 'Received via CLIQ — TXN-2025-881234', by: 'Super Admin' }] },
+  { id: 'INV-002', tenant: 'صالون ياسمين', tenantEn: 'Yasmin Beauty', amount: 75, status: 'paid', date: '2025-06-01', dueDate: '2025-07-01', paidDate: '2025-06-05', plan: 'Professional', currency: 'JOD', taxRate: 16, notes: '', paymentMethod: 'card', history: [{ date: '2025-06-01T10:00:00Z', action: 'إنشاء الفاتورة', actionEn: 'Invoice created', details: 'تم إنشاء فاتورة اشتراك Professional', detailsEn: 'Professional subscription invoice created', by: 'System' }, { date: '2025-06-05T11:00:00Z', action: 'دفعة ناجحة', actionEn: 'Payment received', details: 'تم الاستلام عبر بطاقة ائتمان', detailsEn: 'Received via credit card', by: 'System' }] },
+  { id: 'INV-003', tenant: 'أكاديمية المستقبل', tenantEn: 'Future Academy', amount: 75, status: 'pending', date: '2025-06-15', dueDate: '2025-07-15', paidDate: null, plan: 'Professional', currency: 'JOD', taxRate: 16, notes: '', paymentMethod: '', history: [{ date: '2025-06-15T10:00:00Z', action: 'إنشاء الفاتورة', actionEn: 'Invoice created', details: 'تم إنشاء فاتورة اشتراك Professional', detailsEn: 'Professional subscription invoice created', by: 'System' }] },
+  { id: 'INV-004', tenant: 'عيادة العيون المتقدمة', tenantEn: 'Advanced Eye Clinic', amount: 150, status: 'paid', date: '2025-06-01', dueDate: '2025-07-01', paidDate: '2025-06-02', plan: 'Business', currency: 'JOD', taxRate: 16, notes: '', paymentMethod: 'bank_transfer', history: [{ date: '2025-06-01T10:00:00Z', action: 'إنشاء الفاتورة', actionEn: 'Invoice created', details: 'تم إنشاء فاتورة اشتراك Business', detailsEn: 'Business subscription invoice created', by: 'System' }, { date: '2025-06-02T16:00:00Z', action: 'دفعة ناجحة', actionEn: 'Payment received', details: 'تم الاستلام عبر تحويل بنكي', detailsEn: 'Received via bank transfer', by: 'Super Admin' }] },
+  { id: 'INV-005', tenant: 'مركز التجميل الملكي', tenantEn: 'Royal Beauty', amount: 250, status: 'overdue', date: '2025-05-01', dueDate: '2025-06-01', paidDate: null, plan: 'Enterprise', currency: 'JOD', taxRate: 16, notes: 'تم إرسال 3 تذكيرات', paymentMethod: '', history: [{ date: '2025-05-01T10:00:00Z', action: 'إنشاء الفاتورة', actionEn: 'Invoice created', details: 'تم إنشاء فاتورة اشتراك Enterprise', detailsEn: 'Enterprise subscription invoice created', by: 'System' }, { date: '2025-05-15T09:00:00Z', action: 'إرسال تذكير', actionEn: 'Reminder sent', details: 'التذكير الأول', detailsEn: 'First reminder', by: 'System' }, { date: '2025-05-25T09:00:00Z', action: 'إرسال تذكير', actionEn: 'Reminder sent', details: 'التذكير الثاني', detailsEn: 'Second reminder', by: 'System' }, { date: '2025-06-01T00:00:00Z', action: 'تأخر', actionEn: 'Overdue', details: 'تجاوز تاريخ الاستحقاق', detailsEn: 'Due date passed', by: 'System' }, { date: '2025-06-10T09:00:00Z', action: 'إرسال تذكير', actionEn: 'Reminder sent', details: 'التذكير الثالث — إشعار تأخير', detailsEn: 'Third reminder — overdue notice', by: 'System' }] },
+  { id: 'INV-006', tenant: 'نادي اللياقة الذهبية', tenantEn: 'Golden Fitness', amount: 75, status: 'failed', date: '2025-06-01', dueDate: '2025-07-01', paidDate: null, plan: 'Professional', currency: 'JOD', taxRate: 16, notes: 'بطاقة مسربة', paymentMethod: '', history: [{ date: '2025-06-01T10:00:00Z', action: 'إنشاء الفاتورة', actionEn: 'Invoice created', details: 'تم إنشاء فاتورة اشتراك Professional', detailsEn: 'Professional subscription invoice created', by: 'System' }, { date: '2025-06-01T12:30:00Z', action: 'فشل الدفع', actionEn: 'Payment failed', details: 'بطاقة مسربة — رفض البنك', detailsEn: 'Declined card — bank rejected', by: 'Payment Gateway' }] },
 ]
 
 export const BACKUPS: Backup[] = [

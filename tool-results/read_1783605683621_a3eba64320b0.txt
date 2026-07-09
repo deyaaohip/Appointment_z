@@ -1,0 +1,502 @@
+   900→   900→            </div>
+   901→   901→          </div>
+   902→   902→          <DlgFooter onCancel={() => setDlg(null)} onConfirm={handleSave} />
+   903→   903→        </DialogContent>
+   904→   904→      </Dialog>
+   905→   905→
+   906→   906→      {/* Delete Confirm */}
+   907→   907→      <ConfirmDialog open={dlg?.type === 'delete'} onOpenChange={() => setDlg(null)} title={t.delete} desc={lang === 'ar' ? `هل أنت متأكد من حذف باقة "${dlg?.plan?.name}"؟` : `Delete plan "${dlg?.plan?.name}"?`} onConfirm={handleDelete} danger />
+   908→   908→    </div>
+   909→   909→  )
+   910→   910→}
+   911→   911→
+   912→   912→// ════════════════════════════════════════════════════════════════
+   913→   913→// PAGE 5: BILLING (Full invoice CRUD + CSV export + JOD)
+   914→   914→// ════════════════════════════════════════════════════════════════
+   915→   915→function BillingPage() {
+   916→   916→  const { t, lang, isRTL } = useSA()
+   917→   917→  const { fmt, sym } = useCurrency()
+   918→   918→  const [invoices, setInvoices] = useState<Invoice[]>([...INVOICES])
+   919→   919→  const [filter, setFilter] = useState('all')
+   920→   920→  const [page, setPage] = useState(1)
+   921→   921→  const [sort, setSort] = useState<SortState>({ key: 'date', dir: 'desc' })
+   922→   922→  const [addOpen, setAddOpen] = useState(false)
+   923→   923→  const [invForm, setInvForm] = useState({ tenant: '', tenantEn: '', plan: 'Starter', amount: 0, status: 'pending' as string })
+   924→   924→
+   925→   925→  const filtered = useMemo(() => {
+   926→   926→    let list = filter === 'all' ? [...invoices] : invoices.filter(i => i.status === filter)
+   927→   927→    return genericSort(list, sort.key, sort.dir, lang)
+   928→   928→  }, [invoices, filter, sort, lang])
+   929→   929→  const { items, totalPages } = paginate(filtered, page, PER_PAGE)
+   930→   930→  const handleSort = (key: string) => setSort(p => p.key === key ? { key, dir: p.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' })
+   931→   931→  const totalPaid = invoices.filter(i => i.status === 'paid').reduce((s, i) => s + i.amount, 0)
+   932→   932→  const totalPending = invoices.filter(i => i.status === 'pending' || i.status === 'overdue').reduce((s, i) => s + i.amount, 0)
+   933→   933→
+   934→   934→  const [previewInv, setPreviewInv] = useState<Invoice | null>(null)
+   935→   935→
+   936→   936→  const handleMarkPaid = (inv: Invoice) => {
+   937→   937→    setInvoices(p => p.map(i => i.id === inv.id ? { ...i, status: 'paid' } : i))
+   938→   938→    toast.success(t.paid)
+   939→   939→  }
+   940→   940→
+   941→   941→  const handleCreateInvoice = () => {
+   942→   942→    if (!invForm.tenant.trim()) { toast.error(isRTL ? 'يرجى اختيار المستأجر' : 'Please select a tenant'); return }
+   943→   943→    if (invForm.amount <= 0) { toast.error(isRTL ? 'يرجى إدخال مبلغ صحيح' : 'Please enter a valid amount'); return }
+   944→   944→    const newId = `INV-${String(invoices.length + 1).padStart(3, '0')}`
+   945→   945→    const inv: Invoice = {
+   946→   946→      id: newId, tenant: invForm.tenant, tenantEn: invForm.tenantEn,
+   947→   947→      amount: invForm.amount, status: invForm.status,
+   948→   948→      date: new Date().toISOString().split('T')[0],
+   949→   949→      plan: invForm.plan, currency: 'JOD',
+   950→   950→    }
+   951→   951→    setInvoices(p => [inv, ...p]); toast.success(isRTL ? `تم إنشاء الفاتورة ${newId}` : `Invoice ${newId} created`); setAddOpen(false)
+   952→   952→    setInvForm({ tenant: '', tenantEn: '', plan: 'Starter', amount: 0, status: 'pending' })
+   953→   953→  }
+   954→   954→
+   955→   955→  const handleExportExcel = useCallback(() => {
+   956→   956→    import('xlsx').then(XLSX => {
+   957→   957→      const statusLabels: Record<string, string> = { paid: isRTL ? 'مدفوع' : 'Paid', pending: isRTL ? 'معلق' : 'Pending', overdue: isRTL ? 'متأخر' : 'Overdue', failed: isRTL ? 'فاشل' : 'Failed' }
+   958→   958→      const headers = isRTL
+   959→   959→        ? ['رقم الفاتورة', 'المستأجر', 'الباقة', 'المبلغ (د.أ)', 'العملة', 'الحالة', 'التاريخ']
+   960→   960→        : ['Invoice No.', 'Tenant', 'Plan', 'Amount (JOD)', 'Currency', 'Status', 'Date']
+   961→   961→      const rows = filtered.map(inv => [
+   962→   962→        inv.id, isRTL ? inv.tenant : (inv.tenantEn || inv.tenant), inv.plan,
+   963→   963→        inv.amount, inv.currency, statusLabels[inv.status] || inv.status, inv.date,
+   964→   964→      ])
+   965→   965→      const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
+   966→   966→      ws['!cols'] = headers.map(() => ({ wch: 20 }))
+   967→   967→      const wb = XLSX.utils.book_new()
+   968→   968→      XLSX.utils.book_append_sheet(wb, ws, isRTL ? 'الفواتير' : 'Invoices')
+   969→   969→      XLSX.writeFile(wb, `invoices_${new Date().toISOString().split('T')[0]}.xlsx`)
+   970→   970→      toast.success(isRTL ? 'تم تصدير الفواتير إلى Excel بنجاح' : 'Invoices exported to Excel successfully')
+   971→   971→    }).catch(() => {
+   972→   972→      toast.error(isRTL ? 'فشل تصدير Excel' : 'Excel export failed')
+   973→   973→    })
+   974→   974→  }, [filtered, isRTL])
+   975→   975→
+   976→   976→  const handleDeleteInvoice = (inv: Invoice) => {
+   977→   977→    setInvoices(p => p.filter(i => i.id !== inv.id)); toast.success(t.deleted); setPage(1)
+   978→   978→  }
+   979→   979→
+   980→   980→  return (
+   981→   981→    <div className="space-y-5">
+   982→   982→      <PageTitle title={t.billingTitle} action={
+   983→   983→        <div className="flex gap-2">
+   984→   984→          <Button variant="outline" className="gap-2 h-9" onClick={handleExportExcel}><Download className="h-4 w-4" />{t.exportExcel}</Button>
+   985→   985→          <PrimaryBtn icon={Plus} label={t.createInvoice} onClick={() => setAddOpen(true)} />
+   986→   986→        </div>
+   987→   987→      } />
+   988→   988→      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+   989→   989→        <StatCard icon={CheckCircle2} label={t.payments} value={fmt(totalPaid)} color="text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30" />
+   990→   990→        <StatCard icon={Clock} label={t.pending} value={fmt(totalPending)} color="text-amber-600 bg-amber-50 dark:bg-amber-950/30" />
+   991→   991→        <StatCard icon={Banknote} label={t.paid} value={`${invoices.filter(i => i.status === 'paid').length}`} color="text-sky-600 bg-sky-50 dark:bg-sky-950/30" />
+   992→   992→        <StatCard icon={AlertTriangle} label={t.overdue} value={`${invoices.filter(i => i.status === 'overdue').length}`} color="text-red-600 bg-red-50 dark:bg-red-950/30" />
+   993→   993→      </div>
+   994→   994→      <div className="flex gap-3">
+   995→   995→        <Select value={filter} onValueChange={v => { setFilter(v); setPage(1) }}>
+   996→   996→          <SelectTrigger className="w-44 h-10"><SelectValue /></SelectTrigger>
+   997→   997→          <SelectContent><SelectItem value="all">{t.all}</SelectItem><SelectItem value="paid">{t.paid}</SelectItem><SelectItem value="pending">{t.pending}</SelectItem><SelectItem value="overdue">{t.overdue}</SelectItem><SelectItem value="failed">{t.failed}</SelectItem></SelectContent>
+   998→   998→        </Select>
+   999→   999→      </div>
+  1000→  1000→
+  1001→  1001→      <Card className="border-0 shadow-sm overflow-hidden hidden md:block">
+  1002→  1002→        <div className="overflow-x-auto">
+  1003→  1003→          <Table><TableHeader><TableRow className="bg-muted/50 hover:bg-muted/50">
+  1004→  1004→            <SortableTH label={t.invoiceNo} sortKey="id" currentSort={sort} onSort={handleSort} className="ps-5" />
+  1005→  1005→            <SortableTH label={t.tenant} sortKey="tenant" currentSort={sort} onSort={handleSort} />
+  1006→  1006→            <SortableTH label={t.plan} sortKey="plan" currentSort={sort} onSort={handleSort} className="hidden lg:table-cell" />
+  1007→  1007→            <SortableTH label={t.amount} sortKey="amount" currentSort={sort} onSort={handleSort} align="end" />
+  1008→  1008→            <SortableTH label={t.status} sortKey="status" currentSort={sort} onSort={handleSort} />
+  1009→  1009→            <TableHead className="pe-5 font-semibold text-xs uppercase tracking-wider text-end">{t.actions}</TableHead>
+  1010→  1010→          </TableRow></TableHeader>
+  1011→  1011→          <TableBody>
+  1012→  1012→            {items.length === 0 ? <EmptyRow colSpan={6} /> : items.map(inv => (
+  1013→  1013→            <TableRow key={inv.id} className="group hover:bg-muted/20 transition-colors">
+  1014→  1014→              <TableCell className="ps-5 font-mono text-sm font-semibold">{inv.id}</TableCell>
+  1015→  1015→              <TableCell className="px-3 text-sm">{invTenant(inv, lang)}</TableCell>
+  1016→  1016→              <TableCell className="px-3 hidden lg:table-cell"><Badge variant="secondary" className="text-xs">{inv.plan}</Badge></TableCell>
+  1017→  1017→              <TableCell className="px-3 text-end font-semibold tabular-nums text-sm">{inv.amount.toLocaleString()} <span className="text-xs font-normal text-muted-foreground">{sym}</span></TableCell>
+  1018→  1018→              <TableCell className="px-3"><StatusBadge status={inv.status} locale={lang} /></TableCell>
+  1019→  1019→              <TableCell className="pe-5">
+  1020→  1020→                <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+  1021→  1021→                  <ActionBtn icon={Eye} label={t.view} onClick={() => setPreviewInv(inv)} />
+  1022→  1022→                  {inv.status !== 'paid' && <ActionBtn icon={CheckCircle2} label={t.paid} onClick={() => handleMarkPaid(inv)} />}
+  1023→  1023→                  <ActionBtn icon={Download} onClick={() => handleExportExcel()} />
+  1024→  1024→                  <ActionBtn icon={Trash2} onClick={() => handleDeleteInvoice(inv)} danger />
+  1025→  1025→                </div>
+  1026→  1026→              </TableCell>
+  1027→  1027→            </TableRow>
+  1028→  1028→          ))}
+  1029→  1029→          </TableBody></Table>
+  1030→  1030→        </div>
+  1031→  1031→        <TableFooter current={items.length} total={filtered.length} entity={isRTL ? 'فاتورة' : 'invoices'} />
+  1032→  1032→        <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+  1033→  1033→      </Card>
+  1034→  1034→
+  1035→  1035→      <div className="md:hidden space-y-3">
+  1036→  1036→        {items.length === 0 ? <Card className="border-0 shadow-sm"><CardContent className="py-16 text-center text-muted-foreground text-sm">{t.noResults}</CardContent></Card> : items.map(inv => (
+  1037→  1037→          <Card key={inv.id} className="border-0 shadow-sm"><CardContent className="p-4">
+  1038→  1038→            <div className="flex items-start justify-between gap-3 mb-3">
+  1039→  1039→              <div className="min-w-0"><p className="font-mono text-sm font-bold">{inv.id}</p><p className="text-xs text-muted-foreground mt-0.5">{invTenant(inv, lang)}</p></div>
+  1040→  1040→              <StatusBadge status={inv.status} locale={lang} />
+  1041→  1041→            </div>
+  1042→  1042→            <div className="flex items-center justify-between pt-2 border-t">
+  1043→  1043→              <span className="font-bold text-sm">{inv.amount.toLocaleString()} <span className="text-xs font-normal text-muted-foreground">{sym}</span></span>
+  1044→  1044→              <div className="flex gap-1">
+  1045→  1045→                {inv.status !== 'paid' && <ActionBtn icon={CheckCircle2} onClick={() => handleMarkPaid(inv)} />}
+  1046→  1046→                <ActionBtn icon={Download} onClick={() => handleExportExcel()} />
+  1047→  1047→                <ActionBtn icon={Trash2} onClick={() => handleDeleteInvoice(inv)} danger />
+  1048→  1048→              </div>
+  1049→  1049→            </div>
+  1050→  1050→          </CardContent></Card>
+  1051→  1051→        ))}
+  1052→  1052→      </div>
+  1053→  1053→
+  1054→  1054→      {/* Create Invoice Dialog */}
+  1055→  1055→      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+  1056→  1056→        <DialogContent className="max-w-md" dir={isRTL ? 'rtl' : 'ltr'}><DialogHeader><DialogTitle>{t.createInvoice}</DialogTitle><DialogDescription className="sr-only">{isRTL ? 'إنشاء فاتورة جديدة' : 'Create a new invoice'}</DialogDescription></DialogHeader>
+  1057→  1057→          <div className="space-y-4 pt-2">
+  1058→  1058→            <FormField label={t.tenant}>
+  1059→  1059→              <Select value={invForm.tenant} onValueChange={v => {
+  1060→  1060→                const tn = INIT_TENANTS.find(x => x.name === v || x.nameEn === v)
+  1061→  1061→                setInvForm(p => ({ ...p, tenant: tn?.name || v, tenantEn: tn?.nameEn || v }))
+  1062→  1062→              }}>
+  1063→  1063→                <SelectTrigger><SelectValue placeholder={isRTL ? 'اختر المستأجر' : 'Select tenant'} /></SelectTrigger>
+  1064→  1064→                <SelectContent>
+  1065→  1065→                  {INIT_TENANTS.map(tn => <SelectItem key={tn.id} value={lang === 'en' ? tn.nameEn : tn.name}>{lang === 'en' ? tn.nameEn : tn.name}</SelectItem>)}
+  1066→  1066→                </SelectContent>
+  1067→  1067→              </Select>
+  1068→  1068→            </FormField>
+  1069→  1069→            <div className="grid grid-cols-2 gap-3">
+  1070→  1070→              <FormField label={t.plan}>
+  1071→  1071→                <Select value={invForm.plan} onValueChange={v => {
+  1072→  1072→                  setInvForm(p => ({ ...p, plan: v }))
+  1073→  1073→                  const plan = PLANS.find(pl => pl.name === v)
+  1074→  1074→                  if (plan) setInvForm(p => ({ ...p, amount: plan.price }))
+  1075→  1075→                }}>
+  1076→  1076→                  <SelectTrigger><SelectValue /></SelectTrigger>
+  1077→  1077→                  <SelectContent>{PLANS.map(p => <SelectItem key={p.id} value={p.name}>{p.name} ({p.price} {sym})</SelectItem>)}</SelectContent>
+  1078→  1078→                </Select>
+  1079→  1079→              </FormField>
+  1080→  1080→              <FormField label={t.amount}>
+  1081→  1081→                <Input type="number" value={invForm.amount || ''} onChange={e => setInvForm(p => ({ ...p, amount: Number(e.target.value) }))} />
+  1082→  1082→              </FormField>
+  1083→  1083→            </div>
+  1084→  1084→            <FormField label={t.status}>
+  1085→  1085→              <Select value={invForm.status} onValueChange={v => setInvForm(p => ({ ...p, status: v }))}>
+  1086→  1086→                <SelectTrigger><SelectValue /></SelectTrigger>
+  1087→  1087→                <SelectContent>
+  1088→  1088→                  <SelectItem value="pending">{t.pending}</SelectItem>
+  1089→  1089→                  <SelectItem value="paid">{t.paid}</SelectItem>
+  1090→  1090→                </SelectContent>
+  1091→  1091→              </Select>
+  1092→  1092→            </FormField>
+  1093→  1093→          </div>
+  1094→  1094→          <DlgFooter onCancel={() => setAddOpen(false)} onConfirm={handleCreateInvoice} confirmLabel={isRTL ? 'إنشاء' : 'Create'} />
+  1095→  1095→        </DialogContent>
+  1096→  1096→      </Dialog>
+  1097→  1097→    </div>
+  1098→  1098→  )
+  1099→  1099→}
+  1100→  1100→
+  1101→  1101→// ════════════════════════════════════════════════════════════════
+  1102→  1102→// PAGE 6: ROLES (full CRUD)
+  1103→  1103→// ════════════════════════════════════════════════════════════════
+  1104→  1104→function RolesPage() {
+  1105→  1105→  const { t, lang, isRTL } = useSA()
+  1106→  1106→  const [roles, setRoles] = useState<Role[]>(INIT_ROLES)
+  1107→  1107→  const [addOpen, setAddOpen] = useState(false)
+  1108→  1108→  const [editRole, setEditRole] = useState<Role | null>(null)
+  1109→  1109→  const [form, setForm] = useState({ name: '', nameEn: '', desc: '', descEn: '' })
+  1110→  1110→
+  1111→  1111→  const openAdd = () => { setForm({ name: '', nameEn: '', desc: '', descEn: '' }); setAddOpen(true) }
+  1112→  1112→  const openEdit = (r: Role) => { setForm({ name: r.name, nameEn: r.nameEn, desc: r.description, descEn: r.descriptionEn }); setEditRole(r) }
+  1113→  1113→
+  1114→  1114→  const rName = (r: Role) => lang === 'en' ? r.nameEn : r.name
+  1115→  1115→  const rDesc = (r: Role) => lang === 'en' ? r.descriptionEn : r.description
+  1116→  1116→
+  1117→  1117→  const handleCreate = () => {
+  1118→  1118→    if (!form.name.trim()) return
+  1119→  1119→    const r: Role = { id: Date.now().toString(), name: form.name, nameEn: form.nameEn, users: 0, permissions: 0, description: form.desc, descriptionEn: form.descEn }
+  1120→  1120→    setRoles(p => [r, ...p]); toast.success(t.roleCreated); setAddOpen(false)
+  1121→  1121→  }
+  1122→  1122→
+  1123→  1123→  const handleUpdate = () => {
+  1124→  1124→    if (!editRole || !form.name.trim()) return
+  1125→  1125→    setRoles(p => p.map(r => r.id === editRole.id ? { ...r, name: form.name, nameEn: form.nameEn, description: form.desc, descriptionEn: form.descEn } : r))
+  1126→  1126→    toast.success(t.roleUpdated); setEditRole(null)
+  1127→  1127→  }
+  1128→  1128→
+  1129→  1129→  const handleDelete = (r: Role) => { setRoles(p => p.filter(x => x.id !== r.id)); toast.success(t.roleDeleted) }
+  1130→  1130→
+  1131→  1131→  return (
+  1132→  1132→    <div className="space-y-6">
+  1133→  1133→      <PageTitle title={t.rolesTitle} action={<PrimaryBtn icon={Plus} label={t.addRole} onClick={openAdd} />} />
+  1134→  1134→      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+  1135→  1135→        {roles.map((r, i) => (
+  1136→  1136→          <motion.div key={r.id} variants={fade} initial="hidden" animate="visible" transition={{ delay: i * 0.04 }}>
+  1137→  1137→            <Card className="group transition-all hover:shadow-lg border-0 shadow-sm h-full">
+  1138→  1138→              <CardContent className="p-5 sm:p-6">
+  1139→  1139→                <div className="flex items-start justify-between mb-4">
+  1140→  1140→                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-100 dark:bg-violet-900/30"><Shield className="h-5 w-5 text-violet-600" /></div>
+  1141→  1141→                  <Badge variant="secondary" className="text-xs">{r.permissions} {t.permissions}</Badge>
+  1142→  1142→                </div>
+  1143→  1143→                <h3 className="font-bold text-base">{rName(r)}</h3>
+  1144→  1144→                <p className="text-xs text-muted-foreground mb-2">{lang === 'ar' ? r.nameEn : r.name}</p>
+  1145→  1145→                <p className="text-sm text-muted-foreground mb-4 leading-relaxed">{rDesc(r)}</p>
+  1146→  1146→                <div className="flex items-center justify-between pt-3 border-t">
+  1147→  1147→                  <span className="text-xs text-muted-foreground">{r.users} {t.users}</span>
+  1148→  1148→                  <div className="flex gap-1">
+  1149→  1149→                    <ActionBtn icon={Edit} label={t.edit} onClick={() => openEdit(r)} />
+  1150→  1150→                    <ActionBtn icon={Trash2} onClick={() => handleDelete(r)} danger />
+  1151→  1151→                  </div>
+  1152→  1152→                </div>
+  1153→  1153→              </CardContent>
+  1154→  1154→            </Card>
+  1155→  1155→          </motion.div>
+  1156→  1156→        ))}
+  1157→  1157→      </div>
+  1158→  1158→
+  1159→  1159→      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+  1160→  1160→        <DialogContent className="max-w-md" dir={isRTL ? 'rtl' : 'ltr'}><DialogHeader><DialogTitle>{t.addRoleDlg}</DialogTitle><DialogDescription className="sr-only">{isRTL ? 'إضافة دور جديد' : 'Add new role'}</DialogDescription></DialogHeader>
+  1161→  1161→          <div className="space-y-4 pt-2">
+  1162→  1162→            <FormField label={t.roleName}><Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} /></FormField>
+  1163→  1163→            <FormField label={t.roleNameEn}><Input value={form.nameEn} onChange={e => setForm(p => ({ ...p, nameEn: e.target.value }))} dir="ltr" /></FormField>
+  1164→  1164→            <FormField label={t.description}><Input value={form.desc} onChange={e => setForm(p => ({ ...p, desc: e.target.value }))} /></FormField>
+  1165→  1165→          </div>
+  1166→  1166→          <DlgFooter onCancel={() => setAddOpen(false)} onConfirm={handleCreate} confirmLabel={t.create} />
+  1167→  1167→        </DialogContent>
+  1168→  1168→      </Dialog>
+  1169→  1169→
+  1170→  1170→      <Dialog open={!!editRole} onOpenChange={() => setEditRole(null)}>
+  1171→  1171→        <DialogContent className="max-w-md" dir={isRTL ? 'rtl' : 'ltr'}><DialogHeader><DialogTitle>{t.editRoleDlg}</DialogTitle><DialogDescription className="sr-only">{isRTL ? 'تعديل الدور' : 'Edit role'}</DialogDescription></DialogHeader>
+  1172→  1172→          <div className="space-y-4 pt-2">
+  1173→  1173→            <FormField label={t.roleName}><Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} /></FormField>
+  1174→  1174→            <FormField label={t.roleNameEn}><Input value={form.nameEn} onChange={e => setForm(p => ({ ...p, nameEn: e.target.value }))} dir="ltr" /></FormField>
+  1175→  1175→            <FormField label={t.description}><Input value={form.desc} onChange={e => setForm(p => ({ ...p, desc: e.target.value }))} /></FormField>
+  1176→  1176→          </div>
+  1177→  1177→          <DlgFooter onCancel={() => setEditRole(null)} onConfirm={handleUpdate} />
+  1178→  1178→        </DialogContent>
+  1179→  1179→      </Dialog>
+  1180→  1180→    </div>
+  1181→  1181→  )
+  1182→  1182→}
+  1183→  1183→
+  1184→  1184→// ════════════════════════════════════════════════════════════════
+  1185→  1185→// PAGE 7: AUDIT LOGS (bilingual)
+  1186→  1186→// ════════════════════════════════════════════════════════════════
+  1187→  1187→function AuditPage() {
+  1188→  1188→  const { t, lang } = useSA()
+  1189→  1189→  const [logs] = useState<SysLog[]>(INIT_LOGS)
+  1190→  1190→  const [filter, setFilter] = useState('all')
+  1191→  1191→  const [page, setPage] = useState(1)
+  1192→  1192→  const filtered = useMemo(() => filter === 'all' ? logs : logs.filter(l => l.level === filter), [logs, filter])
+  1193→  1193→  const { items, totalPages } = paginate(filtered, page, 8)
+  1194→  1194→
+  1195→  1195→  return (
+  1196→  1196→    <div className="space-y-5">
+  1197→  1197→      <PageTitle title={t.auditTitle} action={<Button className="gap-2" variant="outline" onClick={() => toast.success(t.logExported)}><Download className="h-4 w-4" />{t.export}</Button>} />
+  1198→  1198→      <div className="flex flex-wrap gap-2">
+  1199→  1199→        {['all','info','success','warn','error'].map(f => (
+  1200→  1200→          <Button key={f} size="sm" variant={filter === f ? 'default' : 'outline'} className="text-xs h-8 rounded-full px-4" onClick={() => { setFilter(f); setPage(1) }}>
+  1201→  1201→            {f === 'all' ? t.all : getLogLabel(f, t)}
+  1202→  1202→          </Button>
+  1203→  1203→        ))}
+  1204→  1204→      </div>
+  1205→  1205→      <Card className="border-0 shadow-sm overflow-hidden hidden sm:block">
+  1206→  1206→        <div className="overflow-x-auto">
+  1207→  1207→          <Table><TableHeader><TableRow className="bg-muted/50 hover:bg-muted/50">
+  1208→  1208→            <TableHead className="ps-5 font-semibold text-xs uppercase tracking-wider w-24">{t.level}</TableHead>
+  1209→  1209→            <TableHead className="px-3 font-semibold text-xs uppercase tracking-wider">{t.message}</TableHead>
+  1210→  1210→            <TableHead className="px-3 font-semibold text-xs uppercase tracking-wider hidden md:table-cell">{t.source}</TableHead>
+  1211→  1211→            <TableHead className="pe-5 font-semibold text-xs uppercase tracking-wider text-end">{t.date}</TableHead>
+  1212→  1212→          </TableRow></TableHeader>
+  1213→  1213→          <TableBody>{items.map(l => (
+  1214→  1214→            <TableRow key={l.id} className="hover:bg-muted/20 transition-colors">
+  1215→  1215→              <TableCell className="ps-5"><span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${l.level === 'info' ? 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-400' : l.level === 'warn' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400' : l.level === 'error' ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400'}`}>{getLogLabel(l.level, t)}</span></TableCell>
+  1216→  1216→              <TableCell className="px-3 text-sm max-w-[400px]">{logMsg(l, lang)}</TableCell>
+  1217→  1217→              <TableCell className="px-3 text-xs text-muted-foreground hidden md:table-cell">{logSrc(l, lang)}</TableCell>
+  1218→  1218→              <TableCell className="pe-5 text-xs text-muted-foreground whitespace-nowrap text-end">{new Date(l.timestamp).toLocaleString(lang === 'ar' ? 'ar-JO' : 'en-JO')}</TableCell>
+  1219→  1219→            </TableRow>
+  1220→  1220→          ))}</TableBody></Table>
+  1221→  1221→        </div>
+  1222→  1222→        <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+  1223→  1223→      </Card>
+  1224→  1224→      <div className="sm:hidden space-y-2">
+  1225→  1225→        {items.map(l => (
+  1226→  1226→          <Card key={l.id} className="border-0 shadow-sm"><CardContent className="p-3">
+  1227→  1227→            <div className="flex items-start gap-3"><LogDot level={l.level} />
+  1228→  1228→              <div className="min-w-0 flex-1">
+  1229→  1229→                <div className="flex items-center gap-2 mb-1"><span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${l.level === 'info' ? 'bg-sky-100 text-sky-700' : l.level === 'warn' ? 'bg-amber-100 text-amber-700' : l.level === 'error' ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>{getLogLabel(l.level, t)}</span><span className="text-[10px] text-muted-foreground">{logSrc(l, lang)}</span></div>
+  1230→  1230→                <p className="text-xs leading-relaxed">{logMsg(l, lang)}</p>
+  1231→  1231→                <p className="text-[10px] text-muted-foreground mt-1">{new Date(l.timestamp).toLocaleString(lang === 'ar' ? 'ar-JO' : 'en-JO')}</p>
+  1232→  1232→              </div>
+  1233→  1233→            </div>
+  1234→  1234→          </CardContent></Card>
+  1235→  1235→        ))}
+  1236→  1236→      </div>
+  1237→  1237→    </div>
+  1238→  1238→  )
+  1239→  1239→}
+  1240→  1240→
+  1241→  1241→// ════════════════════════════════════════════════════════════════
+  1242→  1242→// PAGE 8: NOTIFICATIONS (full CRUD on templates)
+  1243→  1243→// ════════════════════════════════════════════════════════════════
+  1244→  1244→function NotificationsPage() {
+  1245→  1245→  const { t, lang, isRTL } = useSA()
+  1246→  1246→  const [templates, setTemplates] = useState<NotificationTemplate[]>(NOTIF_TEMPLATES)
+  1247→  1247→  const [sendOpen, setSendOpen] = useState(false)
+  1248→  1248→  const [msg, setMsg] = useState({ title: '', body: '', target: 'all' })
+  1249→  1249→  const [delTarget, setDelTarget] = useState<NotificationTemplate | null>(null)
+  1250→  1250→
+  1251→  1251→  const handleDelete = (tmpl: NotificationTemplate) => { setTemplates(p => p.filter(x => x.id !== tmpl.id)); toast.success(t.deleted); setDelTarget(null) }
+  1252→  1252→
+  1253→  1253→  return (
+  1254→  1254→    <div className="space-y-5">
+  1255→  1255→      <PageTitle title={t.notificationsTitle} action={<PrimaryBtn icon={Bell} label={t.sendNotif} onClick={() => setSendOpen(true)} />} />
+  1256→  1256→
+  1257→  1257→      <Card className="border-0 shadow-sm overflow-hidden hidden sm:block">
+  1258→  1258→        <div className="overflow-x-auto">
+  1259→  1259→          <Table><TableHeader><TableRow className="bg-muted/50 hover:bg-muted/50">
+  1260→  1260→            <TableHead className="ps-5 font-semibold text-xs uppercase tracking-wider">{t.template}</TableHead>
+  1261→  1261→            <TableHead className="px-3 font-semibold text-xs uppercase tracking-wider hidden md:table-cell">{t.type}</TableHead>
+  1262→  1262→            <TableHead className="px-3 font-semibold text-xs uppercase tracking-wider">{t.status}</TableHead>
+  1263→  1263→            <TableHead className="px-3 font-semibold text-xs uppercase tracking-wider text-end hidden lg:table-cell">{t.sent}</TableHead>
+  1264→  1264→            <TableHead className="pe-5 font-semibold text-xs uppercase tracking-wider text-end">{t.actions}</TableHead>
+  1265→  1265→          </TableRow></TableHeader>
+  1266→  1266→          <TableBody>{templates.map(tmpl => (
+  1267→  1267→            <TableRow key={tmpl.id} className="group hover:bg-muted/20 transition-colors">
+  1268→  1268→              <TableCell className="ps-5 font-medium text-sm">{lang === 'en' ? tmpl.nameEn : tmpl.name}</TableCell>
+  1269→  1269→              <TableCell className="px-3 text-sm hidden md:table-cell">{lang === 'en' ? tmpl.typeEn : tmpl.type}</TableCell>
+  1270→  1270→              <TableCell className="px-3"><StatusBadge status={tmpl.status} locale={lang} /></TableCell>
+  1271→  1271→              <TableCell className="px-3 tabular-nums text-sm hidden lg:table-cell text-end">{tmpl.sent}</TableCell>
+  1272→  1272→              <TableCell className="pe-5">
+  1273→  1273→                <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+  1274→  1274→                  <ActionBtn icon={Edit} label={t.edit} onClick={() => toast.info(t.editTemplate)} />
+  1275→  1275→                  <ActionBtn icon={Mail} onClick={() => toast.success(t.testSent)} />
+  1276→  1276→                  <ActionBtn icon={Trash2} onClick={() => setDelTarget(tmpl)} danger />
+  1277→  1277→                </div>
+  1278→  1278→              </TableCell>
+  1279→  1279→            </TableRow>
+  1280→  1280→          ))}</TableBody></Table>
+  1281→  1281→        </div>
+  1282→  1282→      </Card>
+  1283→  1283→
+  1284→  1284→      <div className="sm:hidden space-y-3">
+  1285→  1285→        {templates.map(tmpl => (
+  1286→  1286→          <Card key={tmpl.id} className="border-0 shadow-sm"><CardContent className="p-4">
+  1287→  1287→            <div className="flex items-start justify-between gap-3 mb-2">
+  1288→  1288→              <div className="min-w-0"><p className="font-medium text-sm">{lang === 'en' ? tmpl.nameEn : tmpl.name}</p><p className="text-xs text-muted-foreground mt-0.5">{lang === 'en' ? tmpl.typeEn : tmpl.type} · {tmpl.sent} {t.sent}</p></div>
+  1289→  1289→              <StatusBadge status={tmpl.status} locale={lang} />
+  1290→  1290→            </div>
+  1291→  1291→            <div className="flex items-center justify-end gap-1 pt-2 border-t">
+  1292→  1292→              <ActionBtn icon={Edit} label={t.edit} onClick={() => toast.info(t.editTemplate)} />
+  1293→  1293→              <ActionBtn icon={Mail} onClick={() => toast.success(t.testSent)} />
+  1294→  1294→              <ActionBtn icon={Trash2} onClick={() => setDelTarget(tmpl)} danger />
+  1295→  1295→            </div>
+  1296→  1296→          </CardContent></Card>
+  1297→  1297→        ))}
+  1298→  1298→      </div>
+  1299→  1299→
+  1300→  1300→      <Dialog open={sendOpen} onOpenChange={setSendOpen}>
+  1301→  1301→        <DialogContent className="max-w-md" dir={isRTL ? 'rtl' : 'ltr'}><DialogHeader><DialogTitle>{t.sendNotifDlg}</DialogTitle><DialogDescription className="sr-only">{isRTL ? 'إرسال إشعار' : 'Send notification'}</DialogDescription></DialogHeader>
+  1302→  1302→          <div className="space-y-4 pt-2">
+  1303→  1303→            <FormField label={t.title}><Input value={msg.title} onChange={e => setMsg(p => ({ ...p, title: e.target.value }))} /></FormField>
+  1304→  1304→            <FormField label={t.content}><Input value={msg.body} onChange={e => setMsg(p => ({ ...p, body: e.target.value }))} /></FormField>
+  1305→  1305→            <FormField label={t.target}><Select value={msg.target} onValueChange={v => setMsg(p => ({ ...p, target: v }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">{t.everyone}</SelectItem><SelectItem value="active">{t.activeUsers}</SelectItem><SelectItem value="trial">{t.trialUsers}</SelectItem></SelectContent></Select></FormField>
+  1306→  1306→          </div>
+  1307→  1307→          <DlgFooter onCancel={() => setSendOpen(false)} onConfirm={() => { toast.success(t.notifSent); setSendOpen(false); setMsg({ title: '', body: '', target: 'all' }) }} confirmLabel={t.send} />
+  1308→  1308→        </DialogContent>
+  1309→  1309→      </Dialog>
+  1310→  1310→
+  1311→  1311→      <ConfirmDialog open={!!delTarget} onOpenChange={() => setDelTarget(null)} title={t.delete} desc={t.confirmDeleteTemplate} onConfirm={() => { if (delTarget) handleDelete(delTarget) }} danger />
+  1312→  1312→    </div>
+  1313→  1313→  )
+  1314→  1314→}
+  1315→  1315→
+  1316→  1316→// ════════════════════════════════════════════════════════════════
+  1317→  1317→// PAGE 9: REPORTS
+  1318→  1318→// ════════════════════════════════════════════════════════════════
+  1319→  1319→function ReportsPage() {
+  1320→  1320→  const { t, lang } = useSA()
+  1321→  1321→  return (
+  1322→  1322→    <div className="space-y-6">
+  1323→  1323→      <PageTitle title={t.reportsTitle} />
+  1324→  1324→      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+  1325→  1325→        {REPORTS.map((r, i) => (
+  1326→  1326→          <motion.div key={r.id} variants={fade} initial="hidden" animate="visible" transition={{ delay: i * 0.04 }}>
+  1327→  1327→            <Card className="group transition-all hover:shadow-lg border-0 shadow-sm h-full">
+  1328→  1328→              <CardContent className="p-5 sm:p-6">
+  1329→  1329→                <div className="flex items-start justify-between mb-4">
+  1330→  1330→                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-sky-100 dark:bg-sky-900/30"><BarChart3 className="h-5 w-5 text-sky-600" /></div>
+  1331→  1331→                  <Badge variant="outline" className="text-xs">{lang === 'en' ? r.typeEn : r.type}</Badge>
+  1332→  1332→                </div>
+  1333→  1333→                <h3 className="font-bold text-sm mb-1">{lang === 'en' ? r.nameEn : r.name}</h3>
+  1334→  1334→                <p className="text-xs text-muted-foreground mb-5 leading-relaxed">{lang === 'en' ? r.descEn : r.desc}</p>
+  1335→  1335→                <div className="flex items-center justify-between pt-3 border-t">
+  1336→  1336→                  <span className="text-[11px] text-muted-foreground">{t.lastGenerated} {r.last}</span>
+  1337→  1337→                  <div className="flex gap-1">
+  1338→  1338→                    <ActionBtn icon={RefreshCw} label={t.generate} onClick={() => toast.success(t.reportGenerated)} />
+  1339→  1339→                    <ActionBtn icon={Download} onClick={() => toast.success(t.reportDownloaded)} />
+  1340→  1340→                  </div>
+  1341→  1341→                </div>
+  1342→  1342→              </CardContent>
+  1343→  1343→            </Card>
+  1344→  1344→          </motion.div>
+  1345→  1345→        ))}
+  1346→  1346→      </div>
+  1347→  1347→    </div>
+  1348→  1348→  )
+  1349→  1349→}
+  1350→  1350→
+  1351→  1351→// ════════════════════════════════════════════════════════════════
+  1352→  1352→// PAGE 10: SYSTEM HEALTH
+  1353→  1353→// ════════════════════════════════════════════════════════════════
+  1354→  1354→function SystemPage() {
+  1355→  1355→  const { t, lang } = useSA()
+  1356→  1356→  const [logs] = useState<SysLog[]>(INIT_LOGS)
+  1357→  1357→  const gauges = [
+  1358→  1358→    { label: t.gaugeApi, value: 99, icon: Server },
+  1359→  1359→    { label: t.gaugeDatabase, value: 85, icon: Database },
+  1360→  1360→    { label: t.gaugeMemory, value: 78, icon: Monitor },
+  1361→  1361→    { label: t.gaugeDisk, value: 62, icon: HardDrive },
+  1362→  1362→    { label: t.gaugeCdn, value: 100, icon: Globe },
+  1363→  1363→    { label: t.gaugeWorker, value: 95, icon: RefreshCw },
+  1364→  1364→  ]
+  1365→  1365→
+  1366→  1366→  return (
+  1367→  1367→    <div className="space-y-6">
+  1368→  1368→      <PageTitle title={t.systemTitle} action={<Button className="gap-2" variant="outline" onClick={() => toast.success(t.refreshed)}><RefreshCw className="h-4 w-4" />{t.refresh}</Button>} />
+  1369→  1369→      <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 sm:gap-4">
+  1370→  1370→        {gauges.map((g, i) => (
+  1371→  1371→          <motion.div key={g.label} variants={fade} initial="hidden" animate="visible" transition={{ delay: i * 0.04 }}>
+  1372→  1372→            <Card className="text-center border-0 shadow-sm">
+  1373→  1373→              <CardContent className="p-3 sm:p-4">
+  1374→  1374→                <div className="relative mx-auto h-14 w-14 sm:h-16 sm:w-16 mb-2">
+  1375→  1375→                  <svg className={`h-14 w-14 sm:h-16 sm:w-16 -rotate-90 ${gaugeColor(g.value)}`} viewBox="0 0 64 64">
+  1376→  1376→                    <circle cx="32" cy="32" r="28" fill="none" stroke="currentColor" strokeWidth="4" className="opacity-15" />
+  1377→  1377→                    <circle cx="32" cy="32" r="28" fill="none" stroke="currentColor" strokeWidth="4" strokeDasharray={`${2 * Math.PI * 28 * g.value / 100} ${2 * Math.PI * 28}`} strokeLinecap="round" />
+  1378→  1378→                  </svg>
+  1379→  1379→                  <span className="absolute inset-0 flex items-center justify-center text-xs sm:text-sm font-bold">{g.value}%</span>
+  1380→  1380→                </div>
+  1381→  1381→                <div className="flex items-center justify-center gap-1.5 text-muted-foreground"><g.icon className="h-3.5 w-3.5" /><span className="text-[10px] sm:text-xs font-medium">{g.label}</span></div>
+  1382→  1382→              </CardContent>
+  1383→  1383→            </Card>
+  1384→  1384→          </motion.div>
+  1385→  1385→        ))}
+  1386→  1386→      </div>
+  1387→  1387→      <Card className="border-0 shadow-sm">
+  1388→  1388→        <CardHeader className="pb-3"><CardTitle className="text-sm sm:text-base font-semibold">{t.systemLog}</CardTitle></CardHeader>
+  1389→  1389→        <CardContent>
+  1390→  1390→          <div className="space-y-0.5">{logs.map(l => (
+  1391→  1391→            <div key={l.id} className="flex items-start gap-3 rounded-lg px-3 py-2.5 hover:bg-muted/50 transition-colors">
+  1392→  1392→              <LogDot level={l.level} />
+  1393→  1393→              <div className="min-w-0 flex-1">
+  1394→  1394→                <p className="text-sm leading-relaxed">{logMsg(l, lang)}</p>
+  1395→  1395→                <p className="text-[11px] text-muted-foreground mt-0.5">{logSrc(l, lang)} — {new Date(l.timestamp).toLocaleString(lang === 'ar' ? 'ar-JO' : 'en-JO')}</p>
+  1396→  1396→              </div>
+  1397→  1397→            </div>
+  1398→  1398→          ))}</div>
+  1399→  1399→        </CardContent>
+
+[showing lines 900-1399 of 2002; use offset=1400 with limit to continue reading]

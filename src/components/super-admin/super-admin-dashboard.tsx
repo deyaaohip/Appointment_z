@@ -20,7 +20,7 @@ import {
   Database, Lock, Bell, FileText, UserCog, CheckCircle2, AlertTriangle,
   RefreshCw, Globe, UserPlus, Clock, Monitor, HardDrive, Mail, Download,
   Power, PowerOff, Save, ChevronLeft, Search, Wallet, XCircle, Info,
-  Upload, Image as ImageIcon, ClipboardCheck, Banknote,
+  Upload, Image as ImageIcon, ClipboardCheck, Banknote, Copy, Link2, LayoutGrid, ChevronRight,
 } from 'lucide-react'
 
 // ─── Imports from shared modules ───────────────────────────────
@@ -43,6 +43,12 @@ import {
 } from './sa-helpers'
 import { TenantWizard, type TenantFormData } from './tenant-wizard'
 import { TenantDetailsDialog } from './tenant-details-dialog'
+import {
+  INIT_RBAC_ROLES, INIT_RBAC_TEMPLATES, SYSTEM_MODULES, PERMISSION_ACTIONS,
+  type RbacRole, type PermissionTemplate, type ModuleKey, type ActionKey,
+  hasPermission, cloneRolePermissions, getEffectivePermissions, countPermissions,
+  togglePermission, applyTemplate, getInheritedVsOwn,
+} from './rbac-data'
 
 const PER_PAGE = 7
 
@@ -719,6 +725,7 @@ function BillingPage() {
   const [sort, setSort] = useState<SortState>({ key: 'date', dir: 'desc' })
   const [addOpen, setAddOpen] = useState(false)
   const [invForm, setInvForm] = useState({ tenant: '', tenantEn: '', plan: 'Starter', amount: 0, status: 'pending' as string })
+  const [previewInv, setPreviewInv] = useState<Invoice | null>(null)
 
   const filtered = useMemo(() => {
     let list = filter === 'all' ? [...invoices] : invoices.filter(i => i.status === filter)
@@ -729,20 +736,44 @@ function BillingPage() {
   const totalPaid = invoices.filter(i => i.status === 'paid').reduce((s, i) => s + i.amount, 0)
   const totalPending = invoices.filter(i => i.status === 'pending' || i.status === 'overdue').reduce((s, i) => s + i.amount, 0)
 
-  const handleMarkPaid = (inv: Invoice) => {
-    setInvoices(p => p.map(i => i.id === inv.id ? { ...i, status: 'paid' } : i))
-    toast.success(t.paid)
-  }
+  const handleStatusChange = useCallback((invoiceId: string, newStatus: string, method?: string) => {
+    setInvoices(p => p.map(i => {
+      if (i.id !== invoiceId) return i
+      const updated = { ...i, status: newStatus }
+      if (newStatus === 'paid') {
+        updated.paidDate = new Date().toISOString().split('T')[0]
+        updated.paymentMethod = method || 'cliq'
+        updated.history = [...(i.history || []), {
+          date: new Date().toISOString(), action: 'دفعة ناجحة', actionEn: 'Payment received',
+          details: `تم الدفع عبر ${method === 'card' ? 'بطاقة ائتمان' : method === 'bank_transfer' ? 'تحويل بنكي' : 'CLIQ'}`,
+          detailsEn: `Paid via ${method === 'card' ? 'credit card' : method === 'bank_transfer' ? 'bank transfer' : 'CLIQ'}`,
+          by: 'Super Admin',
+        }]
+      } else if (newStatus === 'refunded') {
+        updated.history = [...(i.history || []), {
+          date: new Date().toISOString(), action: 'إرجاع', actionEn: 'Refunded',
+          details: 'تم إرجاع مبلغ الفاتورة', detailsEn: 'Invoice amount refunded', by: 'Super Admin',
+        }]
+      }
+      return updated
+    }))
+    toast.success(t.invoiceStatusChanged)
+  }, [])
+
+  const handleMarkPaid = (inv: Invoice) => { handleStatusChange(inv.id, 'paid') }
 
   const handleCreateInvoice = () => {
     if (!invForm.tenant.trim()) { toast.error(isRTL ? 'يرجى اختيار المستأجر' : 'Please select a tenant'); return }
     if (invForm.amount <= 0) { toast.error(isRTL ? 'يرجى إدخال مبلغ صحيح' : 'Please enter a valid amount'); return }
     const newId = `INV-${String(invoices.length + 1).padStart(3, '0')}`
+    const today = new Date().toISOString().split('T')[0]
+    const dueDate = new Date(); dueDate.setDate(dueDate.getDate() + 30)
     const inv: Invoice = {
       id: newId, tenant: invForm.tenant, tenantEn: invForm.tenantEn,
       amount: invForm.amount, status: invForm.status,
-      date: new Date().toISOString().split('T')[0],
-      plan: invForm.plan, currency: 'JOD',
+      date: today, dueDate: dueDate.toISOString().split('T')[0], paidDate: null,
+      plan: invForm.plan, currency: 'JOD', taxRate: 16, notes: '', paymentMethod: '',
+      history: [{ date: new Date().toISOString(), action: 'إنشاء الفاتورة', actionEn: 'Invoice created', details: `فاتورة اشتراك ${invForm.plan}`, detailsEn: `${invForm.plan} subscription invoice`, by: 'Super Admin' }],
     }
     setInvoices(p => [inv, ...p]); toast.success(isRTL ? `تم إنشاء الفاتورة ${newId}` : `Invoice ${newId} created`); setAddOpen(false)
     setInvForm({ tenant: '', tenantEn: '', plan: 'Starter', amount: 0, status: 'pending' })
@@ -814,9 +845,11 @@ function BillingPage() {
               <TableCell className="px-3"><StatusBadge status={inv.status} locale={lang} /></TableCell>
               <TableCell className="pe-5">
                 <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <ActionBtn icon={Eye} label={t.view} onClick={() => toast.info(t.viewingInvoice.replace('{id}', inv.id))} />
-                  {inv.status !== 'paid' && <ActionBtn icon={CheckCircle2} label={t.paid} onClick={() => handleMarkPaid(inv)} />}
-                  <ActionBtn icon={Download} onClick={() => handleExportExcel()} />
+                  <ActionBtn icon={Eye} label={t.view} onClick={() => setPreviewInv(inv)} />
+                  {inv.status === 'pending' && <ActionBtn icon={CheckCircle2} label={t.invoiceMarkPaid} onClick={() => handleStatusChange(inv.id, 'paid')} />}
+                  {inv.status === 'overdue' && <ActionBtn icon={AlertTriangle} onClick={() => { handleStatusChange(inv.id, 'pending'); toast.success(t.invoiceSendReminderDesc) }} />}
+                  {inv.status === 'paid' && <ActionBtn icon={RefreshCw} label={t.invoiceRefund} onClick={() => handleStatusChange(inv.id, 'refunded')} />}
+                  <ActionBtn icon={Download} onClick={handleExportExcel} />
                   <ActionBtn icon={Trash2} onClick={() => handleDeleteInvoice(inv)} danger />
                 </div>
               </TableCell>
@@ -890,89 +923,319 @@ function BillingPage() {
           <DlgFooter onCancel={() => setAddOpen(false)} onConfirm={handleCreateInvoice} confirmLabel={isRTL ? 'إنشاء' : 'Create'} />
         </DialogContent>
       </Dialog>
+
+      {/* Invoice Preview Dialog */}
+      {previewInv && <InvoicePreviewDialog invoice={previewInv} open={!!previewInv} onClose={() => setPreviewInv(null)} onStatusChange={handleStatusChange} />}
     </div>
   )
 }
 
 // ════════════════════════════════════════════════════════════════
-// PAGE 6: ROLES (full CRUD)
+// PAGE 6: ROLES & PERMISSIONS (Enterprise RBAC)
 // ════════════════════════════════════════════════════════════════
 function RolesPage() {
   const { t, lang, isRTL } = useSA()
-  const [roles, setRoles] = useState<Role[]>(INIT_ROLES)
-  const [addOpen, setAddOpen] = useState(false)
-  const [editRole, setEditRole] = useState<Role | null>(null)
-  const [form, setForm] = useState({ name: '', nameEn: '', desc: '', descEn: '' })
+  const [roles, setRoles] = useState<RbacRole[]>(INIT_RBAC_ROLES)
+  const [templates] = useState<PermissionTemplate[]>(INIT_RBAC_TEMPLATES)
+  const [dlg, setDlg] = useState<{ type: 'add' | 'edit' | 'delete' | 'matrix' | 'clone_src'; role?: RbacRole } | null>(null)
+  const [form, setForm] = useState({ name: '', nameEn: '', desc: '', descEn: '', parentId: null as string | null, permissions: {} as Record<string, string[]> })
+  const [tplDlg, setTplDlg] = useState(false)
+  const [viewTab, setViewTab] = useState<'matrix' | 'roles' | 'templates'>('roles')
 
-  const openAdd = () => { setForm({ name: '', nameEn: '', desc: '', descEn: '' }); setAddOpen(true) }
-  const openEdit = (r: Role) => { setForm({ name: r.name, nameEn: r.nameEn, desc: r.description, descEn: r.descriptionEn }); setEditRole(r) }
+  const rName = (r: RbacRole) => lang === 'en' ? r.nameEn : r.name
+  const rDesc = (r: RbacRole) => lang === 'en' ? r.descriptionEn : r.description
 
-  const rName = (r: Role) => lang === 'en' ? r.nameEn : r.name
-  const rDesc = (r: Role) => lang === 'en' ? r.descriptionEn : r.description
-
-  const handleCreate = () => {
-    if (!form.name.trim()) return
-    const r: Role = { id: Date.now().toString(), name: form.name, nameEn: form.nameEn, users: 0, permissions: 0, description: form.desc, descriptionEn: form.descEn }
-    setRoles(p => [r, ...p]); toast.success(t.roleCreated); setAddOpen(false)
+  const openAdd = () => {
+    setForm({ name: '', nameEn: '', desc: '', descEn: '', parentId: null, permissions: {} })
+    SYSTEM_MODULES.forEach(m => { form.permissions[m.key] = ['view'] })
+    setForm(p => ({ ...p, permissions: { ...p.permissions } }))
+    setDlg({ type: 'add' })
   }
 
-  const handleUpdate = () => {
-    if (!editRole || !form.name.trim()) return
-    setRoles(p => p.map(r => r.id === editRole.id ? { ...r, name: form.name, nameEn: form.nameEn, description: form.desc, descriptionEn: form.descEn } : r))
-    toast.success(t.roleUpdated); setEditRole(null)
+  const openEdit = (r: RbacRole) => {
+    setForm({ name: r.name, nameEn: r.nameEn, desc: r.description, descEn: r.descriptionEn, parentId: r.parentId, permissions: cloneRolePermissions(r) })
+    setDlg({ type: 'edit', role: r })
   }
 
-  const handleDelete = (r: Role) => { setRoles(p => p.filter(x => x.id !== r.id)); toast.success(t.roleDeleted) }
+  const openMatrix = (r: RbacRole) => { setForm({ name: r.name, nameEn: r.nameEn, desc: r.description, descEn: r.descriptionEn, parentId: r.parentId, permissions: cloneRolePermissions(r) }); setDlg({ type: 'matrix', role: r }) }
+
+  const handleClone = (r: RbacRole) => {
+    const clone: RbacRole = { ...r, id: Date.now().toString(), name: `${r.name} ${t.rbacCloneSuffix}`, nameEn: `${r.nameEn} (Copy)`, userCount: 0, isSystem: false, parentId: r.parentId, permissions: cloneRolePermissions(r), createdAt: new Date().toISOString().split('T')[0] }
+    setRoles(p => [clone, ...p]); toast.success(t.rbacRoleCloned)
+  }
+
+  const handleSave = () => {
+    if (!form.name.trim()) { toast.error(lang === 'ar' ? 'يرجى إدخال اسم الدور' : 'Please enter role name'); return }
+    if (dlg?.type === 'add') {
+      const r: RbacRole = { id: Date.now().toString(), name: form.name, nameEn: form.nameEn, description: form.desc, descriptionEn: form.descEn, userCount: 0, isSystem: false, parentId: form.parentId, permissions: { ...form.permissions }, createdAt: new Date().toISOString().split('T')[0] }
+      setRoles(p => [r, ...p]); toast.success(t.roleCreated)
+    } else if (dlg?.role) {
+      setRoles(p => p.map(r => r.id === dlg.role!.id ? { ...r, name: form.name, nameEn: form.nameEn, description: form.desc, descriptionEn: form.descEn, parentId: form.parentId, permissions: { ...form.permissions } } : r))
+      toast.success(t.roleUpdated)
+    }
+    setDlg(null)
+  }
+
+  const handleDelete = () => {
+    if (!dlg?.role) return
+    setRoles(p => p.filter(x => x.id !== dlg.role!.id)); toast.success(t.roleDeleted); setDlg(null)
+  }
+
+  const handleTogglePerm = (mod: string, action: string) => {
+    setForm(p => ({ ...p, permissions: togglePermission({ ...p, permissions: p.permissions }, mod, action) }))
+  }
+
+  const handleApplyTemplate = (tpl: PermissionTemplate) => {
+    const perms = applyTemplate(tpl)
+    setForm(p => ({ ...p, permissions: perms }))
+    setTplDlg(false); toast.success(t.rbacTemplateApplied)
+  }
+
+  const permCount = (r: RbacRole) => countPermissions(r.permissions)
+  const effectivePerms = dlg?.role ? getEffectivePermissions(dlg.role, roles) : null
+  const inheritedInfo = dlg?.role ? getInheritedVsOwn(dlg.role, roles) : null
 
   return (
     <div className="space-y-6">
-      <PageTitle title={t.rolesTitle} action={<PrimaryBtn icon={Plus} label={t.addRole} onClick={openAdd} />} />
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
-        {roles.map((r, i) => (
-          <motion.div key={r.id} variants={fade} initial="hidden" animate="visible" transition={{ delay: i * 0.04 }}>
-            <Card className="group transition-all hover:shadow-lg border-0 shadow-sm h-full">
-              <CardContent className="p-5 sm:p-6">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-100 dark:bg-violet-900/30"><Shield className="h-5 w-5 text-violet-600" /></div>
-                  <Badge variant="secondary" className="text-xs">{r.permissions} {t.permissions}</Badge>
-                </div>
-                <h3 className="font-bold text-base">{rName(r)}</h3>
-                <p className="text-xs text-muted-foreground mb-2">{lang === 'ar' ? r.nameEn : r.name}</p>
-                <p className="text-sm text-muted-foreground mb-4 leading-relaxed">{rDesc(r)}</p>
-                <div className="flex items-center justify-between pt-3 border-t">
-                  <span className="text-xs text-muted-foreground">{r.users} {t.users}</span>
-                  <div className="flex gap-1">
-                    <ActionBtn icon={Edit} label={t.edit} onClick={() => openEdit(r)} />
-                    <ActionBtn icon={Trash2} onClick={() => handleDelete(r)} danger />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
+      <PageTitle title={t.rbacTitle} action={<PrimaryBtn icon={Plus} label={t.addRole} onClick={openAdd} />} />
+
+      {/* View Tabs */}
+      <div className="flex gap-2">
+        {(['roles', 'matrix', 'templates'] as const).map(tab => (
+          <Button key={tab} size="sm" variant={viewTab === tab ? 'default' : 'outline'} className="text-xs rounded-full px-4" onClick={() => setViewTab(tab)}>
+            {tab === 'roles' ? t.rolesTitle : tab === 'matrix' ? t.rbacMatrix : t.rbacTemplates}
+          </Button>
         ))}
       </div>
 
-      <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent className="max-w-md" dir={isRTL ? 'rtl' : 'ltr'}><DialogHeader><DialogTitle>{t.addRoleDlg}</DialogTitle><DialogDescription className="sr-only">{isRTL ? 'إضافة دور جديد' : 'Add new role'}</DialogDescription></DialogHeader>
-          <div className="space-y-4 pt-2">
-            <FormField label={t.roleName}><Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} /></FormField>
-            <FormField label={t.roleNameEn}><Input value={form.nameEn} onChange={e => setForm(p => ({ ...p, nameEn: e.target.value }))} dir="ltr" /></FormField>
-            <FormField label={t.description}><Input value={form.desc} onChange={e => setForm(p => ({ ...p, desc: e.target.value }))} /></FormField>
-          </div>
-          <DlgFooter onCancel={() => setAddOpen(false)} onConfirm={handleCreate} confirmLabel={t.create} />
+      {/* Roles View */}
+      {viewTab === 'roles' && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+          {roles.map((r, i) => (
+            <motion.div key={r.id} variants={fade} initial="hidden" animate="visible" transition={{ delay: i * 0.04 }}>
+              <Card className="group transition-all hover:shadow-lg border-0 shadow-sm h-full">
+                <CardContent className="p-5 sm:p-6">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-100 dark:bg-violet-900/30"><Shield className="h-5 w-5 text-violet-600" /></div>
+                    <div className="flex items-center gap-1.5">
+                      {r.isSystem && <Badge variant="secondary" className="text-[10px] bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400">{t.rbacSystemRole}</Badge>}
+                    </div>
+                  </div>
+                  <h3 className="font-bold text-base">{rName(r)}</h3>
+                  <p className="text-xs text-muted-foreground mb-1">{lang === 'ar' ? r.nameEn : r.name}</p>
+                  <p className="text-sm text-muted-foreground mb-4 leading-relaxed">{rDesc(r)}</p>
+                  <div className="flex items-center gap-3 mb-4 text-xs text-muted-foreground">
+                    <span>{permCount(r)} {t.rbacPermissions}</span>
+                    <span>·</span>
+                    <span>{r.userCount} {t.rbacUserCount}</span>
+                    {r.parentId && <><span>·</span><span className="text-sky-600">{t.rbacInherited}</span></>}
+                  </div>
+                  <div className="flex items-center justify-between pt-3 border-t">
+                    <div className="flex gap-1">
+                      <ActionBtn icon={Eye} label={t.rbacMatrix} onClick={() => openMatrix(r)} />
+                      <ActionBtn icon={Edit} label={t.edit} onClick={() => openEdit(r)} />
+                      <ActionBtn icon={Copy} label={t.rbacCloneRole} onClick={() => handleClone(r)} />
+                    </div>
+                    {!r.isSystem && <ActionBtn icon={Trash2} onClick={() => setDlg({ type: 'delete', role: r })} danger />}
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          ))}
+        </div>
+      )}
+
+      {/* Matrix Overview */}
+      {viewTab === 'matrix' && (
+        <Card className="border-0 shadow-sm overflow-hidden">
+          <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">{t.rbacMatrix} — {roles.length} {lang === 'ar' ? 'أدوار' : 'roles'} × {SYSTEM_MODULES.length} {t.rbacModule}</CardTitle></CardHeader>
+          <CardContent className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b">
+                  <th className="p-2 text-start font-semibold sticky start-0 bg-background min-w-[120px]">{t.rbacModule}</th>
+                  {roles.map(r => <th key={r.id} className="p-2 text-center font-semibold min-w-[80px]">{rName(r)}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {SYSTEM_MODULES.map(mod => (
+                  <tr key={mod.key} className="border-b border-border/50 hover:bg-muted/30">
+                    <td className="p-2 font-medium sticky start-0 bg-background">{lang === 'ar' ? mod.labelAr : mod.labelEn}</td>
+                    {roles.map(r => {
+                      const count = (r.permissions[mod.key] || []).length
+                      const total = PERMISSION_ACTIONS.length
+                      const pct = Math.round(count / total * 100)
+                      return (
+                        <td key={r.id} className="p-2 text-center">
+                          <div className="flex items-center justify-center gap-1">
+                            <div className="w-12 h-1.5 rounded-full bg-muted overflow-hidden"><div className={`h-full rounded-full ${pct === 100 ? 'bg-emerald-500' : pct > 50 ? 'bg-sky-500' : pct > 0 ? 'bg-amber-500' : 'bg-gray-300'}`} style={{ width: `${pct}%` }} /></div>
+                            <span className="tabular-nums text-muted-foreground w-6">{count}</span>
+                          </div>
+                        </td>
+                      )
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Templates View */}
+      {viewTab === 'templates' && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {templates.map((tpl, i) => (
+            <motion.div key={tpl.id} variants={fade} initial="hidden" animate="visible" transition={{ delay: i * 0.04 }}>
+              <Card className="group transition-all hover:shadow-lg border-0 shadow-sm cursor-pointer" onClick={() => handleApplyTemplate(tpl)}>
+                <CardContent className="p-5 text-center">
+                  <div className="h-12 w-12 rounded-2xl bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center mx-auto mb-3"><Shield className="h-6 w-6 text-violet-600" /></div>
+                  <h3 className="font-bold text-sm">{lang === 'ar' ? tpl.name : tpl.nameEn}</h3>
+                  <p className="text-xs text-muted-foreground mt-1 mb-3">{lang === 'ar' ? tpl.description : tpl.descriptionEn}</p>
+                  <Badge variant="secondary" className="text-[10px]">{countPermissions(tpl.permissions)} {t.rbacPermissions}</Badge>
+                  <p className="text-[10px] text-violet-600 mt-3 group-hover:underline">{t.rbacApplyTemplate}</p>
+                </CardContent>
+              </Card>
+            </motion.div>
+          ))}
+        </div>
+      )}
+
+      {/* Permission Matrix Dialog (View) */}
+      <Dialog open={dlg?.type === 'matrix'} onOpenChange={() => setDlg(null)}>
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto" dir={isRTL ? 'rtl' : 'ltr'}>
+          <DialogHeader><DialogTitle>{t.rbacMatrix} — {dlg?.role ? rName(dlg.role) : ''}</DialogTitle><DialogDescription className="sr-only">{lang === 'ar' ? 'مصفوفة الصلاحيات' : 'Permission matrix'}</DialogDescription></DialogHeader>
+          {dlg?.role && effectivePerms && inheritedInfo && (
+            <div className="space-y-3 pt-2">
+              <div className="flex items-center gap-4 text-xs mb-4">
+                <div className="flex items-center gap-1.5"><div className="h-3 w-3 rounded bg-emerald-500" /><span>{t.rbacOwnPerms}</span></div>
+                <div className="flex items-center gap-1.5"><div className="h-3 w-3 rounded bg-sky-400" /><span>{t.rbacInherited}</span></div>
+                <div className="ms-auto font-semibold">{countPermissions(effectivePerms)} {t.rbacTotalPermissions}</div>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="p-2 text-start font-semibold sticky start-0 bg-background min-w-[100px]">{t.rbacModule}</th>
+                      {PERMISSION_ACTIONS.map(a => <th key={a.key} className="p-1.5 text-center font-semibold min-w-[60px]">{lang === 'ar' ? a.labelAr : a.labelEn}</th>)}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {SYSTEM_MODULES.map(mod => (
+                      <tr key={mod.key} className="border-b border-border/50">
+                        <td className="p-2 font-medium sticky start-0 bg-background text-xs">{lang === 'ar' ? mod.labelAr : mod.labelEn}</td>
+                        {PERMISSION_ACTIONS.map(action => {
+                          const hasOwn = (inheritedInfo.own[mod.key] || []).includes(action.key)
+                          const hasInh = (inheritedInfo.inherited[mod.key] || []).includes(action.key)
+                          const has = hasOwn || hasInh
+                          return (
+                            <td key={action.key} className="p-1.5 text-center">
+                              {has ? (
+                                <span className={`inline-flex h-5 w-5 items-center justify-center rounded text-[9px] font-bold ${hasOwn ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700' : 'bg-sky-100 dark:bg-sky-900/30 text-sky-700'}`}>✓</span>
+                              ) : (
+                                <span className="inline-flex h-5 w-5 items-center justify-center rounded bg-muted text-muted-foreground text-[9px]">—</span>
+                              )}
+                            </td>
+                          )
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+          <DlgFooter onCancel={() => setDlg(null)} onConfirm={() => { if (dlg?.role) { openEdit(dlg.role); setDlg(null) } }} confirmLabel={t.edit} />
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!editRole} onOpenChange={() => setEditRole(null)}>
-        <DialogContent className="max-w-md" dir={isRTL ? 'rtl' : 'ltr'}><DialogHeader><DialogTitle>{t.editRoleDlg}</DialogTitle><DialogDescription className="sr-only">{isRTL ? 'تعديل الدور' : 'Edit role'}</DialogDescription></DialogHeader>
+      {/* Add/Edit Dialog with Permission Matrix Editor */}
+      <Dialog open={dlg?.type === 'add' || dlg?.type === 'edit'} onOpenChange={() => setDlg(null)}>
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto" dir={isRTL ? 'rtl' : 'ltr'}>
+          <DialogHeader><DialogTitle>{dlg?.type === 'add' ? t.addRoleDlg : t.editRoleDlg}</DialogTitle><DialogDescription className="sr-only">{lang === 'ar' ? 'إدارة الأدوار' : 'Role management'}</DialogDescription></DialogHeader>
           <div className="space-y-4 pt-2">
-            <FormField label={t.roleName}><Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} /></FormField>
-            <FormField label={t.roleNameEn}><Input value={form.nameEn} onChange={e => setForm(p => ({ ...p, nameEn: e.target.value }))} dir="ltr" /></FormField>
-            <FormField label={t.description}><Input value={form.desc} onChange={e => setForm(p => ({ ...p, desc: e.target.value }))} /></FormField>
+            <div className="grid grid-cols-2 gap-3">
+              <FormField label={t.roleName}><Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} /></FormField>
+              <FormField label={t.roleNameEn}><Input value={form.nameEn} onChange={e => setForm(p => ({ ...p, nameEn: e.target.value }))} dir="ltr" /></FormField>
+            </div>
+            <FormField label={t.rbacDescription}><Input value={form.desc} onChange={e => setForm(p => ({ ...p, desc: e.target.value }))} /></FormField>
+
+            {/* Parent Role for Inheritance */}
+            <FormField label={t.rbacParentRole}>
+              <Select value={form.parentId || '__none__'} onValueChange={v => setForm(p => ({ ...p, parentId: v === '__none__' ? null : v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">{t.rbacNoParent}</SelectItem>
+                  {roles.filter(r => r.id !== dlg?.role?.id).map(r => <SelectItem key={r.id} value={r.id}>{rName(r)}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </FormField>
+
+            <Separator />
+
+            {/* Apply Template */}
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">{t.rbacTemplates}</span>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setTplDlg(true)}>{t.rbacApplyTemplate}</Button>
+              </div>
+            </div>
+
+            {/* Permission Matrix Editor */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b">
+                    <th className="p-2 text-start font-semibold sticky start-0 bg-background min-w-[100px]">{t.rbacModule}</th>
+                    {PERMISSION_ACTIONS.map(a => <th key={a.key} className="p-1.5 text-center font-semibold min-w-[50px]">{lang === 'ar' ? a.labelAr : a.labelEn}</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {SYSTEM_MODULES.map(mod => (
+                    <tr key={mod.key} className="border-b border-border/50 hover:bg-muted/30">
+                      <td className="p-2 font-medium sticky start-0 bg-background text-xs">{lang === 'ar' ? mod.labelAr : mod.labelEn}</td>
+                      {PERMISSION_ACTIONS.map(action => {
+                        const has = (form.permissions[mod.key] || []).includes(action.key)
+                        return (
+                          <td key={action.key} className="p-1.5 text-center">
+                            <button type="button" onClick={() => handleTogglePerm(mod.key, action.key)} className={`inline-flex h-6 w-6 items-center justify-center rounded-md transition-colors ${has ? 'bg-emerald-500 text-white' : 'bg-muted text-muted-foreground hover:bg-muted/80'}`}>
+                              {has && <span className="text-[10px]">✓</span>}
+                            </button>
+                          </td>
+                        )
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="text-xs text-muted-foreground text-center">{t.rbacTotalPermissions}: {countPermissions(form.permissions)}</div>
           </div>
-          <DlgFooter onCancel={() => setEditRole(null)} onConfirm={handleUpdate} />
+          <DlgFooter onCancel={() => setDlg(null)} onConfirm={handleSave} confirmLabel={dlg?.type === 'add' ? t.create : t.save} />
         </DialogContent>
       </Dialog>
+
+      {/* Template Selection Dialog */}
+      <Dialog open={tplDlg} onOpenChange={setTplDlg}>
+        <DialogContent className="max-w-md" dir={isRTL ? 'rtl' : 'ltr'}>
+          <DialogHeader><DialogTitle>{t.rbacApplyTemplate}</DialogTitle><DialogDescription className="sr-only">{lang === 'ar' ? 'اختر قالب صلاحيات' : 'Select permission template'}</DialogDescription></DialogHeader>
+          <div className="space-y-2 pt-2">
+            {templates.map(tpl => (
+              <button key={tpl.id} className="w-full flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors text-start" onClick={() => handleApplyTemplate(tpl)}>
+                <div>
+                  <p className="text-sm font-medium">{lang === 'ar' ? tpl.name : tpl.nameEn}</p>
+                  <p className="text-xs text-muted-foreground">{lang === 'ar' ? tpl.description : tpl.descriptionEn}</p>
+                </div>
+                <Badge variant="secondary" className="text-[10px]">{countPermissions(tpl.permissions)}</Badge>
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirm */}
+      <ConfirmDialog open={dlg?.type === 'delete'} onOpenChange={() => setDlg(null)} title={t.delete} desc={t.confirmDeleteRole.replace('{name}', dlg?.role ? rName(dlg.role) : '')} onConfirm={handleDelete} danger />
     </div>
   )
 }
