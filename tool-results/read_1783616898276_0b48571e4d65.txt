@@ -1,0 +1,502 @@
+   550→            <div className="grid grid-cols-2 gap-3 mb-3">
+   551→              <div className="rounded-lg bg-muted/50 p-2"><p className="text-[10px] text-muted-foreground">{t.tenant}</p><p className="text-xs font-semibold mt-0.5 truncate">{userTenant(u, lang)}</p></div>
+   552→              <div className="rounded-lg bg-muted/50 p-2"><p className="text-[10px] text-muted-foreground">{t.role}</p><p className="text-xs font-semibold mt-0.5">{ROLE_MAP[u.role] || u.role}</p></div>
+   553→            </div>
+   554→            <div className="flex items-center justify-end gap-1 pt-2 border-t">
+   555→              <ActionBtn icon={Edit} label={t.edit} onClick={() => openEdit(u)} />
+   556→              <ActionBtn icon={u.status === 'suspended' ? Power : PowerOff} label={u.status === 'suspended' ? t.active : t.suspended} onClick={() => handleToggleStatus(u)} />
+   557→              <ActionBtn icon={Trash2} onClick={() => setDlg({ type: 'delete', user: u })} danger />
+   558→            </div>
+   559→          </CardContent></Card>
+   560→        ))}
+   561→      </div>
+   562→
+   563→      <Dialog open={dlg?.type === 'add' || dlg?.type === 'edit'} onOpenChange={() => setDlg(null)}>
+   564→        <DialogContent className="max-w-md" dir={isRTL ? 'rtl' : 'ltr'}><DialogHeader><DialogTitle>{dlg?.type === 'add' ? t.addUserDlg : t.editUserDlg}</DialogTitle><DialogDescription className="sr-only">{isRTL ? 'إدارة المستخدمين' : 'Manage users'}</DialogDescription></DialogHeader>
+   565→          <div className="space-y-4 pt-2">
+   566→            <FormField label={t.name}><Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} /></FormField>
+   567→            <FormField label={t.email}><Input type="email" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} dir="ltr" /></FormField>
+   568→            <FormField label={t.tenant}><Input value={form.tenant} onChange={e => setForm(p => ({ ...p, tenant: e.target.value }))} /></FormField>
+   569→            <FormField label={t.role}><Select value={form.role} onValueChange={v => setForm(p => ({ ...p, role: v }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="owner">{t.owner}</SelectItem><SelectItem value="manager">{t.manager}</SelectItem><SelectItem value="receptionist">{t.receptionist}</SelectItem><SelectItem value="accountant">{t.accountant}</SelectItem></SelectContent></Select></FormField>
+   570→          </div>
+   571→          <DlgFooter onCancel={() => setDlg(null)} onConfirm={handleSave} />
+   572→        </DialogContent>
+   573→      </Dialog>
+   574→      <ConfirmDialog open={dlg?.type === 'delete'} onOpenChange={() => setDlg(null)} title={t.deleteUserDlg} desc={t.confirmDeleteUser.replace('{name}', dlg?.user?.name || '')} onConfirm={() => { if (dlg?.user) handleDelete(dlg.user) }} danger />
+   575→    </div>
+   576→  )
+   577→}
+   578→
+   579→// ════════════════════════════════════════════════════════════════
+   580→// PAGE 4: PLANS (Full CRUD + JOD currency)
+   581→// ════════════════════════════════════════════════════════════════
+   582→const PLAN_COLORS = ['bg-gray-500', 'bg-sky-500', 'bg-violet-500', 'bg-indigo-500', 'bg-emerald-500', 'bg-amber-500', 'bg-rose-500']
+   583→
+   584→function PlansPage() {
+   585→  const { t, lang, isRTL } = useSA()
+   586→  const { sym, fmt } = useCurrency()
+   587→  const [plans, setPlans] = useState<Plan[]>([...PLANS])
+   588→  const [dlg, setDlg] = useState<{ type: 'add' | 'edit' | 'delete'; plan?: Plan } | null>(null)
+   589→  const [detailPlan, setDetailPlan] = useState<Plan | null>(null)
+   590→  const emptyFeature = { ar: '', en: '' }
+   591→  const [form, setForm] = useState({ name: '', price: 0, tenants: 0, color: 'bg-violet-500', popular: false, features: [{ ar: '', en: '' }] as { ar: string; en: string }[] })
+   592→
+   593→  const openAdd = () => {
+   594→    setForm({ name: '', price: 0, tenants: 0, color: 'bg-violet-500', popular: false, features: [{ ar: '', en: '' }] })
+   595→    setDlg({ type: 'add' })
+   596→  }
+   597→  const openEdit = (p: Plan) => {
+   598→    setForm({ name: p.name, price: p.price, tenants: p.tenants, color: p.color, popular: p.popular, features: [...p.features] })
+   599→    setDlg({ type: 'edit', plan: p })
+   600→  }
+   601→
+   602→  const handleSave = useCallback(() => {
+   603→    if (!form.name.trim()) { toast.error(lang === 'ar' ? 'يرجى إدخال اسم الباقة' : 'Please enter plan name'); return }
+   604→    const cleanFeatures = form.features.filter(f => f.ar.trim() || f.en.trim())
+   605→    if (cleanFeatures.length === 0) { toast.error(lang === 'ar' ? 'أضف ميزة واحدة على الأقل' : 'Add at least one feature'); return }
+   606→    if (dlg?.type === 'add') {
+   607→      const p: Plan = { id: Date.now().toString(), name: form.name, price: form.price, tenants: form.tenants, features: cleanFeatures, color: form.color, popular: form.popular, currency: 'JOD' }
+   608→      setPlans(prev => [...prev, p]); toast.success(lang === 'ar' ? 'تم إنشاء الباقة' : 'Plan created')
+   609→    } else if (dlg?.plan) {
+   610→      setPlans(prev => prev.map(p => p.id === dlg.plan!.id ? { ...p, name: form.name, price: form.price, tenants: form.tenants, features: cleanFeatures, color: form.color, popular: form.popular } : p))
+   611→      toast.success(t.updated)
+   612→    }
+   613→    setDlg(null)
+   614→  }, [form, dlg, t, lang])
+   615→
+   616→  const handleDelete = () => {
+   617→    if (!dlg?.plan) return
+   618→    setPlans(prev => prev.filter(p => p.id !== dlg.plan!.id)); toast.success(t.deleted); setDlg(null)
+   619→  }
+   620→
+   621→  const addFeature = () => setForm(p => ({ ...p, features: [...p.features, { ar: '', en: '' }] }))
+   622→  const removeFeature = (i: number) => setForm(p => ({ ...p, features: p.features.filter((_, idx) => idx !== i) }))
+   623→  const updateFeature = (i: number, field: 'ar' | 'en', val: string) => {
+   624→    setForm(p => { const f = [...p.features]; f[i] = { ...f[i], [field]: val }; return { ...p, features: f } })
+   625→  }
+   626→
+   627→  return (
+   628→    <div className="space-y-6">
+   629→      <PageTitle title={t.plansTitle} action={<PrimaryBtn icon={Plus} label={t.createPlan} onClick={openAdd} />} />
+   630→      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 sm:gap-5">
+   631→        {plans.map((p, i) => (
+   632→          <motion.div key={p.id} variants={fade} initial="hidden" animate="visible" transition={{ delay: i * 0.04 }}>
+   633→            <Card className={`h-full flex flex-col transition-all hover:shadow-lg border-0 shadow-sm ${p.popular ? 'ring-2 ring-violet-500 shadow-violet-500/10' : ''}`}>
+   634→              <CardContent className="flex-1 flex flex-col items-center p-5 sm:p-6 pt-7">
+   635→                {p.popular && <Badge className="bg-violet-600 text-white mb-3 -mt-1 text-[10px]">{t.mostPopular}</Badge>}
+   636→                <div className={`h-12 w-12 rounded-2xl ${p.color} flex items-center justify-center mb-4 shadow-lg`}><CreditCard className="h-6 w-6 text-white" /></div>
+   637→                <h3 className="font-bold text-base">{p.name}</h3>
+   638→                <p className="text-3xl font-extrabold mt-3 mb-1">{p.price > 0 ? `${p.price}` : t.free}</p>
+   639→                <p className="text-xs text-muted-foreground mb-5">{p.price > 0 ? `${sym} ${t.perMonth}` : ''} · {p.tenants} {t.tenants}</p>
+   640→                <Separator className="w-full mb-5" />
+   641→                <ul className="space-y-2.5 w-full text-start flex-1">{p.features.map((f, j) => (
+   642→                  <li key={j} className="flex items-start gap-2 text-xs sm:text-sm"><CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" /><span>{lang === 'en' ? f.en : f.ar}</span></li>
+   643→                ))}</ul>
+   644→                <div className="flex gap-2 w-full mt-6">
+   645→                  <Button className={`flex-1 ${p.popular ? 'bg-violet-600 hover:bg-violet-700 text-white' : ''}`} variant={p.popular ? 'default' : 'outline'} onClick={() => setDetailPlan(p)}>{t.view}</Button>
+   646→                  <ActionBtn icon={Edit} label={t.edit} onClick={() => openEdit(p)} />
+   647→                  <ActionBtn icon={Trash2} onClick={() => setDlg({ type: 'delete', plan: p })} danger />
+   648→                </div>
+   649→              </CardContent>
+   650→            </Card>
+   651→          </motion.div>
+   652→        ))}
+   653→      </div>
+   654→
+   655→      {/* Detail Dialog */}
+   656→      <Dialog open={!!detailPlan} onOpenChange={() => setDetailPlan(null)}>
+   657→        <DialogContent className="max-w-sm" dir={isRTL ? 'rtl' : 'ltr'}><DialogHeader><DialogTitle>{t.planDetails}</DialogTitle><DialogDescription className="sr-only">{lang === 'ar' ? 'تفاصيل الباقة' : 'Plan details'}</DialogDescription></DialogHeader>
+   658→          {detailPlan && <div className="space-y-4 pt-2">
+   659→            <div className="text-center"><p className="text-3xl font-extrabold">{detailPlan.price > 0 ? `${detailPlan.price} ${sym}` : t.free}</p><p className="text-sm text-muted-foreground mt-1">{t.monthly} · {detailPlan.tenants} {t.tenants}</p></div>
+   660→            <Separator />
+   661→            <ul className="space-y-2">{detailPlan.features.map((f, i) => (<li key={i} className="flex items-center gap-2 text-sm"><CheckCircle2 className="h-4 w-4 text-emerald-500" />{lang === 'en' ? f.en : f.ar}</li>))}</ul>
+   662→          </div>}
+   663→          <DlgFooter onCancel={() => setDetailPlan(null)} onConfirm={() => { if (detailPlan) { openEdit(detailPlan); setDetailPlan(null) } }} confirmLabel={t.edit} />
+   664→        </DialogContent>
+   665→      </Dialog>
+   666→
+   667→      {/* Add/Edit Dialog */}
+   668→      <Dialog open={dlg?.type === 'add' || dlg?.type === 'edit'} onOpenChange={() => setDlg(null)}>
+   669→        <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto" dir={isRTL ? 'rtl' : 'ltr'}>
+   670→          <DialogHeader><DialogTitle>{dlg?.type === 'add' ? t.createPlan : t.editPlanDlg}</DialogTitle><DialogDescription className="sr-only">{lang === 'ar' ? 'إضافة أو تعديل باقة' : 'Add or edit a plan'}</DialogDescription></DialogHeader>
+   671→          <div className="space-y-4 pt-2">
+   672→            <FormField label={lang === 'ar' ? 'اسم الباقة' : 'Plan Name'}>
+   673→              <Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder={lang === 'ar' ? 'مثال: Professional' : 'e.g. Professional'} />
+   674→            </FormField>
+   675→            <div className="grid grid-cols-2 gap-3">
+   676→              <FormField label={t.amount}>
+   677→                <Input type="number" value={form.price || ''} onChange={e => setForm(p => ({ ...p, price: Number(e.target.value) }))} placeholder="0" />
+   678→              </FormField>
+   679→              <FormField label={lang === 'ar' ? 'عدد المستأجرين' : 'Max Tenants'}>
+   680→                <Input type="number" value={form.tenants || ''} onChange={e => setForm(p => ({ ...p, tenants: Number(e.target.value) }))} placeholder="0" />
+   681→              </FormField>
+   682→            </div>
+   683→            <FormField label={lang === 'ar' ? 'اللون' : 'Color'}>
+   684→              <div className="flex flex-wrap gap-2">
+   685→                {PLAN_COLORS.map(c => (
+   686→                  <button key={c} className={`h-8 w-8 rounded-full ${c} transition-transform ${form.color === c ? 'ring-2 ring-offset-2 ring-violet-500 scale-110' : 'opacity-60 hover:opacity-100'}`} onClick={() => setForm(p => ({ ...p, color: c }))} />
+   687→                ))}
+   688→              </div>
+   689→            </FormField>
+   690→            <div className="flex items-center justify-between">
+   691→              <span className="text-sm font-medium">{t.mostPopular}</span>
+   692→              <Toggle on={form.popular} onToggle={() => setForm(p => ({ ...p, popular: !p.popular }))} />
+   693→            </div>
+   694→            <Separator />
+   695→            <div className="space-y-3">
+   696→              <div className="flex items-center justify-between">
+   697→                <span className="text-sm font-medium">{lang === 'ar' ? 'المميزات' : 'Features'}</span>
+   698→                <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={addFeature}><Plus className="h-3 w-3" />{lang === 'ar' ? 'إضافة' : 'Add'}</Button>
+   699→              </div>
+   700→              {form.features.map((f, i) => (
+   701→                <div key={i} className="flex items-start gap-2">
+   702→                  <div className="flex-1 grid grid-cols-2 gap-2">
+   703→                    <Input value={f.ar} onChange={e => updateFeature(i, 'ar', e.target.value)} placeholder={lang === 'ar' ? 'بالعربي' : 'Arabic'} />
+   704→                    <Input value={f.en} onChange={e => updateFeature(i, 'en', e.target.value)} placeholder="English" dir="ltr" />
+   705→                  </div>
+   706→                  {form.features.length > 1 && <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0 mt-0.5" onClick={() => removeFeature(i)}><Trash2 className="h-3.5 w-3.5 text-red-400" /></Button>}
+   707→                </div>
+   708→              ))}
+   709→            </div>
+   710→          </div>
+   711→          <DlgFooter onCancel={() => setDlg(null)} onConfirm={handleSave} />
+   712→        </DialogContent>
+   713→      </Dialog>
+   714→
+   715→      {/* Delete Confirm */}
+   716→      <ConfirmDialog open={dlg?.type === 'delete'} onOpenChange={() => setDlg(null)} title={t.delete} desc={lang === 'ar' ? `هل أنت متأكد من حذف باقة "${dlg?.plan?.name}"؟` : `Delete plan "${dlg?.plan?.name}"?`} onConfirm={handleDelete} danger />
+   717→    </div>
+   718→  )
+   719→}
+   720→
+   721→// ════════════════════════════════════════════════════════════════
+   722→// PAGE 5: BILLING (Full invoice CRUD + CSV export + JOD)
+   723→// ════════════════════════════════════════════════════════════════
+   724→function BillingPage() {
+   725→  const { t, lang, isRTL } = useSA()
+   726→  const { fmt, sym } = useCurrency()
+   727→  const [invoices, setInvoices] = useState<Invoice[]>([...INVOICES])
+   728→  const [filter, setFilter] = useState('all')
+   729→  const [page, setPage] = useState(1)
+   730→  const [sort, setSort] = useState<SortState>({ key: 'date', dir: 'desc' })
+   731→  const [addOpen, setAddOpen] = useState(false)
+   732→  const [invForm, setInvForm] = useState({ tenant: '', tenantEn: '', plan: 'Starter', amount: 0, status: 'pending' as string })
+   733→  const [previewInv, setPreviewInv] = useState<Invoice | null>(null)
+   734→
+   735→  const filtered = useMemo(() => {
+   736→    let list = filter === 'all' ? [...invoices] : invoices.filter(i => i.status === filter)
+   737→    return genericSort(list, sort.key, sort.dir, lang)
+   738→  }, [invoices, filter, sort, lang])
+   739→  const { items, totalPages } = paginate(filtered, page, PER_PAGE)
+   740→  const handleSort = (key: string) => setSort(p => p.key === key ? { key, dir: p.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' })
+   741→  const totalPaid = invoices.filter(i => i.status === 'paid').reduce((s, i) => s + i.amount, 0)
+   742→  const totalPending = invoices.filter(i => i.status === 'pending' || i.status === 'overdue').reduce((s, i) => s + i.amount, 0)
+   743→
+   744→  const handleStatusChange = useCallback((invoiceId: string, newStatus: string, method?: string) => {
+   745→    setInvoices(p => p.map(i => {
+   746→      if (i.id !== invoiceId) return i
+   747→      const updated = { ...i, status: newStatus }
+   748→      if (newStatus === 'paid') {
+   749→        updated.paidDate = new Date().toISOString().split('T')[0]
+   750→        updated.paymentMethod = method || 'cliq'
+   751→        updated.history = [...(i.history || []), {
+   752→          date: new Date().toISOString(), action: 'دفعة ناجحة', actionEn: 'Payment received',
+   753→          details: `تم الدفع عبر ${method === 'card' ? 'بطاقة ائتمان' : method === 'bank_transfer' ? 'تحويل بنكي' : 'CLIQ'}`,
+   754→          detailsEn: `Paid via ${method === 'card' ? 'credit card' : method === 'bank_transfer' ? 'bank transfer' : 'CLIQ'}`,
+   755→          by: 'Super Admin',
+   756→        }]
+   757→      } else if (newStatus === 'refunded') {
+   758→        updated.history = [...(i.history || []), {
+   759→          date: new Date().toISOString(), action: 'إرجاع', actionEn: 'Refunded',
+   760→          details: 'تم إرجاع مبلغ الفاتورة', detailsEn: 'Invoice amount refunded', by: 'Super Admin',
+   761→        }]
+   762→      }
+   763→      return updated
+   764→    }))
+   765→    toast.success(t.invoiceStatusChanged)
+   766→  }, [])
+   767→
+   768→  const handleMarkPaid = (inv: Invoice) => { handleStatusChange(inv.id, 'paid') }
+   769→
+   770→  const handleCreateInvoice = () => {
+   771→    if (!invForm.tenant.trim()) { toast.error(isRTL ? 'يرجى اختيار المستأجر' : 'Please select a tenant'); return }
+   772→    if (invForm.amount <= 0) { toast.error(isRTL ? 'يرجى إدخال مبلغ صحيح' : 'Please enter a valid amount'); return }
+   773→    const newId = `INV-${String(invoices.length + 1).padStart(3, '0')}`
+   774→    const today = new Date().toISOString().split('T')[0]
+   775→    const dueDate = new Date(); dueDate.setDate(dueDate.getDate() + 30)
+   776→    const inv: Invoice = {
+   777→      id: newId, tenant: invForm.tenant, tenantEn: invForm.tenantEn,
+   778→      amount: invForm.amount, status: invForm.status,
+   779→      date: today, dueDate: dueDate.toISOString().split('T')[0], paidDate: null,
+   780→      plan: invForm.plan, currency: 'JOD', taxRate: 16, notes: '', paymentMethod: '',
+   781→      history: [{ date: new Date().toISOString(), action: 'إنشاء الفاتورة', actionEn: 'Invoice created', details: `فاتورة اشتراك ${invForm.plan}`, detailsEn: `${invForm.plan} subscription invoice`, by: 'Super Admin' }],
+   782→    }
+   783→    setInvoices(p => [inv, ...p]); toast.success(isRTL ? `تم إنشاء الفاتورة ${newId}` : `Invoice ${newId} created`); setAddOpen(false)
+   784→    setInvForm({ tenant: '', tenantEn: '', plan: 'Starter', amount: 0, status: 'pending' })
+   785→  }
+   786→
+   787→  const handleExportExcel = useCallback(() => {
+   788→    import('xlsx').then(XLSX => {
+   789→      const statusLabels: Record<string, string> = { paid: isRTL ? 'مدفوع' : 'Paid', pending: isRTL ? 'معلق' : 'Pending', overdue: isRTL ? 'متأخر' : 'Overdue', failed: isRTL ? 'فاشل' : 'Failed' }
+   790→      const headers = isRTL
+   791→        ? ['رقم الفاتورة', 'المستأجر', 'الباقة', 'المبلغ (د.أ)', 'العملة', 'الحالة', 'التاريخ']
+   792→        : ['Invoice No.', 'Tenant', 'Plan', 'Amount (JOD)', 'Currency', 'Status', 'Date']
+   793→      const rows = filtered.map(inv => [
+   794→        inv.id, isRTL ? inv.tenant : (inv.tenantEn || inv.tenant), inv.plan,
+   795→        inv.amount, inv.currency, statusLabels[inv.status] || inv.status, inv.date,
+   796→      ])
+   797→      const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
+   798→      ws['!cols'] = headers.map(() => ({ wch: 20 }))
+   799→      const wb = XLSX.utils.book_new()
+   800→      XLSX.utils.book_append_sheet(wb, ws, isRTL ? 'الفواتير' : 'Invoices')
+   801→      XLSX.writeFile(wb, `invoices_${new Date().toISOString().split('T')[0]}.xlsx`)
+   802→      toast.success(isRTL ? 'تم تصدير الفواتير إلى Excel بنجاح' : 'Invoices exported to Excel successfully')
+   803→    }).catch(() => {
+   804→      toast.error(isRTL ? 'فشل تصدير Excel' : 'Excel export failed')
+   805→    })
+   806→  }, [filtered, isRTL])
+   807→
+   808→  const handleDeleteInvoice = (inv: Invoice) => {
+   809→    setInvoices(p => p.filter(i => i.id !== inv.id)); toast.success(t.deleted); setPage(1)
+   810→  }
+   811→
+   812→  return (
+   813→    <div className="space-y-5">
+   814→      <PageTitle title={t.billingTitle} action={
+   815→        <div className="flex gap-2">
+   816→          <Button variant="outline" className="gap-2 h-9" onClick={handleExportExcel}><Download className="h-4 w-4" />{t.exportExcel}</Button>
+   817→          <PrimaryBtn icon={Plus} label={t.createInvoice} onClick={() => setAddOpen(true)} />
+   818→        </div>
+   819→      } />
+   820→      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+   821→        <StatCard icon={CheckCircle2} label={t.payments} value={fmt(totalPaid)} color="text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30" />
+   822→        <StatCard icon={Clock} label={t.pending} value={fmt(totalPending)} color="text-amber-600 bg-amber-50 dark:bg-amber-950/30" />
+   823→        <StatCard icon={Banknote} label={t.paid} value={`${invoices.filter(i => i.status === 'paid').length}`} color="text-sky-600 bg-sky-50 dark:bg-sky-950/30" />
+   824→        <StatCard icon={AlertTriangle} label={t.overdue} value={`${invoices.filter(i => i.status === 'overdue').length}`} color="text-red-600 bg-red-50 dark:bg-red-950/30" />
+   825→      </div>
+   826→      <div className="flex gap-3">
+   827→        <Select value={filter} onValueChange={v => { setFilter(v); setPage(1) }}>
+   828→          <SelectTrigger className="w-44 h-10"><SelectValue /></SelectTrigger>
+   829→          <SelectContent><SelectItem value="all">{t.all}</SelectItem><SelectItem value="paid">{t.paid}</SelectItem><SelectItem value="pending">{t.pending}</SelectItem><SelectItem value="overdue">{t.overdue}</SelectItem><SelectItem value="failed">{t.failed}</SelectItem></SelectContent>
+   830→        </Select>
+   831→      </div>
+   832→
+   833→      <Card className="border-0 shadow-sm overflow-hidden hidden md:block">
+   834→        <div className="overflow-x-auto">
+   835→          <Table><TableHeader><TableRow className="bg-muted/50 hover:bg-muted/50">
+   836→            <SortableTH label={t.invoiceNo} sortKey="id" currentSort={sort} onSort={handleSort} className="ps-5" />
+   837→            <SortableTH label={t.tenant} sortKey="tenant" currentSort={sort} onSort={handleSort} />
+   838→            <SortableTH label={t.plan} sortKey="plan" currentSort={sort} onSort={handleSort} className="hidden lg:table-cell" />
+   839→            <SortableTH label={t.amount} sortKey="amount" currentSort={sort} onSort={handleSort} align="end" />
+   840→            <SortableTH label={t.status} sortKey="status" currentSort={sort} onSort={handleSort} />
+   841→            <TableHead className="pe-5 font-semibold text-xs uppercase tracking-wider text-end">{t.actions}</TableHead>
+   842→          </TableRow></TableHeader>
+   843→          <TableBody>
+   844→            {items.length === 0 ? <EmptyRow colSpan={6} /> : items.map(inv => (
+   845→            <TableRow key={inv.id} className="group hover:bg-muted/20 transition-colors">
+   846→              <TableCell className="ps-5 font-mono text-sm font-semibold">{inv.id}</TableCell>
+   847→              <TableCell className="px-3 text-sm">{invTenant(inv, lang)}</TableCell>
+   848→              <TableCell className="px-3 hidden lg:table-cell"><Badge variant="secondary" className="text-xs">{inv.plan}</Badge></TableCell>
+   849→              <TableCell className="px-3 text-end font-semibold tabular-nums text-sm">{inv.amount.toLocaleString()} <span className="text-xs font-normal text-muted-foreground">{sym}</span></TableCell>
+   850→              <TableCell className="px-3"><StatusBadge status={inv.status} locale={lang} /></TableCell>
+   851→              <TableCell className="pe-5">
+   852→                <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+   853→                  <ActionBtn icon={Eye} label={t.view} onClick={() => setPreviewInv(inv)} />
+   854→                  {inv.status === 'pending' && <ActionBtn icon={CheckCircle2} label={t.invoiceMarkPaid} onClick={() => handleStatusChange(inv.id, 'paid')} />}
+   855→                  {inv.status === 'overdue' && <ActionBtn icon={AlertTriangle} onClick={() => { handleStatusChange(inv.id, 'pending'); toast.success(t.invoiceSendReminderDesc) }} />}
+   856→                  {inv.status === 'paid' && <ActionBtn icon={RefreshCw} label={t.invoiceRefund} onClick={() => handleStatusChange(inv.id, 'refunded')} />}
+   857→                  <ActionBtn icon={Download} onClick={handleExportExcel} />
+   858→                  <ActionBtn icon={Trash2} onClick={() => handleDeleteInvoice(inv)} danger />
+   859→                </div>
+   860→              </TableCell>
+   861→            </TableRow>
+   862→          ))}
+   863→          </TableBody></Table>
+   864→        </div>
+   865→        <TableFooter current={items.length} total={filtered.length} entity={isRTL ? 'فاتورة' : 'invoices'} />
+   866→        <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+   867→      </Card>
+   868→
+   869→      <div className="md:hidden space-y-3">
+   870→        {items.length === 0 ? <Card className="border-0 shadow-sm"><CardContent className="py-16 text-center text-muted-foreground text-sm">{t.noResults}</CardContent></Card> : items.map(inv => (
+   871→          <Card key={inv.id} className="border-0 shadow-sm"><CardContent className="p-4">
+   872→            <div className="flex items-start justify-between gap-3 mb-3">
+   873→              <div className="min-w-0"><p className="font-mono text-sm font-bold">{inv.id}</p><p className="text-xs text-muted-foreground mt-0.5">{invTenant(inv, lang)}</p></div>
+   874→              <StatusBadge status={inv.status} locale={lang} />
+   875→            </div>
+   876→            <div className="flex items-center justify-between pt-2 border-t">
+   877→              <span className="font-bold text-sm">{inv.amount.toLocaleString()} <span className="text-xs font-normal text-muted-foreground">{sym}</span></span>
+   878→              <div className="flex gap-1">
+   879→                <ActionBtn icon={Eye} onClick={() => setPreviewInv(inv)} />
+   880→                {inv.status !== 'paid' && <ActionBtn icon={CheckCircle2} onClick={() => handleMarkPaid(inv)} />}
+   881→                {inv.status === 'paid' && <ActionBtn icon={RefreshCw} label={t.invoiceRefund} onClick={() => handleStatusChange(inv.id, 'refunded')} />}
+   882→                <ActionBtn icon={Download} onClick={() => handleExportExcel()} />
+   883→                <ActionBtn icon={Trash2} onClick={() => handleDeleteInvoice(inv)} danger />
+   884→              </div>
+   885→            </div>
+   886→          </CardContent></Card>
+   887→        ))}
+   888→      </div>
+   889→
+   890→      {/* Create Invoice Dialog */}
+   891→      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+   892→        <DialogContent className="max-w-md" dir={isRTL ? 'rtl' : 'ltr'}><DialogHeader><DialogTitle>{t.createInvoice}</DialogTitle><DialogDescription className="sr-only">{isRTL ? 'إنشاء فاتورة جديدة' : 'Create a new invoice'}</DialogDescription></DialogHeader>
+   893→          <div className="space-y-4 pt-2">
+   894→            <FormField label={t.tenant}>
+   895→              <Select value={invForm.tenant} onValueChange={v => {
+   896→                const tn = INIT_TENANTS.find(x => x.name === v || x.nameEn === v)
+   897→                setInvForm(p => ({ ...p, tenant: tn?.name || v, tenantEn: tn?.nameEn || v }))
+   898→              }}>
+   899→                <SelectTrigger><SelectValue placeholder={isRTL ? 'اختر المستأجر' : 'Select tenant'} /></SelectTrigger>
+   900→                <SelectContent>
+   901→                  {INIT_TENANTS.map(tn => <SelectItem key={tn.id} value={lang === 'en' ? tn.nameEn : tn.name}>{lang === 'en' ? tn.nameEn : tn.name}</SelectItem>)}
+   902→                </SelectContent>
+   903→              </Select>
+   904→            </FormField>
+   905→            <div className="grid grid-cols-2 gap-3">
+   906→              <FormField label={t.plan}>
+   907→                <Select value={invForm.plan} onValueChange={v => {
+   908→                  setInvForm(p => ({ ...p, plan: v }))
+   909→                  const plan = PLANS.find(pl => pl.name === v)
+   910→                  if (plan) setInvForm(p => ({ ...p, amount: plan.price }))
+   911→                }}>
+   912→                  <SelectTrigger><SelectValue /></SelectTrigger>
+   913→                  <SelectContent>{PLANS.map(p => <SelectItem key={p.id} value={p.name}>{p.name} ({p.price} {sym})</SelectItem>)}</SelectContent>
+   914→                </Select>
+   915→              </FormField>
+   916→              <FormField label={t.amount}>
+   917→                <Input type="number" value={invForm.amount || ''} onChange={e => setInvForm(p => ({ ...p, amount: Number(e.target.value) }))} />
+   918→              </FormField>
+   919→            </div>
+   920→            <FormField label={t.status}>
+   921→              <Select value={invForm.status} onValueChange={v => setInvForm(p => ({ ...p, status: v }))}>
+   922→                <SelectTrigger><SelectValue /></SelectTrigger>
+   923→                <SelectContent>
+   924→                  <SelectItem value="pending">{t.pending}</SelectItem>
+   925→                  <SelectItem value="paid">{t.paid}</SelectItem>
+   926→                </SelectContent>
+   927→              </Select>
+   928→            </FormField>
+   929→          </div>
+   930→          <DlgFooter onCancel={() => setAddOpen(false)} onConfirm={handleCreateInvoice} confirmLabel={isRTL ? 'إنشاء' : 'Create'} />
+   931→        </DialogContent>
+   932→      </Dialog>
+   933→
+   934→      {/* Invoice Preview Dialog */}
+   935→      {previewInv && <InvoicePreviewDialog invoice={previewInv} open={!!previewInv} onClose={() => setPreviewInv(null)} onStatusChange={handleStatusChange} />}
+   936→    </div>
+   937→  )
+   938→}
+   939→
+   940→// ════════════════════════════════════════════════════════════════
+   941→// PAGE 6: ROLES & PERMISSIONS (Enterprise RBAC — Enhanced)
+   942→// ════════════════════════════════════════════════════════════════
+   943→function RolesPage() {
+   944→  const { t, lang, isRTL } = useSA()
+   945→  const [roles, setRoles] = useState<RbacRole[]>(INIT_RBAC_ROLES)
+   946→  const [templates, setTemplates] = useState<PermissionTemplate[]>(INIT_RBAC_TEMPLATES)
+   947→  const [dlg, setDlg] = useState<{ type: 'add' | 'edit' | 'delete' | 'matrix' | 'clone_src' | 'details' | 'policy' | 'save_tpl'; role?: RbacRole } | null>(null)
+   948→  const [form, setForm] = useState({ name: '', nameEn: '', desc: '', descEn: '', parentId: null as string | null, permissions: {} as Record<string, string[]> })
+   949→  const [tplDlg, setTplDlg] = useState(false)
+   950→  const [viewTab, setViewTab] = useState<'roles' | 'matrix' | 'templates' | 'api' | 'buttons' | 'jwt' | 'visibility' | 'policies'>('roles')
+   951→  const [detailRole, setDetailRole] = useState<RbacRole | null>(null)
+   952→  const [policyForm, setPolicyForm] = useState({ name: '', nameEn: '', effect: 'deny' as 'allow' | 'deny', module: '*' as string, action: '*' as string, condition: '', conditionAr: '', conditionEn: '', priority: 1 })
+   953→  const [editingPolicyId, setEditingPolicyId] = useState<string | null>(null)
+   954→  const [saveTplForm, setSaveTplForm] = useState({ name: '', nameEn: '', desc: '', descEn: '' })
+   955→
+   956→  const rName = (r: RbacRole) => lang === 'en' ? r.nameEn : r.name
+   957→  const rDesc = (r: RbacRole) => lang === 'en' ? r.descriptionEn : r.description
+   958→
+   959→  const openAdd = () => {
+   960→    setForm({ name: '', nameEn: '', desc: '', descEn: '', parentId: null, permissions: {} })
+   961→    SYSTEM_MODULES.forEach(m => { form.permissions[m.key] = ['view'] })
+   962→    setForm(p => ({ ...p, permissions: { ...p.permissions } }))
+   963→    setDlg({ type: 'add' })
+   964→  }
+   965→
+   966→  const openEdit = (r: RbacRole) => {
+   967→    setForm({ name: r.name, nameEn: r.nameEn, desc: r.description, descEn: r.descriptionEn, parentId: r.parentId, permissions: cloneRolePermissions(r) })
+   968→    setDlg({ type: 'edit', role: r })
+   969→  }
+   970→
+   971→  const openMatrix = (r: RbacRole) => { setForm({ name: r.name, nameEn: r.nameEn, desc: r.description, descEn: r.descriptionEn, parentId: r.parentId, permissions: cloneRolePermissions(r) }); setDlg({ type: 'matrix', role: r }) }
+   972→
+   973→  const openDetails = (r: RbacRole) => { setDetailRole(r) }
+   974→
+   975→  const handleClone = (r: RbacRole) => {
+   976→    const clone: RbacRole = { ...r, id: Date.now().toString(), name: `${r.name} ${t.rbacCloneSuffix}`, nameEn: `${r.nameEn} (Copy)`, userCount: 0, isSystem: false, parentId: r.parentId, permissions: cloneRolePermissions(r), createdAt: new Date().toISOString().split('T')[0], claims: r.claims ? r.claims.map(c => ({ ...c })) : [], policies: r.policies ? r.policies.map(p => ({ ...p })) : [], hiddenPages: r.hiddenPages ? [...r.hiddenPages] : [] }
+   977→    setRoles(p => [clone, ...p]); toast.success(t.rbacRoleCloned)
+   978→  }
+   979→
+   980→  const handleSave = () => {
+   981→    if (!form.name.trim()) { toast.error(lang === 'ar' ? 'يرجى إدخال اسم الدور' : 'Please enter role name'); return }
+   982→    if (dlg?.type === 'add') {
+   983→      const r: RbacRole = { id: Date.now().toString(), name: form.name, nameEn: form.nameEn, description: form.desc, descriptionEn: form.descEn, userCount: 0, isSystem: false, parentId: form.parentId, permissions: { ...form.permissions }, createdAt: new Date().toISOString().split('T')[0], claims: [], policies: [], hiddenPages: [] }
+   984→      setRoles(p => [r, ...p]); toast.success(t.roleCreated)
+   985→    } else if (dlg?.role) {
+   986→      setRoles(p => p.map(r => r.id === dlg.role!.id ? { ...r, name: form.name, nameEn: form.nameEn, description: form.desc, descriptionEn: form.descEn, parentId: form.parentId, permissions: { ...form.permissions } } : r))
+   987→      toast.success(t.roleUpdated)
+   988→    }
+   989→    setDlg(null)
+   990→  }
+   991→
+   992→  const handleDelete = () => {
+   993→    if (!dlg?.role) return
+   994→    setRoles(p => p.filter(x => x.id !== dlg.role!.id)); toast.success(t.roleDeleted); setDlg(null)
+   995→  }
+   996→
+   997→  const handleTogglePerm = (mod: string, action: string) => {
+   998→    setForm(p => ({ ...p, permissions: togglePermission({ ...p, permissions: p.permissions }, mod, action) }))
+   999→  }
+  1000→
+  1001→  const handleApplyTemplate = (tpl: PermissionTemplate) => {
+  1002→    const perms = applyTemplate(tpl)
+  1003→    setForm(p => ({ ...p, permissions: perms }))
+  1004→    setTplDlg(false); toast.success(t.rbacTemplateApplied)
+  1005→  }
+  1006→
+  1007→  // Policy management
+  1008→  const openAddPolicy = () => {
+  1009→    setEditingPolicyId(null)
+  1010→    setPolicyForm({ name: '', nameEn: '', effect: 'deny', module: '*', action: '*', condition: '', conditionAr: '', conditionEn: '', priority: 1 })
+  1011→    setDlg({ type: 'policy', role: detailRole || undefined })
+  1012→  }
+  1013→
+  1014→  const openEditPolicy = (policy: RbacPolicy) => {
+  1015→    setEditingPolicyId(policy.id)
+  1016→    setPolicyForm({ name: policy.name, nameEn: policy.nameEn, effect: policy.effect, module: policy.module, action: policy.action, condition: policy.condition || '', conditionAr: policy.conditionAr || '', conditionEn: policy.conditionEn || '', priority: policy.priority })
+  1017→    setDlg({ type: 'policy', role: detailRole || undefined })
+  1018→  }
+  1019→
+  1020→  const handleSavePolicy = () => {
+  1021→    if (!policyForm.name.trim() || !dlg?.role) return
+  1022→    const newPolicy: RbacPolicy = {
+  1023→      id: editingPolicyId || `p-${Date.now()}`,
+  1024→      name: policyForm.name,
+  1025→      nameEn: policyForm.nameEn,
+  1026→      effect: policyForm.effect,
+  1027→      module: policyForm.module,
+  1028→      action: policyForm.action,
+  1029→      condition: policyForm.condition || undefined,
+  1030→      conditionAr: policyForm.conditionAr || undefined,
+  1031→      conditionEn: policyForm.conditionEn || undefined,
+  1032→      priority: policyForm.priority,
+  1033→    }
+  1034→    setRoles(p => p.map(r => {
+  1035→      if (r.id !== dlg.role!.id) return r
+  1036→      const policies = [...(r.policies || [])]
+  1037→      if (editingPolicyId) {
+  1038→        const idx = policies.findIndex(pp => pp.id === editingPolicyId)
+  1039→        if (idx >= 0) policies[idx] = newPolicy
+  1040→      } else {
+  1041→        policies.push(newPolicy)
+  1042→      }
+  1043→      return { ...r, policies }
+  1044→    }))
+  1045→    toast.success(editingPolicyId ? t.rbacPolicyUpdated : t.rbacPolicyCreated)
+  1046→    setDlg(null)
+  1047→    // Refresh detailRole
+  1048→    setRoles(p => p)
+  1049→  }
+
+[showing lines 550-1049 of 2625; use offset=1050 with limit to continue reading]
