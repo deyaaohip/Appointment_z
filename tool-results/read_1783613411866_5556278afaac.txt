@@ -1,0 +1,484 @@
+     1→'use client'
+     2→
+     3→import { useState, useRef } from 'react'
+     4→import { motion } from 'framer-motion'
+     5→import { toast } from 'sonner'
+     6→import { Button } from '@/components/ui/button'
+     7→import { Badge } from '@/components/ui/badge'
+     8→import { Input } from '@/components/ui/input'
+     9→import { Separator } from '@/components/ui/separator'
+    10→import {
+    11→  X, Printer, Download, Mail, Copy, CheckCircle2, FileText,
+    12→  Clock, CreditCard, ArrowRightLeft, AlertTriangle, RotateCcw, Send,
+    13→} from 'lucide-react'
+    14→import { useSA, StatusBadge, useCurrency } from './sa-helpers'
+    15→import { type Invoice } from './sa-data'
+    16→
+    17→// ─── Simple QR Code SVG Generator ──────────────────────────────
+    18→function SimpleQRCode({ data, size = 120 }: { data: string; size?: number }) {
+    19→  const hash = Array.from(data).reduce((acc, c) => ((acc << 5) - acc + c.charCodeAt(0)) | 0, 0)
+    20→  const cells = 21
+    21→  const matrix: boolean[][] = Array.from({ length: cells }, () => Array(cells).fill(false))
+    22→  const seed = Math.abs(hash)
+    23→  const rng = (i: number) => { let x = Math.sin(seed + i * 127.1) * 43758.5453; return x - Math.floor(x) }
+    24→  const drawFinder = (r: number, c: number) => {
+    25→    for (let i = 0; i < 7; i++) for (let j = 0; j < 7; j++) {
+    26→      const isBorder = i === 0 || i === 6 || j === 0 || j === 6
+    27→      const isInner = i >= 2 && i <= 4 && j >= 2 && j <= 4
+    28→      matrix[r + i][c + j] = isBorder || isInner
+    29→    }
+    30→  }
+    31→  drawFinder(0, 0); drawFinder(0, 14); drawFinder(14, 0)
+    32→  let idx = 0
+    33→  for (let r = 0; r < cells; r++) for (let c = 0; c < cells; c++) {
+    34→    if (matrix[r][c]) continue
+    35→    const inTL = r < 8 && c < 8; const inTR = r < 8 && c > 12; const inBL = r > 12 && c < 8
+    36→    if (inTL || inTR || inBL) continue
+    37→    if (rng(idx++) > 0.5) matrix[r][c] = true
+    38→  }
+    39→  const cellSize = size / cells
+    40→  return (
+    41→    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="mx-auto">
+    42→      <rect width={size} height={size} fill="white" rx="4" />
+    43→      {matrix.map((row, r) => row.map((filled, c) => filled ? (
+    44→        <rect key={`${r}-${c}`} x={c * cellSize} y={r * cellSize} width={cellSize} height={cellSize} fill="#1a1a2e" rx={0.5} />
+    45→      ) : null))}
+    46→    </svg>
+    47→  )
+    48→}
+    49→
+    50→// ─── Payment Method Label ──────────────────────────────────────
+    51→function payMethodLabel(method: string, lang: 'ar' | 'en'): string {
+    52→  if (!method) return lang === 'ar' ? '—' : '—'
+    53→  const map: Record<string, { ar: string; en: string }> = {
+    54→    cliq: { ar: 'CLIQ تحويل', en: 'CLIQ Transfer' },
+    55→    card: { ar: 'بطاقة ائتمان', en: 'Credit Card' },
+    56→    bank_transfer: { ar: 'تحويل بنكي', en: 'Bank Transfer' },
+    57→  }
+    58→  return map[method]?.[lang] || method
+    59→}
+    60→
+    61→// ─── Invoice Preview Component ──────────────────────────────────
+    62→export function InvoicePreviewDialog({
+    63→  invoice,
+    64→  open,
+    65→  onClose,
+    66→  onStatusChange,
+    67→}: {
+    68→  invoice: Invoice
+    69→  open: boolean
+    70→  onClose: () => void
+    71→  onStatusChange?: (invoiceId: string, newStatus: string, method?: string) => void
+    72→}) {
+    73→  const { isRTL, lang } = useSA()
+    74→  const { sym } = useCurrency()
+    75→  const printRef = useRef<HTMLDivElement>(null)
+    76→  const [taxRate, setTaxRate] = useState(invoice.taxRate || 16)
+    77→  const [showTaxInput, setShowTaxInput] = useState(false)
+    78→  const [sending, setSending] = useState(false)
+    79→  const [copied, setCopied] = useState(false)
+    80→  const [payMethodDlg, setPayMethodDlg] = useState(false)
+    81→  const [selectedMethod, setSelectedMethod] = useState('cliq')
+    82→
+    83→  if (!open || !invoice) return null
+    84→
+    85→  const subtotal = invoice.amount
+    86→  const tax = Math.round(subtotal * taxRate / 100)
+    87→  const total = subtotal + tax
+    88→  const ar = lang === 'ar'
+    89→
+    90→  const isPaid = invoice.status === 'paid'
+    91→  const isPending = invoice.status === 'pending'
+    92→  const isOverdue = invoice.status === 'overdue'
+    93→  const isFailed = invoice.status === 'failed'
+    94→
+    95→  // Calculate days until due / days overdue
+    96→  const now = new Date()
+    97→  const due = new Date(invoice.dueDate)
+    98→  const diffMs = due.getTime() - now.getTime()
+    99→  const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24))
+   100→  const isOverdueNow = diffDays < 0 && !isPaid
+   101→
+   102→  const handleMarkPaid = () => {
+   103→    if (!onStatusChange) return
+   104→    onStatusChange(invoice.id, 'paid', selectedMethod)
+   105→    setPayMethodDlg(false)
+   106→  }
+   107→
+   108→  const handleRefund = () => {
+   109→    if (!onStatusChange) return
+   110→    onStatusChange(invoice.id, 'refunded')
+   111→    toast.success(ar ? 'تم إرجاع الفاتورة' : 'Invoice refunded')
+   112→  }
+   113→
+   114→  const handleSendReminder = () => {
+   115→    toast.success(ar ? `تم إرسال تذكير لفاتورة ${invoice.id}` : `Reminder sent for ${invoice.id}`)
+   116→  }
+   117→
+   118→  const handlePrint = () => {
+   119→    const content = printRef.current
+   120→    if (!content) return
+   121→    const printWindow = window.open('', '_blank', 'width=800,height=600')
+   122→    if (!printWindow) { toast.error(ar ? 'فشل فتح نافذة الطباعة' : 'Failed to open print window'); return }
+   123→    printWindow.document.write(`
+   124→      <!DOCTYPE html><html dir="${isRTL ? 'rtl' : 'ltr'}"><head>
+   125→      <title>${ar ? 'فاتورة' : 'Invoice'} ${invoice.id}</title>
+   126→      <style>
+   127→        * { margin: 0; padding: 0; box-sizing: border-box; }
+   128→        body { font-family: 'Segoe UI', Tahoma, sans-serif; padding: 40px; color: #1a1a2e; }
+   129→        .invoice { max-width: 700px; margin: 0 auto; border: 2px solid #e5e7eb; border-radius: 12px; padding: 32px; }
+   130→        .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; padding-bottom: 20px; border-bottom: 2px solid #7c3aed; }
+   131→        .logo { font-size: 24px; font-weight: 800; color: #7c3aed; }
+   132→        .logo-sub { font-size: 12px; color: #666; }
+   133→        .inv-id { font-size: 14px; font-weight: 700; font-family: monospace; }
+   134→        .details { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px; }
+   135→        .detail-label { font-size: 11px; color: #888; margin-bottom: 4px; }
+   136→        .detail-value { font-size: 14px; font-weight: 600; }
+   137→        .table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+   138→        .table th { background: #f5f3ff; padding: 10px 12px; font-size: 11px; text-align: left; text-transform: uppercase; letter-spacing: 0.5px; color: #555; border-bottom: 2px solid #ddd6fe; }
+   139→        .table td { padding: 10px 12px; font-size: 13px; border-bottom: 1px solid #eee; }
+   140→        .amounts { margin-left: auto; width: 250px; }
+   141→        .amount-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 14px; }
+   142→        .amount-row.total { border-top: 2px solid #7c3aed; padding-top: 10px; margin-top: 4px; font-size: 18px; font-weight: 800; color: #7c3aed; }
+   143→        .amount-label { color: #666; }
+   144→        .footer { margin-top: 24px; padding-top: 16px; border-top: 1px solid #eee; text-align: center; font-size: 11px; color: #999; }
+   145→        .history { margin-top: 20px; }
+   146→        .history-item { display: flex; gap: 12px; padding: 8px 0; border-bottom: 1px solid #f3f4f6; font-size: 12px; }
+   147→        .history-date { color: #888; white-space: nowrap; min-width: 120px; }
+   148→        .history-action { font-weight: 600; }
+   149→        @media print { body { padding: 20px; } }
+   150→      </style></head><body>
+   151→      <div class="invoice">
+   152→        <div class="header">
+   153→          <div><div class="logo">BookFlow</div><div class="logo-sub">${ar ? 'منصة الحجز الإلكتروني' : 'Electronic Booking Platform'}</div></div>
+   154→          <div style="text-align: right;"><div class="inv-id">${invoice.id}</div></div>
+   155→        </div>
+   156→        <div class="details">
+   157→          <div><div class="detail-label">${ar ? 'المستأجر' : 'Tenant'}</div><div class="detail-value">${isRTL ? invoice.tenant : (invoice.tenantEn || invoice.tenant)}</div></div>
+   158→          <div><div class="detail-label">${ar ? 'تاريخ الإنشاء' : 'Date'}</div><div class="detail-value">${invoice.date}</div></div>
+   159→          <div><div class="detail-label">${ar ? 'تاريخ الاستحقاق' : 'Due Date'}</div><div class="detail-value">${invoice.dueDate}</div></div>
+   160→          <div><div class="detail-label">${ar ? 'الباقة' : 'Plan'}</div><div class="detail-value">${invoice.plan}</div></div>
+   161→          ${invoice.paymentMethod ? `<div><div class="detail-label">${ar ? 'طريقة الدفع' : 'Payment Method'}</div><div class="detail-value">${payMethodLabel(invoice.paymentMethod, lang)}</div></div>` : ''}
+   162→          ${invoice.paidDate ? `<div><div class="detail-label">${ar ? 'تاريخ الدفع' : 'Paid Date'}</div><div class="detail-value">${invoice.paidDate}</div></div>` : ''}
+   163→        </div>
+   164→        <table class="table">
+   165→          <thead><tr><th>${ar ? 'الوصف' : 'Description'}</th><th style="text-align: right;">${ar ? 'المبلغ' : 'Amount'}</th></tr></thead>
+   166→          <tbody>
+   167→            <tr><td>${ar ? 'اشتراك الباقة' : 'Plan Subscription'} - ${invoice.plan} (${ar ? 'شهري' : 'Monthly'})</td><td style="text-align: right; font-weight: 600;">${subtotal.toLocaleString()} ${sym}</td></tr>
+   168→            <tr><td>${ar ? 'ضريبة المبيعات' : 'Sales Tax'} (${taxRate}%)</td><td style="text-align: right;">${tax.toLocaleString()} ${sym}</td></tr>
+   169→          </tbody>
+   170→        </table>
+   171→        <div class="amounts">
+   172→          <div class="amount-row"><span class="amount-label">${ar ? 'المجموع الفرعي' : 'Subtotal'}</span><span>${subtotal.toLocaleString()} ${sym}</span></div>
+   173→          <div class="amount-row"><span class="amount-label">${ar ? 'الضريبة' : 'Tax'} (${taxRate}%)</span><span>${tax.toLocaleString()} ${sym}</span></div>
+   174→          <div class="amount-row total"><span>${ar ? 'الإجمالي' : 'Total'}</span><span>${total.toLocaleString()} ${sym}</span></div>
+   175→        </div>
+   176→        ${invoice.history && invoice.history.length > 1 ? `
+   177→        <div class="history">
+   178→          <h4 style="font-size: 13px; font-weight: 700; margin-bottom: 8px;">${ar ? 'سجل الفاتورة' : 'Invoice History'}</h4>
+   179→          ${invoice.history.map(h => `<div class="history-item"><span class="history-date">${new Date(h.date).toLocaleString(lang === 'ar' ? 'ar-JO' : 'en-JO')}</span><span class="history-action">${lang === 'en' ? h.actionEn : h.action}</span><span style="color: #666;">${lang === 'en' ? h.detailsEn : h.details}</span></div>`).join('')}
+   180→        </div>` : ''}
+   181→        <div class="footer">${ar ? 'شكراً لاستخدامكم منصة BookFlow' : 'Thank you for using BookFlow Platform'}<br/>support@bookflow.com</div>
+   182→      </div>
+   183→      <script>window.onload = function() { window.print(); }</script>
+   184→      </body></html>`)
+   185→    printWindow.document.close()
+   186→  }
+   187→
+   188→  const handleDownloadPDF = () => { handlePrint() }
+   189→
+   190→  const handleSendEmail = async () => {
+   191→    setSending(true)
+   192→    await new Promise(resolve => setTimeout(resolve, 1500))
+   193→    setSending(false)
+   194→    toast.success(ar ? `تم إرسال الفاتورة ${invoice.id} بالبريد الإلكتروني` : `Invoice ${invoice.id} sent via email`)
+   195→  }
+   196→
+   197→  const handleCopyLink = () => {
+   198→    const invUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/invoice/${invoice.id}`
+   199→    navigator.clipboard.writeText(invUrl).then(() => {
+   200→      setCopied(true); toast.success(ar ? 'تم نسخ الرابط' : 'Link copied')
+   201→      setTimeout(() => setCopied(false), 2000)
+   202→    })
+   203→  }
+   204→
+   205→  return (
+   206→    <>
+   207→    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={onClose}>
+   208→      <motion.div
+   209→        initial={{ opacity: 0, scale: 0.95 }}
+   210→        animate={{ opacity: 1, scale: 1 }}
+   211→        className="bg-background rounded-2xl shadow-2xl border w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden"
+   212→        dir={isRTL ? 'rtl' : 'ltr'}
+   213→        onClick={e => e.stopPropagation()}
+   214→      >
+   215→        {/* Header */}
+   216→        <div className="p-5 border-b flex items-center justify-between">
+   217→          <div className="flex items-center gap-3">
+   218→            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-100 dark:bg-violet-900/30">
+   219→              <FileText className="h-5 w-5 text-violet-600" />
+   220→            </div>
+   221→            <div>
+   222→              <h2 className="text-lg font-bold">{ar ? 'فاتورة' : 'Invoice'}</h2>
+   223→              <p className="text-xs text-muted-foreground font-mono">{invoice.id}</p>
+   224→            </div>
+   225→          </div>
+   226→          <div className="flex items-center gap-2">
+   227→            <StatusBadge status={invoice.status} locale={lang} />
+   228→            <Button variant="ghost" size="icon" className="h-9 w-9" onClick={onClose}><X className="h-4 w-4" /></Button>
+   229→          </div>
+   230→        </div>
+   231→
+   232→        {/* Invoice Content */}
+   233→        <div className="flex-1 overflow-y-auto p-5" ref={printRef}>
+   234→          <div className="border rounded-xl p-6 sm:p-8 space-y-6">
+   235→            {/* Invoice Header */}
+   236→            <div className="flex items-start justify-between gap-4">
+   237→              <div>
+   238→                <h3 className="text-2xl font-extrabold text-violet-600">BookFlow</h3>
+   239→                <p className="text-xs text-muted-foreground mt-1">{ar ? 'منصة الحجز الإلكتروني' : 'Electronic Booking Platform'}</p>
+   240→                <p className="text-xs text-muted-foreground" dir="ltr">support@bookflow.com</p>
+   241→              </div>
+   242→              <div className="text-end">
+   243→                <p className="text-xl font-bold font-mono">{invoice.id}</p>
+   244→                <div className="mt-2"><StatusBadge status={invoice.status} locale={lang} /></div>
+   245→              </div>
+   246→            </div>
+   247→
+   248→            <Separator />
+   249→
+   250→            {/* Invoice Details Grid */}
+   251→            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
+   252→              <div>
+   253→                <p className="text-[11px] text-muted-foreground mb-1">{ar ? 'المستأجر' : 'Tenant'}</p>
+   254→                <p className="font-semibold">{isRTL ? invoice.tenant : (invoice.tenantEn || invoice.tenant)}</p>
+   255→              </div>
+   256→              <div>
+   257→                <p className="text-[11px] text-muted-foreground mb-1">{ar ? 'تاريخ الإنشاء' : 'Date'}</p>
+   258→                <p className="font-semibold">{invoice.date}</p>
+   259→              </div>
+   260→              <div>
+   261→                <p className="text-[11px] text-muted-foreground mb-1">{ar ? 'تاريخ الاستحقاق' : 'Due Date'}</p>
+   262→                <p className={`font-semibold ${isOverdueNow ? 'text-red-500' : ''}`}>{invoice.dueDate}</p>
+   263→                {isOverdueNow && <p className="text-[10px] text-red-500 mt-0.5">{Math.abs(diffDays)} {ar ? 'يوم متأخر' : 'days overdue'}</p>}
+   264→                {!isOverdueNow && !isPaid && diffDays > 0 && diffDays <= 7 && <p className="text-[10px] text-amber-500 mt-0.5">{ar ? `مستحق خلال ${diffDays} يوم` : `due in ${diffDays} days`}</p>}
+   265→              </div>
+   266→              <div>
+   267→                <p className="text-[11px] text-muted-foreground mb-1">{ar ? 'الباقة' : 'Plan'}</p>
+   268→                <p className="font-semibold">{invoice.plan}</p>
+   269→              </div>
+   270→              <div>
+   271→                <p className="text-[11px] text-muted-foreground mb-1">{ar ? 'العملة' : 'Currency'}</p>
+   272→                <p className="font-semibold">{invoice.currency}</p>
+   273→              </div>
+   274→              {invoice.paymentMethod && (
+   275→                <div>
+   276→                  <p className="text-[11px] text-muted-foreground mb-1">{ar ? 'طريقة الدفع' : 'Payment Method'}</p>
+   277→                  <p className="font-semibold">{payMethodLabel(invoice.paymentMethod, lang)}</p>
+   278→                </div>
+   279→              )}
+   280→              {invoice.paidDate && (
+   281→                <div>
+   282→                  <p className="text-[11px] text-muted-foreground mb-1">{ar ? 'تاريخ الدفع' : 'Paid Date'}</p>
+   283→                  <p className="font-semibold text-emerald-600">{invoice.paidDate}</p>
+   284→                </div>
+   285→              )}
+   286→            </div>
+   287→
+   288→            {/* Status Action Buttons */}
+   289→            {(isPending || isOverdue || isPaid || isFailed) && (
+   290→              <div className="flex flex-wrap gap-2">
+   291→                {isPending && (
+   292→                  <>
+   293→                    <Button size="sm" className="gap-1.5 h-8 bg-emerald-600 hover:bg-emerald-700 text-white text-xs" onClick={() => setPayMethodDlg(true)}>
+   294→                      <CheckCircle2 className="h-3.5 w-3.5" />{ar ? 'تحديد كمدفوع' : 'Mark Paid'}
+   295→                    </Button>
+   296→                    <Button size="sm" variant="outline" className="gap-1.5 h-8 text-xs" onClick={handleSendReminder}>
+   297→                      <Send className="h-3.5 w-3.5" />{ar ? 'إرسال تذكير' : 'Send Reminder'}
+   298→                    </Button>
+   299→                  </>
+   300→                )}
+   301→                {isOverdue && (
+   302→                  <>
+   303→                    <Button size="sm" className="gap-1.5 h-8 bg-emerald-600 hover:bg-emerald-700 text-white text-xs" onClick={() => setPayMethodDlg(true)}>
+   304→                      <CheckCircle2 className="h-3.5 w-3.5" />{ar ? 'تحديد كمدفوع' : 'Mark Paid'}
+   305→                    </Button>
+   306→                    <Button size="sm" variant="outline" className="gap-1.5 h-8 text-xs text-amber-600 border-amber-300" onClick={handleSendReminder}>
+   307→                      <AlertTriangle className="h-3.5 w-3.5" />{ar ? 'إرسال تذكير تأخير' : 'Overdue Reminder'}
+   308→                    </Button>
+   309→                  </>
+   310→                )}
+   311→                {isPaid && (
+   312→                  <Button size="sm" variant="outline" className="gap-1.5 h-8 text-xs text-red-500 border-red-300" onClick={handleRefund}>
+   313→                    <RotateCcw className="h-3.5 w-3.5" />{ar ? 'إرجاع' : 'Refund'}
+   314→                  </Button>
+   315→                )}
+   316→                {isFailed && (
+   317→                  <Button size="sm" variant="outline" className="gap-1.5 h-8 text-xs" onClick={handleSendReminder}>
+   318→                    <ArrowRightLeft className="h-3.5 w-3.5" />{ar ? 'إعادة المحاولة' : 'Retry'}
+   319→                  </Button>
+   320→                )}
+   321→              </div>
+   322→            )}
+   323→
+   324→            {/* Line Items */}
+   325→            <div className="border rounded-lg overflow-hidden">
+   326→              <table className="w-full text-sm">
+   327→                <thead>
+   328→                  <tr className="bg-muted/50">
+   329→                    <th className="px-4 py-3 text-start text-xs font-semibold uppercase tracking-wider">{ar ? 'الوصف' : 'Description'}</th>
+   330→                    <th className="px-4 py-3 text-end text-xs font-semibold uppercase tracking-wider w-32">{ar ? 'المبلغ' : 'Amount'}</th>
+   331→                  </tr>
+   332→                </thead>
+   333→                <tbody>
+   334→                  <tr className="border-t">
+   335→                    <td className="px-4 py-3">
+   336→                      <p className="font-medium">{ar ? `اشتراك الباقة ${invoice.plan}` : `${invoice.plan} Plan Subscription`}</p>
+   337→                      <p className="text-xs text-muted-foreground">{ar ? 'شهري' : 'Monthly'}</p>
+   338→                    </td>
+   339→                    <td className="px-4 py-3 text-end font-semibold tabular-nums">{subtotal.toLocaleString()} <span className="text-xs font-normal text-muted-foreground">{sym}</span></td>
+   340→                  </tr>
+   341→                  <tr className="border-t">
+   342→                    <td className="px-4 py-3">
+   343→                      <p className="font-medium">{ar ? `ضريبة المبيعات (${taxRate}%)` : `Sales Tax (${taxRate}%)`}</p>
+   344→                    </td>
+   345→                    <td className="px-4 py-3 text-end tabular-nums text-muted-foreground">{tax.toLocaleString()} <span className="text-xs">{sym}</span></td>
+   346→                  </tr>
+   347→                </tbody>
+   348→              </table>
+   349→            </div>
+   350→
+   351→            {/* Totals */}
+   352→            <div className="flex justify-end">
+   353→              <div className="w-64 space-y-2">
+   354→                <div className="flex justify-between text-sm"><span className="text-muted-foreground">{ar ? 'المجموع الفرعي' : 'Subtotal'}</span><span className="tabular-nums">{subtotal.toLocaleString()} {sym}</span></div>
+   355→                <div className="flex justify-between text-sm items-center gap-2">
+   356→                  <span className="text-muted-foreground">{ar ? 'الضريبة' : 'Tax'}</span>
+   357→                  <div className="flex items-center gap-1">
+   358→                    {showTaxInput ? (
+   359→                      <Input type="number" value={taxRate} onChange={e => setTaxRate(Number(e.target.value))} className="w-16 h-7 text-xs text-end" dir="ltr" min={0} max={50} />
+   360→                    ) : (
+   361→                      <span className="tabular-nums">{taxRate}%</span>
+   362→                    )}
+   363→                    <button onClick={() => setShowTaxInput(!showTaxInput)} className="text-[10px] text-violet-600 hover:underline">{ar ? 'تعديل' : 'edit'}</button>
+   364→                  </div>
+   365→                </div>
+   366→                <Separator />
+   367→                <div className="flex justify-between text-lg font-extrabold text-violet-700 dark:text-violet-400">
+   368→                  <span>{ar ? 'الإجمالي' : 'Total'}</span>
+   369→                  <span className="tabular-nums">{total.toLocaleString()} {sym}</span>
+   370→                </div>
+   371→              </div>
+   372→            </div>
+   373→
+   374→            {/* Notes */}
+   375→            {invoice.notes && (
+   376→              <div className="rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 p-3">
+   377→                <p className="text-[11px] text-amber-700 dark:text-amber-400 font-semibold mb-1">{ar ? 'ملاحظات' : 'Notes'}</p>
+   378→                <p className="text-xs text-amber-600 dark:text-amber-500">{invoice.notes}</p>
+   379→              </div>
+   380→            )}
+   381→
+   382→            {/* QR Code */}
+   383→            <div className="flex items-center justify-center pt-2">
+   384→              <div className="border rounded-xl p-4 bg-white inline-block">
+   385→                <SimpleQRCode data={`BOOKFLOW-${invoice.id}-${invoice.amount}-${invoice.date}`} size={140} />
+   386→                <p className="text-[10px] text-center text-muted-foreground mt-2">{ar ? 'امسح للدفع' : 'Scan to pay'}</p>
+   387→              </div>
+   388→            </div>
+   389→
+   390→            {/* Invoice History Timeline */}
+   391→            {invoice.history && invoice.history.length > 0 && (
+   392→              <div>
+   393→                <Separator className="mb-4" />
+   394→                <h4 className="text-sm font-bold mb-3 flex items-center gap-2">
+   395→                  <Clock className="h-4 w-4 text-muted-foreground" />
+   396→                  {ar ? 'سجل الفاتورة' : 'Invoice History'}
+   397→                </h4>
+   398→                <div className="relative space-y-0">
+   399→                  {invoice.history.map((h, i) => (
+   400→                    <div key={i} className="flex gap-3 pb-3 last:pb-0">
+   401→                      <div className="flex flex-col items-center">
+   402→                        <div className={`h-6 w-6 rounded-full flex items-center justify-center shrink-0 ${i === 0 ? 'bg-violet-100 dark:bg-violet-900/30 text-violet-600' : 'bg-muted text-muted-foreground'}`}>
+   403→                          <div className="h-2 w-2 rounded-full bg-current" />
+   404→                        </div>
+   405→                        {i < invoice.history.length - 1 && <div className="w-px flex-1 bg-border mt-1" />}
+   406→                      </div>
+   407→                      <div className="min-w-0 flex-1 pb-2">
+   408→                        <div className="flex items-center gap-2 mb-0.5">
+   409→                          <p className="text-xs font-semibold">{lang === 'en' ? h.actionEn : h.action}</p>
+   410→                          <span className="text-[10px] text-muted-foreground">{new Date(h.date).toLocaleString(lang === 'ar' ? 'ar-JO' : 'en-JO')}</span>
+   411→                        </div>
+   412→                        <p className="text-[11px] text-muted-foreground">{lang === 'en' ? h.detailsEn : h.details}</p>
+   413→                        <p className="text-[10px] text-muted-foreground">{ar ? 'بواسطة' : 'By'}: {h.by}</p>
+   414→                      </div>
+   415→                    </div>
+   416→                  ))}
+   417→                </div>
+   418→              </div>
+   419→            )}
+   420→
+   421→            {/* Footer */}
+   422→            <div className="text-center text-xs text-muted-foreground pt-2 border-t">
+   423→              <p>{ar ? 'شكراً لاستخدامكم منصة BookFlow' : 'Thank you for using BookFlow Platform'}</p>
+   424→              <p className="mt-1">support@bookflow.com</p>
+   425→            </div>
+   426→          </div>
+   427→        </div>
+   428→
+   429→        {/* Actions */}
+   430→        <div className="p-5 border-t bg-muted/30 flex flex-wrap items-center justify-end gap-2">
+   431→          <Button variant="outline" className="gap-2 h-9" onClick={handleCopyLink}>
+   432→            {copied ? <CheckCircle2 className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+   433→            {copied ? (ar ? 'تم النسخ' : 'Copied') : (ar ? 'نسخ الرابط' : 'Copy Link')}
+   434→          </Button>
+   435→          <Button variant="outline" className="gap-2 h-9" onClick={handleSendEmail} disabled={sending}>
+   436→            <Mail className="h-4 w-4" />
+   437→            {sending ? (ar ? 'جاري الإرسال...' : 'Sending...') : (ar ? 'إرسال بالبريد' : 'Send Email')}
+   438→          </Button>
+   439→          <Button variant="outline" className="gap-2 h-9" onClick={handleDownloadPDF}>
+   440→            <Download className="h-4 w-4" />{ar ? 'تحميل PDF' : 'Download PDF'}
+   441→          </Button>
+   442→          <Button className="gap-2 h-9 bg-violet-600 hover:bg-violet-700 text-white" onClick={handlePrint}>
+   443→            <Printer className="h-4 w-4" />{ar ? 'طباعة' : 'Print'}
+   444→          </Button>
+   445→        </div>
+   446→      </motion.div>
+   447→    </div>
+   448→
+   449→    {/* Payment Method Selection Dialog */}
+   450→    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50" onClick={() => setPayMethodDlg(false)}>
+   451→      <motion.div
+   452→        initial={{ opacity: 0, scale: 0.95 }}
+   453→        animate={{ opacity: 1, scale: 1 }}
+   454→        className="bg-background rounded-xl shadow-2xl border w-full max-w-sm p-5"
+   455→        dir={isRTL ? 'rtl' : 'ltr'}
+   456→        onClick={e => e.stopPropagation()}
+   457→      >
+   458→        <h3 className="text-base font-bold mb-4">{ar ? 'اختر طريقة الدفع' : 'Select Payment Method'}</h3>
+   459→        <div className="space-y-2">
+   460→          {[
+   461→            { key: 'cliq', label: ar ? 'CLIQ تحويل' : 'CLIQ Transfer', icon: <CreditCard className="h-4 w-4" /> },
+   462→            { key: 'card', label: ar ? 'بطاقة ائتمان' : 'Credit Card', icon: <CreditCard className="h-4 w-4" /> },
+   463→            { key: 'bank_transfer', label: ar ? 'تحويل بنكي' : 'Bank Transfer', icon: <ArrowRightLeft className="h-4 w-4" /> },
+   464→          ].map(m => (
+   465→            <button
+   466→              key={m.key}
+   467→              className={`w-full flex items-center gap-3 p-3 rounded-lg border text-start transition-colors ${selectedMethod === m.key ? 'border-violet-500 bg-violet-50 dark:bg-violet-950/30' : 'hover:bg-muted/50'}`}
+   468→              onClick={() => setSelectedMethod(m.key)}
+   469→            >
+   470→              {m.icon}
+   471→              <span className="text-sm font-medium">{m.label}</span>
+   472→              {selectedMethod === m.key && <CheckCircle2 className="h-4 w-4 text-violet-600 ms-auto" />}
+   473→            </button>
+   474→          ))}
+   475→        </div>
+   476→        <div className="flex gap-2 mt-5">
+   477→          <Button variant="outline" className="flex-1" onClick={() => setPayMethodDlg(false)}>{ar ? 'إلغاء' : 'Cancel'}</Button>
+   478→          <Button className="flex-1 bg-violet-600 hover:bg-violet-700 text-white" onClick={handleMarkPaid}>{ar ? 'تأكيد الدفع' : 'Confirm Payment'}</Button>
+   479→        </div>
+   480→      </motion.div>
+   481→    </div>
+   482→    </>
+   483→  )
+   484→}

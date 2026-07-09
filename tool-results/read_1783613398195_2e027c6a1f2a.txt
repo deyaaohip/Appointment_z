@@ -1,0 +1,1411 @@
+     1→import { useAppStore } from '@/stores/app-store'
+     2→
+     3→export type Lang = 'ar' | 'en'
+     4→
+     5→// ─── Comprehensive translations for all 14 dashboard pages ───
+     6→interface T {
+     7→  // Shared
+     8→  noResults: string
+     9→  save: string
+    10→  cancel: string
+    11→  confirm: string
+    12→  actions: string
+    13→  status: string
+    14→  search: string
+    15→  filter: string
+    16→  all: string
+    17→  view: string
+    18→  edit: string
+    19→  delete: string
+    20→  close: string
+    21→  loading: string
+    22→  showingOf: string
+    23→
+    24→  // Overview
+    25→  overviewTitle: string
+    26→  totalTenants: string
+    27→  totalUsers: string
+    28→  revenue: string
+    29→  totalBookings: string
+    30→  active: string
+    31→  thisMonth: string
+    32→  last30Days: string
+    33→  comparedToLastMonth: string
+    34→  revenueByPlan: string
+    35→  recentActivity: string
+    36→  activeTenants: string
+    37→  details: string
+    38→  perMonth: string
+    39→
+    40→  // Tenants
+    41→  tenantMgmt: string
+    42→  addTenant: string
+    43→  tenantSearch: string
+    44→  allStatuses: string
+    45→  trial: string
+    46→  suspended: string
+    47→  tenant: string
+    48→  plan: string
+    49→  bookings: string
+    50→  tenantRevenue: string
+    51→  addTenantDlg: string
+    52→  editTenantDlg: string
+    53→  deleteTenantDlg: string
+    54→  deleteTenantDesc: string
+    55→  nameAr: string
+    56→  nameEn: string
+    57→  email: string
+    58→  country: string
+    59→  added: string
+    60→  updated: string
+    61→  deleted: string
+    62→  enterTenantName: string
+    63→  enterValidEmail: string
+    64→  tenantDetails: string
+    65→  tenantSuspended: string
+    66→  tenantActivated: string
+    67→  confirmSuspend: string
+    68→  confirmActivate: string
+    69→
+    70→  // Users
+    71→  userMgmt: string
+    72→  addUser: string
+    73→  userSearch: string
+    74→  user: string
+    75→  role: string
+    76→  addUserDlg: string
+    77→  editUserDlg: string
+    78→  deleteUserDlg: string
+    79→  name: string
+    80→  enterNameAndEmail: string
+    81→  userSuspended: string
+    82→  userActivated: string
+    83→  changeStatus: string
+    84→  suspendUser: string
+    85→  activateUser: string
+    86→  owner: string
+    87→  manager: string
+    88→  receptionist: string
+    89→  accountant: string
+    90→
+    91→  // Plans
+    92→  plansTitle: string
+    93→  createPlan: string
+    94→  mostPopular: string
+    95→  free: string
+    96→  tenants: string
+    97→  managePlan: string
+    98→  monthly: string
+    99→  editPlanDlg: string
+   100→  willOpenPlanEditor: string
+   101→  willOpenCreatePlan: string
+   102→
+   103→  // Billing
+   104→  billingTitle: string
+   105→  createInvoice: string
+   106→  payments: string
+   107→  pending: string
+   108→  paid: string
+   109→  overdue: string
+   110→  failed: string
+   111→  invoiceNo: string
+   112→  amount: string
+   113→  date: string
+   114→  download: string
+   115→  willCreateInvoice: string
+   116→  downloadingInvoice: string
+   117→  viewingInvoice: string
+   118→
+   119→  // Roles
+   120→  rolesTitle: string
+   121→  addRole: string
+   122→  permissions: string
+   123→  users: string
+   124→  addRoleDlg: string
+   125→  roleName: string
+   126→  roleNameEn: string
+   127→  description: string
+   128→  create: string
+   129→  roleCreated: string
+   130→
+   131→  // Audit
+   132→  auditTitle: string
+   133→  export: string
+   134→  info: string
+   135→  success: string
+   136→  warning: string
+   137→  error: string
+   138→  level: string
+   139→  message: string
+   140→  source: string
+   141→  logExported: string
+   142→
+   143→  // Notifications
+   144→  notificationsTitle: string
+   145→  sendNotif: string
+   146→  template: string
+   147→  type: string
+   148→  sent: string
+   149→  send: string
+   150→  sendNotifDlg: string
+   151→  title: string
+   152→  content: string
+   153→  target: string
+   154→  everyone: string
+   155→  activeUsers: string
+   156→  trialUsers: string
+   157→  notifSent: string
+   158→  editTemplate: string
+   159→  testSent: string
+   160→
+   161→  // Reports
+   162→  reportsTitle: string
+   163→  generate: string
+   164→  lastGenerated: string
+   165→  generating: string
+   166→  downloading: string
+   167→
+   168→  // System
+   169→  systemTitle: string
+   170→  refresh: string
+   171→  systemLog: string
+   172→  refreshed: string
+   173→
+   174→  // Servers
+   175→  serversTitle: string
+   176→  addServer: string
+   177→  restart: string
+   178→  requests: string
+   179→  addServerDlg: string
+   180→  serverName: string
+   181→  region: string
+   182→  serverAdded: string
+   183→  restarting: string
+   184→  serverDetails: string
+   185→
+   186→  // Database
+   187→  dbTitle: string
+   188→  backup: string
+   189→  dbSize: string
+   190→  tables: string
+   191→  avgResponse: string
+   192→  backups: string
+   193→  resourceUsage: string
+   194→  backupList: string
+   195→  automatic: string
+   196→  manual: string
+   197→  backingUp: string
+   198→  downloadingBackup: string
+   199→
+   200→  // Security
+   201→  securityTitle: string
+   202→  securitySettings: string
+   203→  twoFactor: string
+   204→  twoFactorDesc: string
+   205→  ipWhitelist: string
+   206→  ipWhitelistDesc: string
+   207→  bruteForce: string
+   208→  bruteForceDesc: string
+   209→  sessionTimeout: string
+   210→  sessionTimeoutDesc: string
+   211→  auditLogging: string
+   212→  auditLoggingDesc: string
+   213→  dataEncryption: string
+   214→  dataEncryptionDesc: string
+   215→  suspiciousAttempts: string
+   216→  ipAddress: string
+   217→  time: string
+   218→  location: string
+   219→  unknown: string
+   220→  settingUpdated: string
+   221→
+   222→  // Settings
+   223→  settingsTitle: string
+   224→  saveSettings: string
+   225→  generalSettings: string
+   226→  platformName: string
+   227→  supportEmail: string
+   228→  currency: string
+   229→  timezone: string
+   230→  advancedSettings: string
+   231→  maxTenants: string
+   232→  backupFreq: string
+   233→  maintenanceMode: string
+   234→  maintenanceModeDesc: string
+   235→  openRegistration: string
+   236→  openRegistrationDesc: string
+   237→  hourly: string
+   238→  daily: string
+   239→  weekly: string
+   240→  settingsSaved: string
+   241→
+   242→  // Pagination
+   243→  prev: string
+   244→  next: string
+   245→  page: string
+   246→
+   247→  // Sort
+   248→  sortAsc: string
+   249→  sortDesc: string
+   250→
+   251→  // Overview audit additions
+   252→  expiredSubs: string
+   253→  pendingRequests: string
+   254→  monthlyRevenue: string
+   255→  recentPayments: string
+   256→  systemNotifications: string
+   257→  quickActions: string
+   258→
+   259→  // CLIQ Payment Gateway
+   260→  cliqTitle: string
+   261→  cliqSettings: string
+   262→  cliqEnabled: string
+   263→  cliqEnabledDesc: string
+   264→  cliqBankName: string
+   265→  cliqAccountHolder: string
+   266→  cliqAlias: string
+   267→  cliqInstructions: string
+   268→  cliqQrCode: string
+   269→  cliqSupportContact: string
+   270→  cliqUploadQr: string
+   271→  cliqPending: string
+   272→  cliqApproved: string
+   273→  cliqRejected: string
+   274→  cliqInfoRequested: string
+   275→  cliqReferenceNo: string
+   276→  cliqCustomer: string
+   277→  cliqSubmissionDate: string
+   278→  cliqScreenshot: string
+   279→  cliqNotes: string
+   280→  cliqApprove: string
+   281→  cliqReject: string
+   282→  cliqRequestInfo: string
+   283→  cliqApproveDesc: string
+   284→  cliqRejectDesc: string
+   285→  cliqApprovedMsg: string
+   286→  cliqRejectedMsg: string
+   287→  cliqInfoRequestedMsg: string
+   288→  cliqRejectionReason: string
+   289→  cliqEnterReason: string
+   290→  cliqInfoRequestPrompt: string
+   291→  cliqNoScreenshot: string
+   292→  cliqTotalPending: string
+   293→  cliqTotalApproved: string
+   294→  cliqTotalRejected: string
+   295→  cliqNoPayments: string
+   296→  cliqPaymentMethod: string
+   297→  cliqTransferInfo: string
+   298→  cliqTransferComplete: string
+   299→  cliqReferenceRequired: string
+   300→  cliqDuplicateRef: string
+   301→  cliqSubmitPayment: string
+   302→  cliqPaymentSubmitted: string
+   303→  cliqWaitingVerification: string
+   304→  cliqResubmit: string
+   305→  cliqAuditApprove: string
+   306→  cliqAuditReject: string
+   307→  cliqAuditInfo: string
+   308→
+   309→  // Super Admin labels
+   310→  superAdmin: string
+   311→  superAdminDashboard: string
+   312→  profile: string
+   313→  preferences: string
+   314→  signOut: string
+   315→
+   316→  // Sidebar sections
+   317→  mainSection: string
+   318→  managementSection: string
+   319→  systemSection: string
+   320→
+   321→  // Sidebar nav items
+   322→  navOverview: string
+   323→  navTenants: string
+   324→  navUsers: string
+   325→  navPlans: string
+   326→  navBilling: string
+   327→  navRoles: string
+   328→  navAudit: string
+   329→  navNotifications: string
+   330→  navReports: string
+   331→  navSystem: string
+   332→  navServers: string
+   333→  navDatabase: string
+   334→  navSecurity: string
+   335→  navSettings: string
+   336→  navCliq: string
+   337→
+   338→  // Report names
+   339→  reportRevenue: string
+   340→  reportRevenueDesc: string
+   341→  reportGrowth: string
+   342→  reportGrowthDesc: string
+   343→  reportSecurity: string
+   344→  reportSecurityDesc: string
+   345→  reportPerformance: string
+   346→  reportPerformanceDesc: string
+   347→  reportUsers: string
+   348→  reportUsersDesc: string
+   349→  reportBilling: string
+   350→  reportBillingDesc: string
+   351→  reportTypeFinancial: string
+   352→  reportTypeOperational: string
+   353→  reportTypeSecurity: string
+   354→  reportTypeTechnical: string
+   355→
+   356→  // Notification templates
+   357→  notifWelcome: string
+   358→  notifPayment: string
+   359→  notifSuspend: string
+   360→  notifWeekly: string
+   361→  notifTypeEmail: string
+   362→  notifTypeEmailSms: string
+   363→
+   364→  // System gauge labels
+   365→  gaugeApi: string
+   366→  gaugeDatabase: string
+   367→  gaugeMemory: string
+   368→  gaugeDisk: string
+   369→  gaugeCdn: string
+   370→  gaugeWorker: string
+   371→  gaugeConnections: string
+   372→  gaugeCpu: string
+   373→  gaugeUptime: string
+   374→
+   375→  // Confirm dialog descriptions
+   376→  confirmDeleteUser: string
+   377→  confirmDeleteServer: string
+   378→  confirmDeleteRole: string
+   379→  confirmDeleteTemplate: string
+   380→
+   381→  // Actions
+   382→  serverRestarted: string
+   383→  serverDeleted: string
+   384→  roleDeleted: string
+   385→  roleUpdated: string
+   386→  userDeleted: string
+   387→  reportGenerated: string
+   388→  reportDownloaded: string
+   389→  planDetails: string
+   390→  editRoleDlg: string
+   391→
+   392→  // Excel export
+   393→  exportExcel: string
+   394→
+   395→  // Subscription management
+   396→  extendSubscription: string
+   397→  extendSubscriptionDlg: string
+   398→  durationMonths: string
+   399→  subscriptionExtended: string
+   400→  subscriptionActivated: string
+   401→  subscriptionStatus: string
+   402→  subscriptionEnd: string
+   403→  months: string
+   404→
+   405→  // CLIQ new payment
+   406→  newCliqPayment: string
+   407→  newCliqPaymentDlg: string
+   408→  customerName: string
+   409→  customerEmail: string
+   410→  referenceNumber: string
+   411→  notes: string
+   412→  cliqNewPaymentSuccess: string
+   413→  cliqInfoRequested2: string
+   414→
+   415→  // Invoice enhancements
+   416→  invoiceDueDate: string
+   417→  invoicePaidDate: string
+   418→  invoiceTaxRate: string
+   419→  invoiceNotes: string
+   420→  invoicePaymentMethod: string
+   421→  invoiceHistory: string
+   422→  invoiceMarkPaid: string
+   423→  invoiceRefund: string
+   424→  invoiceSendReminder: string
+   425→  invoiceCancel: string
+   426→  invoiceStatusChanged: string
+   427→  invoiceMarkPaidDesc: string
+   428→  invoiceRefundDesc: string
+   429→  invoiceSendReminderDesc: string
+   430→  invoiceCreatedBy: string
+   431→  invoiceCliq: string
+   432→  invoiceCard: string
+   433→  invoiceBankTransfer: string
+   434→  invoiceDaysOverdue: string
+   435→  invoiceDueIn: string
+   436→  invoicePaymentStatus: string
+   437→  invoiceSelectMethod: string
+   438→  invoiceConfirmPayment: string
+   439→
+   440→  // Plans enhancements
+   441→  planCompare: string
+   442→  planSyncBanner: string
+   443→  planNumericLimit: string
+   444→  planEnableFeature: string
+   445→  planCompareSelect: string
+   446→  planNoCompare: string
+   447→  planEditLimits: string
+   448→  planSubscribedTenants: string
+   449→  planValue: string
+   450→
+   451→  // RBAC
+   452→  rbacTitle: string
+   453→  rbacMatrix: string
+   454→  rbacPermissions: string
+   455→  rbacInheritance: string
+   456→  rbacTemplates: string
+   457→  rbacCloneRole: string
+   458→  rbacApplyTemplate: string
+   459→  rbacSaveAsTemplate: string
+   460→  rbacEffectivePerms: string
+   461→  rbacInherited: string
+   462→  rbacOwnPerms: string
+   463→  rbacSystemRole: string
+   464→  rbacParentRole: string
+   465→  rbacNoParent: string
+   466→  rbacCloneSuffix: string
+   467→  rbacRoleCloned: string
+   468→  rbacSelectParent: string
+   469→  rbacTotalPermissions: string
+   470→  rbacModule: string
+   471→  rbacAction: string
+   472→  rbacView: string
+   473→  rbacCreate: string
+   474→  rbacEdit: string
+   475→  rbacDelete: string
+   476→  rbacExport: string
+   477→  rbacImport: string
+   478→  rbacPrint: string
+   479→  rbacApprove: string
+   480→  rbacReject: string
+   481→  rbacRestore: string
+   482→  rbacArchive: string
+   483→  rbacReadOnly: string
+   484→  rbacStandardUser: string
+   485→  rbacManager: string
+   486→  rbacFullAccess: string
+   487→  rbacTemplateApplied: string
+   488→  rbacTemplateSaved: string
+   489→  rbacHidePage: string
+   490→  rbacForbidden: string
+   491→  rbacJwtClaims: string
+   492→  rbacMenuVisibility: string
+   493→  rbacCloneFromRole: string
+   494→  rbacViewDetails: string
+   495→  rbacPermissionCount: string
+   496→  rbacUserCount: string
+   497→  rbacDescription: string
+   498→}
+   499→
+   500→const ar: T = {
+   501→  // Shared
+   502→  noResults: 'لا توجد نتائج',
+   503→  save: 'حفظ',
+   504→  cancel: 'إلغاء',
+   505→  confirm: 'تأكيد',
+   506→  actions: 'إجراءات',
+   507→  status: 'الحالة',
+   508→  search: 'بحث',
+   509→  filter: 'تصفية',
+   510→  all: 'الكل',
+   511→  view: 'عرض',
+   512→  edit: 'تعديل',
+   513→  delete: 'حذف',
+   514→  close: 'إغلاق',
+   515→  loading: 'جاري التحميل...',
+   516→  showingOf: 'عرض {current} من {total} {entity}',
+   517→  // Overview
+   518→  overviewTitle: 'نظرة عامة على المنصة',
+   519→  totalTenants: 'إجمالي المستأجرين',
+   520→  totalUsers: 'إجمالي المستخدمين',
+   521→  revenue: 'الإيرادات (د.أ)',
+   522→  totalBookings: 'إجمالي الحجوزات',
+   523→  active: 'نشط',
+   524→  thisMonth: 'هذا الشهر',
+   525→  last30Days: 'آخر 30 يوم',
+   526→  comparedToLastMonth: 'مقارنة بالشهر السابق',
+   527→  revenueByPlan: 'الإيرادات حسب الباقة',
+   528→  recentActivity: 'آخر النشاطات',
+   529→  activeTenants: 'المستأجرون النشطون',
+   530→  details: 'تفاصيل',
+   531→  perMonth: 'د.أ / شهر',
+   532→  // Tenants
+   533→  tenantMgmt: 'إدارة المستأجرين',
+   534→  addTenant: 'إضافة مستأجر',
+   535→  tenantSearch: 'بحث بالاسم أو البريد الإلكتروني...',
+   536→  allStatuses: 'جميع الحالات',
+   537→  trial: 'تجريبي',
+   538→  suspended: 'معلق',
+   539→  tenant: 'المستأجر',
+   540→  plan: 'الباقة',
+   541→  bookings: 'الحجوزات',
+   542→  tenantRevenue: 'الإيرادات',
+   543→  addTenantDlg: 'إضافة مستأجر',
+   544→  editTenantDlg: 'تعديل المستأجر',
+   545→  deleteTenantDlg: 'حذف المستأجر',
+   546→  deleteTenantDesc: 'هل أنت متأكد من حذف "{name}"؟ لا يمكن التراجع عن هذا الإجراء.',
+   547→  nameAr: 'الاسم (عربي)',
+   548→  nameEn: 'الاسم (إنجليزي)',
+   549→  email: 'البريد الإلكتروني',
+   550→  country: 'البلد',
+   551→  added: 'تم إضافة: {name}',
+   552→  updated: 'تم التحديث',
+   553→  deleted: 'تم الحذف',
+   554→  enterTenantName: 'يرجى إدخال اسم المستأجر',
+   555→  enterValidEmail: 'يرجى إدخال بريد إلكتروني صالح',
+   556→  tenantDetails: 'تفاصيل: {name}',
+   557→  tenantSuspended: 'تم تعليق المستأجر',
+   558→  tenantActivated: 'تم تفعيل المستأجر',
+   559→  confirmSuspend: 'تعليق "{name}"؟',
+   560→  confirmActivate: 'تفعيل "{name}"؟',
+   561→  // Users
+   562→  userMgmt: 'إدارة المستخدمين',
+   563→  addUser: 'إضافة مستخدم',
+   564→  userSearch: 'بحث بالاسم أو البريد...',
+   565→  user: 'المستخدم',
+   566→  role: 'الدور',
+   567→  addUserDlg: 'إضافة مستخدم',
+   568→  editUserDlg: 'تعديل المستخدم',
+   569→  deleteUserDlg: 'حذف المستخدم',
+   570→  name: 'الاسم',
+   571→  enterNameAndEmail: 'يرجى إدخال الاسم والبريد',
+   572→  userSuspended: 'تم تعليق المستخدم',
+   573→  userActivated: 'تم تفعيل المستخدم',
+   574→  changeStatus: 'تغيير الحالة',
+   575→  suspendUser: 'تعليق "{name}"',
+   576→  activateUser: 'تفعيل "{name}"',
+   577→  owner: 'مالك',
+   578→  manager: 'مدير',
+   579→  receptionist: 'موظف استقبال',
+   580→  accountant: 'محاسب',
+   581→  // Plans
+   582→  plansTitle: 'الباقات والاشتراكات',
+   583→  createPlan: 'إنشاء باقة',
+   584→  mostPopular: 'الأكثر شعبية',
+   585→  free: 'مجاني',
+   586→  tenants: 'مستأجر',
+   587→  managePlan: 'إدارة الباقة',
+   588→  monthly: 'شهرياً',
+   589→  editPlanDlg: 'تعديل الباقة',
+   590→  editRoleDlg: 'تعديل الدور',
+   591→  roleUpdated: 'تم تحديث الدور',
+   592→  roleDeleted: 'تم حذف الدور',
+   593→  userDeleted: 'تم حذف المستخدم',
+   594→  willOpenPlanEditor: 'سيتم فتح تعديل الباقة',
+   595→  willOpenCreatePlan: 'سيتم فتح نموذج إنشاء باقة جديدة',
+   596→  serverRestarted: 'تم إعادة تشغيل الخادم',
+   597→  serverDeleted: 'تم حذف الخادم',
+   598→  reportGenerated: 'تم توليد التقرير',
+   599→  reportDownloaded: 'جاري تنزيل التقرير...',
+   600→  planDetails: 'تفاصيل الباقة',
+   601→  // Billing
+   602→  billingTitle: 'الفواتير والمدفوعات',
+   603→  createInvoice: 'إنشاء فاتورة',
+   604→  payments: 'المدفوعات',
+   605→  pending: 'معلق',
+   606→  paid: 'مدفوع',
+   607→  overdue: 'متأخر',
+   608→  failed: 'فاشل',
+   609→  invoiceNo: 'رقم الفاتورة',
+   610→  amount: 'المبلغ',
+   611→  date: 'التاريخ',
+   612→  download: 'تنزيل',
+   613→  willCreateInvoice: 'سيتم إنشاء فاتورة جديدة',
+   614→  downloadingInvoice: 'تنزيل {id}',
+   615→  viewingInvoice: 'عرض {id}',
+   616→  // Roles
+   617→  rolesTitle: 'الأدوار والصلاحيات',
+   618→  addRole: 'إضافة دور',
+   619→  permissions: 'صلاحية',
+   620→  users: 'مستخدم',
+   621→  addRoleDlg: 'إضافة دور جديد',
+   622→  roleName: 'اسم الدور',
+   623→  roleNameEn: 'الاسم (إنجليزي)',
+   624→  description: 'الوصف',
+   625→  create: 'إنشاء',
+   626→  roleCreated: 'تم إنشاء الدور',
+   627→  // Audit
+   628→  auditTitle: 'سجل العمليات',
+   629→  export: 'تصدير',
+   630→  info: 'معلومة',
+   631→  success: 'نجاح',
+   632→  warning: 'تحذير',
+   633→  error: 'خطأ',
+   634→  level: 'المستوى',
+   635→  message: 'الرسالة',
+   636→  source: 'المصدر',
+   637→  logExported: 'تم تصدير السجل',
+   638→  // Notifications
+   639→  notificationsTitle: 'الإشعارات',
+   640→  sendNotif: 'إرسال إشعار',
+   641→  template: 'القالب',
+   642→  type: 'النوع',
+   643→  sent: 'مرات الإرسال',
+   644→  send: 'إرسال',
+   645→  sendNotifDlg: 'إرسال إشعار',
+   646→  title: 'العنوان',
+   647→  content: 'المحتوى',
+   648→  target: 'الفئة',
+   649→  everyone: 'الجميع',
+   650→  activeUsers: 'النشطون',
+   651→  trialUsers: 'التجريبية',
+   652→  notifSent: 'تم الإرسال',
+   653→  editTemplate: 'تعديل القالب',
+   654→  testSent: 'تم إرسال اختبار',
+   655→  // Reports
+   656→  reportsTitle: 'التقارير',
+   657→  generate: 'توليد',
+   658→  lastGenerated: 'آخر توليد:',
+   659→  generating: 'جاري التوليد...',
+   660→  downloading: 'جاري التنزيل...',
+   661→  // System
+   662→  systemTitle: 'صحة النظام',
+   663→  refresh: 'تحديث',
+   664→  systemLog: 'سجل النظام',
+   665→  refreshed: 'تم التحديث',
+   666→  // Servers
+   667→  serversTitle: 'الخوادم',
+   668→  addServer: 'إضافة خادم',
+   669→  restart: 'إعادة تشغيل',
+   670→  requests: 'الطلبات',
+   671→  addServerDlg: 'إضافة خادم',
+   672→  serverName: 'اسم الخادم',
+   673→  region: 'المنطقة',
+   674→  serverAdded: 'تم إضافة الخادم',
+   675→  restarting: 'إعادة تشغيل الخادم',
+   676→  serverDetails: 'تفاصيل الخادم',
+   677→  // Database
+   678→  dbTitle: 'قاعدة البيانات',
+   679→  backup: 'نسخ احتياطي',
+   680→  dbSize: 'حجم القاعدة',
+   681→  tables: 'عدد الجداول',
+   682→  avgResponse: 'متوسط الاستجابة',
+   683→  backups: 'النسخ الاحتياطية',
+   684→  resourceUsage: 'استخدام الموارد',
+   685→  backupList: 'النسخ الاحتياطية',
+   686→  automatic: 'تلقائي',
+   687→  manual: 'يدوي',
+   688→  backingUp: 'جاري النسخ الاحتياطي...',
+   689→  downloadingBackup: 'جاري التنزيل...',
+   690→  // Security
+   691→  securityTitle: 'الأمان',
+   692→  securitySettings: 'إعدادات الأمان',
+   693→  twoFactor: 'المصادقة الثنائية',
+   694→  twoFactorDesc: 'تطلب رمز تحقق إضافي عند تسجيل الدخول',
+   695→  ipWhitelist: 'القائمة البيضاء لـ IP',
+   696→  ipWhitelistDesc: 'السماح فقط بعناوين IP المعتمدة',
+   697→  bruteForce: 'حماية القوة الغاشمة',
+   698→  bruteForceDesc: 'حظر تلقائي بعد 5 محاولات فاشلة',
+   699→  sessionTimeout: 'انتهاء الجلسة',
+   700→  sessionTimeoutDesc: 'إنهاء الجلسة بعد 30 دقيقة من عدم النشاط',
+   701→  auditLogging: 'تسجيل العمليات',
+   702→  auditLoggingDesc: 'تسجيل جميع العمليات الحساسة',
+   703→  dataEncryption: 'تشفير البيانات',
+   704→  dataEncryptionDesc: 'تشفير البيانات الحساسة في التخزين',
+   705→  suspiciousAttempts: 'محاولات الدخول المشبوهة',
+   706→  ipAddress: 'عنوان IP',
+   707→  time: 'الوقت',
+   708→  location: 'الموقع',
+   709→  unknown: 'مجهول',
+   710→  settingUpdated: 'تم تحديث الإعداد',
+   711→  // Settings
+   712→  settingsTitle: 'إعدادات المنصة',
+   713→  saveSettings: 'حفظ الإعدادات',
+   714→  generalSettings: 'الإعدادات العامة',
+   715→  platformName: 'اسم المنصة',
+   716→  supportEmail: 'بريد الدعم',
+   717→  currency: 'العملة',
+   718→  timezone: 'المنطقة الزمنية',
+   719→  advancedSettings: 'إعدادات متقدمة',
+   720→  maxTenants: 'الحد الأقصى للمستأجرين',
+   721→  backupFreq: 'تكرار النسخ الاحتياطي',
+   722→  maintenanceMode: 'وضع الصيانة',
+   723→  maintenanceModeDesc: 'تعطيل الوصول مؤقتاً',
+   724→  openRegistration: 'التسجيل المفتوح',
+   725→  openRegistrationDesc: 'السماح بالتسجيل الذاتي',
+   726→  hourly: 'كل ساعة',
+   727→  daily: 'يومياً',
+   728→  weekly: 'أسبوعياً',
+   729→  settingsSaved: 'تم حفظ الإعدادات',
+   730→  // Pagination
+   731→  prev: 'السابق',
+   732→  next: 'التالي',
+   733→  page: 'صفحة',
+   734→  // Sort
+   735→  sortAsc: 'تصاعدي',
+   736→  sortDesc: 'تنازلي',
+   737→  // Super Admin labels
+   738→  superAdmin: 'مدير النظام',
+   739→  superAdminDashboard: 'لوحة تحكم مدير النظام',
+   740→  profile: 'الملف الشخصي',
+   741→  preferences: 'التفضيلات',
+   742→  signOut: 'تسجيل الخروج',
+   743→  // Sidebar sections
+   744→  mainSection: 'الرئيسية',
+   745→  managementSection: 'الإدارة',
+   746→  systemSection: 'النظام',
+   747→  // Sidebar nav items
+   748→  navOverview: 'نظرة عامة',
+   749→  navTenants: 'إدارة المستأجرين',
+   750→  navUsers: 'إدارة المستخدمين',
+   751→  navPlans: 'الباقات والاشتراكات',
+   752→  navBilling: 'الفواتير والمدفوعات',
+   753→  navRoles: 'الأدوار والصلاحيات',
+   754→  navAudit: 'سجل العمليات',
+   755→  navNotifications: 'الإشعارات',
+   756→  navReports: 'التقارير',
+   757→  navSystem: 'صحة النظام',
+   758→  navServers: 'الخوادم',
+   759→  navDatabase: 'قاعدة البيانات',
+   760→  navSecurity: 'الأمان',
+   761→  navSettings: 'إعدادات المنصة',
+   762→  navCliq: 'مدفوعات CLIQ',
+   763→  // Overview audit additions
+   764→  expiredSubs: 'اشتراكات منتهية',
+   765→  pendingRequests: 'طلبات معلقة',
+   766→  monthlyRevenue: 'إيرادات الشهر',
+   767→  recentPayments: 'المدفوعات الأخيرة',
+   768→  systemNotifications: 'إشعارات النظام',
+   769→  quickActions: 'إجراءات سريعة',
+   770→  // CLIQ Payment Gateway
+   771→  cliqTitle: 'مدفوعات CLIQ',
+   772→  cliqSettings: 'إعدادات الدفع CLIQ',
+   773→  cliqEnabled: 'تفعيل دفع CLIQ',
+   774→  cliqEnabledDesc: 'السماح للعملاء بالدفع عبر تحويل CLIQ',
+   775→  cliqBankName: 'اسم البنك',
+   776→  cliqAccountHolder: 'صاحب الحساب',
+   777→  cliqAlias: 'CLIQ Alias',
+   778→  cliqInstructions: 'تعليمات الدفع',
+   779→  cliqQrCode: 'رمز QR (اختياري)',
+   780→  cliqSupportContact: 'معلومات الدعم',
+   781→  cliqUploadQr: 'رفع رمز QR',
+   782→  cliqPending: 'قيد التحقق',
+   783→  cliqApproved: 'مقبول',
+   784→  cliqRejected: 'مرفوض',
+   785→  cliqInfoRequested: 'مطلوب معلومات',
+   786→  cliqReferenceNo: 'رقم المرجع',
+   787→  cliqCustomer: 'العميل',
+   788→  cliqSubmissionDate: 'تاريخ التقديم',
+   789→  cliqScreenshot: 'لقطة الشاشة',
+   790→  cliqNotes: 'ملاحظات',
+   791→  cliqApprove: 'قبول الدفعة',
+   792→  cliqReject: 'رفض الدفعة',
+   793→  cliqRequestInfo: 'طلب معلومات',
+   794→  cliqApproveDesc: 'هل أنت متأكد من قبول هذا الدفع؟ سيتم تفعيل الاشتراك تلقائياً.',
+   795→  cliqRejectDesc: 'هل أنت متأكد من رفض هذا الدفع؟',
+   796→  cliqApprovedMsg: 'تم قبول الدفعة وتفعيل الاشتراك',
+   797→  cliqRejectedMsg: 'تم رفض الدفعة',
+   798→  cliqInfoRequestedMsg: 'تم طلب معلومات إضافية من العميل',
+   799→  cliqRejectionReason: 'سبب الرفض',
+   800→  cliqEnterReason: 'أدخل سبب الرفض',
+   801→  cliqInfoRequestPrompt: 'ما هي المعلومات الإضافية المطلوبة؟',
+   802→  cliqNoScreenshot: 'لم يتم رفع لقطة',
+   803→  cliqTotalPending: 'إجمالي المعلق',
+   804→  cliqTotalApproved: 'إجمالي المقبول',
+   805→  cliqTotalRejected: 'إجمالي المرفوض',
+   806→  cliqNoPayments: 'لا توجد مدفوعات CLIQ',
+   807→  cliqPaymentMethod: 'CLIQ (تحويل بنكي)',
+   808→  cliqTransferInfo: 'معلومات التحويل',
+   809→  cliqTransferComplete: 'قم بإتمام التحويل ثم أدخل رقم المرجع',
+   810→  cliqReferenceRequired: 'رقم المرجع مطلوب',
+   811→  cliqDuplicateRef: 'رقم المرجع مستخدم مسبقاً',
+   812→  cliqSubmitPayment: 'تقديم إثبات الدفع',
+   813→  cliqPaymentSubmitted: 'تم تقديم إثبات الدفع بنجاح. سيتم مراجعته من قبل الإدارة.',
+   814→  cliqWaitingVerification: 'في انتظار التحقق من الدفعة',
+   815→  cliqResubmit: 'إعادة تقديم',
+   816→  cliqAuditApprove: 'تم قبول دفع CLIQ',
+   817→  cliqAuditReject: 'تم رفض دفع CLIQ',
+   818→  cliqAuditInfo: 'تم طلب معلومات إضافية لدفع CLIQ',
+   819→  // Reports
+   820→  reportRevenue: 'تقرير الإيرادات الشهري',
+   821→  reportRevenueDesc: 'ملخص شامل للإيرادات حسب المستأجر والباقة',
+   822→  reportGrowth: 'تقرير النمو',
+   823→  reportGrowthDesc: 'معدلات النمو في المستأجرين والحجوزات',
+   824→  reportSecurity: 'تقرير الأمان',
+   825→  reportSecurityDesc: 'محاولات الدخول والتهديدات الأمنية',
+   826→  reportPerformance: 'تقرير الأداء',
+   827→  reportPerformanceDesc: 'أداء الخوادم وAPI واستجابة النظام',
+   828→  reportUsers: 'تقرير المستخدمين',
+   829→  reportUsersDesc: 'نشاط المستخدمين وتوزيع الأدوار',
+   830→  reportBilling: 'تقرير الفواتير',
+   831→  reportBillingDesc: 'ملخص الفواتير والمدفوعات المتأخرة',
+   832→  reportTypeFinancial: 'مالي',
+   833→  reportTypeOperational: 'تشغيلي',
+   834→  reportTypeSecurity: 'أمني',
+   835→  reportTypeTechnical: 'تقني',
+   836→  // Notification templates
+   837→  notifWelcome: 'ترحيب مستأجر جديد',
+   838→  notifPayment: 'تذكير بالدفع',
+   839→  notifSuspend: 'إشعار تعليق الحساب',
+   840→  notifWeekly: 'تقرير أسبوعي',
+   841→  notifTypeEmail: 'بريد إلكتروني',
+   842→  notifTypeEmailSms: 'بريد + SMS',
+   843→  // System gauge labels
+   844→  gaugeApi: 'API',
+   845→  gaugeDatabase: 'قاعدة البيانات',
+   846→  gaugeMemory: 'الذاكرة',
+   847→  gaugeDisk: 'القرص',
+   848→  gaugeCdn: 'CDN',
+   849→  gaugeWorker: 'العامل',
+   850→  gaugeConnections: 'الاتصالات',
+   851→  gaugeCpu: 'المعالج',
+   852→  gaugeUptime: 'وقت التشغيل',
+   853→  // Confirm dialog descriptions
+   854→  confirmDeleteUser: 'هل أنت متأكد من حذف "{name}"؟',
+   855→  confirmDeleteServer: 'هل أنت متأكد من حذف هذا الخادم؟',
+   856→  confirmDeleteRole: 'هل أنت متأكد من حذف هذا الدور؟',
+   857→  confirmDeleteTemplate: 'هل أنت متأكد من حذف هذا القالب؟',
+   858→
+   859→  // Excel export
+   860→  exportExcel: 'تصدير Excel',
+   861→
+   862→  // Subscription management
+   863→  extendSubscription: 'تمديد الاشتراك',
+   864→  extendSubscriptionDlg: 'تمديد اشتراك المستأجر',
+   865→  durationMonths: 'مدة الاشتراك (أشهر)',
+   866→  subscriptionExtended: 'تم تمديد الاشتراك بنجاح',
+   867→  subscriptionActivated: 'تم تفعيل الاشتراك',
+   868→  subscriptionStatus: 'حالة الاشتراك',
+   869→  subscriptionEnd: 'ينتهي في',
+   870→  months: 'أشهر',
+   871→
+   872→  // CLIQ new payment
+   873→  newCliqPayment: 'طلب دفع جديد',
+   874→  newCliqPaymentDlg: 'إرسال طلب دفع CLIQ',
+   875→  customerName: 'اسم العميل',
+   876→  customerEmail: 'البريد الإلكتروني',
+   877→  referenceNumber: 'رقم المرجع',
+   878→  notes: 'ملاحظات',
+   879→  cliqNewPaymentSuccess: 'تم إرسال طلب الدفع بنجاح',
+   880→  cliqInfoRequested2: 'طلب معلومات',
+   881→  // Invoice enhancements
+   882→  invoiceDueDate: 'تاريخ الاستحقاق',
+   883→  invoicePaidDate: 'تاريخ الدفع',
+   884→  invoiceTaxRate: 'نسبة الضريبة',
+   885→  invoiceNotes: 'ملاحظات',
+   886→  invoicePaymentMethod: 'طريقة الدفع',
+   887→  invoiceHistory: 'سجل الفاتورة',
+   888→  invoiceMarkPaid: 'تحديد كمدفوع',
+   889→  invoiceRefund: 'إرجاع',
+   890→  invoiceSendReminder: 'إرسال تذكير',
+   891→  invoiceCancel: 'إلغاء',
+   892→  invoiceStatusChanged: 'تم تغيير حالة الفاتورة',
+   893→  invoiceMarkPaidDesc: 'تحديد الفاتورة كمدفوعة؟',
+   894→  invoiceRefundDesc: 'إرجاع مبلغ هذه الفاتورة؟',
+   895→  invoiceSendReminderDesc: 'إرسال تذكير دفع للعميل؟',
+   896→  invoiceCreatedBy: 'بواسطة',
+   897→  invoiceCliq: 'CLIQ',
+   898→  invoiceCard: 'بطاقة',
+   899→  invoiceBankTransfer: 'تحويل بنكي',
+   900→  invoiceDaysOverdue: 'يوم متأخر',
+   901→  invoiceDueIn: 'مستحق خلال',
+   902→  invoicePaymentStatus: 'حالة الدفع',
+   903→  invoiceSelectMethod: 'اختر طريقة الدفع',
+   904→  invoiceConfirmPayment: 'تأكيد الدفع',
+   905→  // Plans enhancements
+   906→  planCompare: 'مقارنة الباقات',
+   907→  planSyncBanner: 'المستأجرون المشتركون سيتم تحديث صلاحياتهم تلقائياً',
+   908→  planNumericLimit: 'الحد الرقمي',
+   909→  planEnableFeature: 'تفعيل الميزة',
+   910→  planCompareSelect: 'اختر باقات للمقارنة',
+   911→  planNoCompare: 'اختر باقتين أو أكثر للمقارنة',
+   912→  planEditLimits: 'تعديل الحدود',
+   913→  planSubscribedTenants: 'مستأجرون مشتركون',
+   914→  planValue: 'القيمة',
+   915→  // RBAC
+   916→  rbacTitle: 'نظام الصلاحيات (RBAC)',
+   917→  rbacMatrix: 'مصفوفة الصلاحيات',
+   918→  rbacPermissions: 'الصلاحيات',
+   919→  rbacInheritance: 'توريث الصلاحيات',
+   920→  rbacTemplates: 'قوالب الصلاحيات',
+   921→  rbacCloneRole: 'استنساخ الدور',
+   922→  rbacApplyTemplate: 'تطبيق القالب',
+   923→  rbacSaveAsTemplate: 'حفظ كقالب',
+   924→  rbacEffectivePerms: 'الصلاحيات الفعالة',
+   925→  rbacInherited: 'موروث',
+   926→  rbacOwnPerms: 'خاصة',
+   927→  rbacSystemRole: 'دور نظام',
+   928→  rbacParentRole: 'الدور الأب',
+   929→  rbacNoParent: 'بدون أب',
+   930→  rbacCloneSuffix: '(نسخة)',
+   931→  rbacRoleCloned: 'تم استنساخ الدور',
+   932→  rbacSelectParent: 'اختر الدور الأب للتوريث',
+   933→  rbacTotalPermissions: 'إجمالي الصلاحيات',
+   934→  rbacModule: 'الوحدة',
+   935→  rbacAction: 'الإجراء',
+   936→  rbacView: 'عرض',
+   937→  rbacCreate: 'إنشاء',
+   938→  rbacEdit: 'تعديل',
+   939→  rbacDelete: 'حذف',
+   940→  rbacExport: 'تصدير',
+   941→  rbacImport: 'استيراد',
+   942→  rbacPrint: 'طباعة',
+   943→  rbacApprove: 'موافقة',
+   944→  rbacReject: 'رفض',
+   945→  rbacRestore: 'استعادة',
+   946→  rbacArchive: 'أرشفة',
+   947→  rbacReadOnly: 'قراءة فقط',
+   948→  rbacStandardUser: 'مستخدم عادي',
+   949→  rbacManager: 'مدير',
+   950→  rbacFullAccess: 'صلاحيات كاملة',
+   951→  rbacTemplateApplied: 'تم تطبيق القالب',
+   952→  rbacTemplateSaved: 'تم حفظ القالب',
+   953→  rbacHidePage: 'إخفاء الصفحة',
+   954→  rbacForbidden: 'ممنوع الوصول (403)',
+   955→  rbacJwtClaims: 'تضمين JWT Claims',
+   956→  rbacMenuVisibility: 'إظهار/إخفاء القوائم',
+   957→  rbacCloneFromRole: 'استنساخ من دور',
+   958→  rbacViewDetails: 'عرض التفاصيل',
+   959→  rbacPermissionCount: 'عدد الصلاحيات',
+   960→  rbacUserCount: 'عدد المستخدمين',
+   961→  rbacDescription: 'الوصف',
+   962→}
+   963→
+   964→const en: T = {
+   965→  noResults: 'No results found',
+   966→  save: 'Save',
+   967→  cancel: 'Cancel',
+   968→  confirm: 'Confirm',
+   969→  actions: 'Actions',
+   970→  status: 'Status',
+   971→  search: 'Search',
+   972→  filter: 'Filter',
+   973→  all: 'All',
+   974→  view: 'View',
+   975→  edit: 'Edit',
+   976→  delete: 'Delete',
+   977→  close: 'Close',
+   978→  loading: 'Loading...',
+   979→  showingOf: 'Showing {current} of {total} {entity}',
+   980→  overviewTitle: 'Platform Overview',
+   981→  totalTenants: 'Total Tenants',
+   982→  totalUsers: 'Total Users',
+   983→  revenue: 'Revenue (JOD)',
+   984→  totalBookings: 'Total Bookings',
+   985→  active: 'Active',
+   986→  thisMonth: 'This Month',
+   987→  last30Days: 'Last 30 Days',
+   988→  comparedToLastMonth: 'vs. previous month',
+   989→  revenueByPlan: 'Revenue by Plan',
+   990→  recentActivity: 'Recent Activity',
+   991→  activeTenants: 'Active Tenants',
+   992→  details: 'Details',
+   993→  perMonth: 'JOD / month',
+   994→  tenantMgmt: 'Tenant Management',
+   995→  addTenant: 'Add Tenant',
+   996→  tenantSearch: 'Search by name or email...',
+   997→  allStatuses: 'All Statuses',
+   998→  trial: 'Trial',
+   999→  suspended: 'Suspended',
+  1000→  tenant: 'Tenant',
+  1001→  plan: 'Plan',
+  1002→  bookings: 'Bookings',
+  1003→  tenantRevenue: 'Revenue',
+  1004→  addTenantDlg: 'Add Tenant',
+  1005→  editTenantDlg: 'Edit Tenant',
+  1006→  deleteTenantDlg: 'Delete Tenant',
+  1007→  deleteTenantDesc: 'Are you sure you want to delete "{name}"? This action cannot be undone.',
+  1008→  nameAr: 'Name (Arabic)',
+  1009→  nameEn: 'Name (English)',
+  1010→  email: 'Email',
+  1011→  country: 'Country',
+  1012→  added: 'Added: {name}',
+  1013→  updated: 'Updated',
+  1014→  deleted: 'Deleted',
+  1015→  enterTenantName: 'Please enter a tenant name',
+  1016→  enterValidEmail: 'Please enter a valid email',
+  1017→  tenantDetails: 'Details: {name}',
+  1018→  tenantSuspended: 'Tenant suspended',
+  1019→  tenantActivated: 'Tenant activated',
+  1020→  confirmSuspend: 'Suspend "{name}"?',
+  1021→  confirmActivate: 'Activate "{name}"?',
+  1022→  userMgmt: 'User Management',
+  1023→  addUser: 'Add User',
+  1024→  userSearch: 'Search by name or email...',
+  1025→  user: 'User',
+  1026→  role: 'Role',
+  1027→  addUserDlg: 'Add User',
+  1028→  editUserDlg: 'Edit User',
+  1029→  deleteUserDlg: 'Delete User',
+  1030→  name: 'Name',
+  1031→  enterNameAndEmail: 'Please enter name and email',
+  1032→  userSuspended: 'User suspended',
+  1033→  userActivated: 'User activated',
+  1034→  changeStatus: 'Change Status',
+  1035→  suspendUser: 'Suspend "{name}"',
+  1036→  activateUser: 'Activate "{name}"',
+  1037→  owner: 'Owner',
+  1038→  manager: 'Manager',
+  1039→  receptionist: 'Receptionist',
+  1040→  accountant: 'Accountant',
+  1041→  plansTitle: 'Plans & Subscriptions',
+  1042→  createPlan: 'Create Plan',
+  1043→  mostPopular: 'Most Popular',
+  1044→  free: 'Free',
+  1045→  tenants: 'tenants',
+  1046→  managePlan: 'Manage Plan',
+  1047→  monthly: 'monthly',
+  1048→  editPlanDlg: 'Edit Plan',
+  1049→  editRoleDlg: 'Edit Role',
+  1050→  roleUpdated: 'Role updated',
+  1051→  roleDeleted: 'Role deleted',
+  1052→  userDeleted: 'User deleted',
+  1053→  willOpenPlanEditor: 'Plan editor will open',
+  1054→  willOpenCreatePlan: 'Create plan form will open',
+  1055→  serverRestarted: 'Server restarted',
+  1056→  serverDeleted: 'Server deleted',
+  1057→  reportGenerated: 'Report generated',
+  1058→  reportDownloaded: 'Downloading report...',
+  1059→  planDetails: 'Plan Details',
+  1060→  billingTitle: 'Billing & Payments',
+  1061→  createInvoice: 'Create Invoice',
+  1062→  payments: 'Payments',
+  1063→  pending: 'Pending',
+  1064→  paid: 'Paid',
+  1065→  overdue: 'Overdue',
+  1066→  failed: 'Failed',
+  1067→  invoiceNo: 'Invoice No.',
+  1068→  amount: 'Amount',
+  1069→  date: 'Date',
+  1070→  download: 'Download',
+  1071→  willCreateInvoice: 'New invoice form will open',
+  1072→  downloadingInvoice: 'Downloading {id}',
+  1073→  viewingInvoice: 'Viewing {id}',
+  1074→  rolesTitle: 'Roles & Permissions',
+  1075→  addRole: 'Add Role',
+  1076→  permissions: 'permissions',
+  1077→  users: 'users',
+  1078→  addRoleDlg: 'Add New Role',
+  1079→  roleName: 'Role Name',
+  1080→  roleNameEn: 'Name (English)',
+  1081→  description: 'Description',
+  1082→  create: 'Create',
+  1083→  roleCreated: 'Role created',
+  1084→  auditTitle: 'Audit Logs',
+  1085→  export: 'Export',
+  1086→  info: 'Info',
+  1087→  success: 'Success',
+  1088→  warning: 'Warning',
+  1089→  error: 'Error',
+  1090→  level: 'Level',
+  1091→  message: 'Message',
+  1092→  source: 'Source',
+  1093→  logExported: 'Log exported',
+  1094→  notificationsTitle: 'Notifications',
+  1095→  sendNotif: 'Send Notification',
+  1096→  template: 'Template',
+  1097→  type: 'Type',
+  1098→  sent: 'Sent',
+  1099→  send: 'Send',
+  1100→  sendNotifDlg: 'Send Notification',
+  1101→  title: 'Title',
+  1102→  content: 'Content',
+  1103→  target: 'Target',
+  1104→  everyone: 'Everyone',
+  1105→  activeUsers: 'Active',
+  1106→  trialUsers: 'Trial',
+  1107→  notifSent: 'Notification sent',
+  1108→  editTemplate: 'Edit template',
+  1109→  testSent: 'Test sent',
+  1110→  reportsTitle: 'Reports',
+  1111→  generate: 'Generate',
+  1112→  lastGenerated: 'Last generated:',
+  1113→  generating: 'Generating...',
+  1114→  downloading: 'Downloading...',
+  1115→  systemTitle: 'System Health',
+  1116→  refresh: 'Refresh',
+  1117→  systemLog: 'System Log',
+  1118→  refreshed: 'Refreshed',
+  1119→  serversTitle: 'Servers',
+  1120→  addServer: 'Add Server',
+  1121→  restart: 'Restart',
+  1122→  requests: 'Requests',
+  1123→  addServerDlg: 'Add Server',
+  1124→  serverName: 'Server Name',
+  1125→  region: 'Region',
+  1126→  serverAdded: 'Server added',
+  1127→  restarting: 'Restarting server',
+  1128→  serverDetails: 'Server details',
+  1129→  dbTitle: 'Database',
+  1130→  backup: 'Backup',
+  1131→  dbSize: 'Database Size',
+  1132→  tables: 'Tables',
+  1133→  avgResponse: 'Avg Response',
+  1134→  backups: 'Backups',
+  1135→  resourceUsage: 'Resource Usage',
+  1136→  backupList: 'Backups',
+  1137→  automatic: 'Automatic',
+  1138→  manual: 'Manual',
+  1139→  backingUp: 'Backing up...',
+  1140→  downloadingBackup: 'Downloading...',
+  1141→  securityTitle: 'Security',
+  1142→  securitySettings: 'Security Settings',
+  1143→  twoFactor: 'Two-Factor Authentication',
+  1144→  twoFactorDesc: 'Require an additional verification code on login',
+  1145→  ipWhitelist: 'IP Whitelist',
+  1146→  ipWhitelistDesc: 'Allow only approved IP addresses',
+  1147→  bruteForce: 'Brute Force Protection',
+  1148→  bruteForceDesc: 'Auto-block after 5 failed attempts',
+  1149→  sessionTimeout: 'Session Timeout',
+  1150→  sessionTimeoutDesc: 'End session after 30 minutes of inactivity',
+  1151→  auditLogging: 'Audit Logging',
+  1152→  auditLoggingDesc: 'Log all sensitive operations',
+  1153→  dataEncryption: 'Data Encryption',
+  1154→  dataEncryptionDesc: 'Encrypt sensitive data in storage',
+  1155→  suspiciousAttempts: 'Suspicious Login Attempts',
+  1156→  ipAddress: 'IP Address',
+  1157→  time: 'Time',
+  1158→  location: 'Location',
+  1159→  unknown: 'Unknown',
+  1160→  settingUpdated: 'Setting updated',
+  1161→  settingsTitle: 'Platform Settings',
+  1162→  saveSettings: 'Save Settings',
+  1163→  generalSettings: 'General Settings',
+  1164→  platformName: 'Platform Name',
+  1165→  supportEmail: 'Support Email',
+  1166→  currency: 'Currency',
+  1167→  timezone: 'Timezone',
+  1168→  advancedSettings: 'Advanced Settings',
+  1169→  maxTenants: 'Max Tenants',
+  1170→  backupFreq: 'Backup Frequency',
+  1171→  maintenanceMode: 'Maintenance Mode',
+  1172→  maintenanceModeDesc: 'Temporarily disable access',
+  1173→  openRegistration: 'Open Registration',
+  1174→  openRegistrationDesc: 'Allow self-registration',
+  1175→  hourly: 'Hourly',
+  1176→  daily: 'Daily',
+  1177→  weekly: 'Weekly',
+  1178→  settingsSaved: 'Settings saved',
+  1179→  prev: 'Previous',
+  1180→  next: 'Next',
+  1181→  page: 'Page',
+  1182→  sortAsc: 'Ascending',
+  1183→  sortDesc: 'Descending',
+  1184→  superAdmin: 'Super Admin',
+  1185→  superAdminDashboard: 'Super Admin Dashboard',
+  1186→  profile: 'Profile',
+  1187→  preferences: 'Preferences',
+  1188→  signOut: 'Sign Out',
+  1189→  mainSection: 'Main',
+  1190→  managementSection: 'Management',
+  1191→  systemSection: 'System',
+  1192→  navOverview: 'Overview',
+  1193→  navTenants: 'Tenants',
+  1194→  navUsers: 'Users',
+  1195→  navPlans: 'Plans',
+  1196→  navBilling: 'Billing',
+  1197→  navRoles: 'Roles',
+  1198→  navAudit: 'Audit Logs',
+  1199→  navNotifications: 'Notifications',
+  1200→  navReports: 'Reports',
+  1201→  navSystem: 'System Health',
+  1202→  navServers: 'Servers',
+  1203→  navDatabase: 'Database',
+  1204→  navSecurity: 'Security',
+  1205→  navSettings: 'Settings',
+  1206→  navCliq: 'CLIQ Payments',
+  1207→  // Overview audit additions
+  1208→  expiredSubs: 'Expired Subscriptions',
+  1209→  pendingRequests: 'Pending Requests',
+  1210→  monthlyRevenue: 'Monthly Revenue',
+  1211→  recentPayments: 'Recent Payments',
+  1212→  systemNotifications: 'System Notifications',
+  1213→  quickActions: 'Quick Actions',
+  1214→  // CLIQ Payment Gateway
+  1215→  cliqTitle: 'Pending CLIQ Payments',
+  1216→  cliqSettings: 'CLIQ Payment Settings',
+  1217→  cliqEnabled: 'Enable CLIQ Payment',
+  1218→  cliqEnabledDesc: 'Allow customers to pay via CLIQ bank transfer',
+  1219→  cliqBankName: 'Bank Name',
+  1220→  cliqAccountHolder: 'Account Holder Name',
+  1221→  cliqAlias: 'CLIQ Alias',
+  1222→  cliqInstructions: 'Payment Instructions',
+  1223→  cliqQrCode: 'QR Code (Optional)',
+  1224→  cliqSupportContact: 'Support Contact',
+  1225→  cliqUploadQr: 'Upload QR Code',
+  1226→  cliqPending: 'Pending Verification',
+  1227→  cliqApproved: 'Approved',
+  1228→  cliqRejected: 'Rejected',
+  1229→  cliqInfoRequested: 'Info Requested',
+  1230→  cliqReferenceNo: 'Reference Number',
+  1231→  cliqCustomer: 'Customer',
+  1232→  cliqSubmissionDate: 'Submission Date',
+  1233→  cliqScreenshot: 'Screenshot',
+  1234→  cliqNotes: 'Notes',
+  1235→  cliqApprove: 'Approve Payment',
+  1236→  cliqReject: 'Reject Payment',
+  1237→  cliqRequestInfo: 'Request Info',
+  1238→  cliqApproveDesc: 'Are you sure? The subscription will be activated automatically.',
+  1239→  cliqRejectDesc: 'Are you sure you want to reject this payment?',
+  1240→  cliqApprovedMsg: 'Payment approved and subscription activated',
+  1241→  cliqRejectedMsg: 'Payment rejected',
+  1242→  cliqInfoRequestedMsg: 'Additional information requested from customer',
+  1243→  cliqRejectionReason: 'Rejection Reason',
+  1244→  cliqEnterReason: 'Enter rejection reason',
+  1245→  cliqInfoRequestPrompt: 'What additional information is needed?',
+  1246→  cliqNoScreenshot: 'No screenshot uploaded',
+  1247→  cliqTotalPending: 'Total Pending',
+  1248→  cliqTotalApproved: 'Total Approved',
+  1249→  cliqTotalRejected: 'Total Rejected',
+  1250→  cliqNoPayments: 'No CLIQ payments',
+  1251→  cliqPaymentMethod: 'CLIQ (Bank Transfer)',
+  1252→  cliqTransferInfo: 'Transfer Information',
+  1253→  cliqTransferComplete: 'Complete the transfer then enter the reference number',
+  1254→  cliqReferenceRequired: 'Reference number is required',
+  1255→  cliqDuplicateRef: 'This reference number is already used',
+  1256→  cliqSubmitPayment: 'Submit Payment Proof',
+  1257→  cliqPaymentSubmitted: 'Payment proof submitted successfully. It will be reviewed by administration.',
+  1258→  cliqWaitingVerification: 'Waiting for payment verification',
+  1259→  cliqResubmit: 'Resubmit',
+  1260→  cliqAuditApprove: 'CLIQ payment approved',
+  1261→  cliqAuditReject: 'CLIQ payment rejected',
+  1262→  cliqAuditInfo: 'CLIQ payment: additional info requested',
+  1263→  reportRevenue: 'Monthly Revenue Report',
+  1264→  reportRevenueDesc: 'Comprehensive revenue summary by tenant and plan',
+  1265→  reportGrowth: 'Growth Report',
+  1266→  reportGrowthDesc: 'Growth rates in tenants and bookings',
+  1267→  reportSecurity: 'Security Report',
+  1268→  reportSecurityDesc: 'Login attempts and security threats',
+  1269→  reportPerformance: 'Performance Report',
+  1270→  reportPerformanceDesc: 'Server, API performance and system response',
+  1271→  reportUsers: 'User Report',
+  1272→  reportUsersDesc: 'User activity and role distribution',
+  1273→  reportBilling: 'Billing Report',
+  1274→  reportBillingDesc: 'Invoice and overdue payments summary',
+  1275→  reportTypeFinancial: 'Financial',
+  1276→  reportTypeOperational: 'Operational',
+  1277→  reportTypeSecurity: 'Security',
+  1278→  reportTypeTechnical: 'Technical',
+  1279→  notifWelcome: 'New Tenant Welcome',
+  1280→  notifPayment: 'Payment Reminder',
+  1281→  notifSuspend: 'Account Suspension Notice',
+  1282→  notifWeekly: 'Weekly Report',
+  1283→  notifTypeEmail: 'Email',
+  1284→  notifTypeEmailSms: 'Email + SMS',
+  1285→  // System gauge labels
+  1286→  gaugeApi: 'API',
+  1287→  gaugeDatabase: 'Database',
+  1288→  gaugeMemory: 'Memory',
+  1289→  gaugeDisk: 'Disk',
+  1290→  gaugeCdn: 'CDN',
+  1291→  gaugeWorker: 'Worker',
+  1292→  gaugeConnections: 'Connections',
+  1293→  gaugeCpu: 'CPU',
+  1294→  gaugeUptime: 'Uptime',
+  1295→  // Confirm dialog descriptions
+  1296→  confirmDeleteUser: 'Are you sure you want to delete "{name}"?',
+  1297→  confirmDeleteServer: 'Are you sure you want to delete this server?',
+  1298→  confirmDeleteRole: 'Are you sure you want to delete this role?',
+  1299→  confirmDeleteTemplate: 'Are you sure you want to delete this template?',
+  1300→
+  1301→  // Excel export
+  1302→  exportExcel: 'Export Excel',
+  1303→
+  1304→  // Subscription management
+  1305→  extendSubscription: 'Extend Subscription',
+  1306→  extendSubscriptionDlg: 'Extend Tenant Subscription',
+  1307→  durationMonths: 'Duration (Months)',
+  1308→  subscriptionExtended: 'Subscription extended successfully',
+  1309→  subscriptionActivated: 'Subscription activated',
+  1310→  subscriptionStatus: 'Subscription Status',
+  1311→  subscriptionEnd: 'Expires on',
+  1312→  months: 'months',
+  1313→
+  1314→  // CLIQ new payment
+  1315→  newCliqPayment: 'New Payment',
+  1316→  newCliqPaymentDlg: 'Submit CLIQ Payment Request',
+  1317→  customerName: 'Customer Name',
+  1318→  customerEmail: 'Customer Email',
+  1319→  referenceNumber: 'Reference Number',
+  1320→  notes: 'Notes',
+  1321→  cliqNewPaymentSuccess: 'Payment request submitted successfully',
+  1322→  cliqInfoRequested2: 'Request Info',
+  1323→  // Invoice enhancements
+  1324→  invoiceDueDate: 'Due Date',
+  1325→  invoicePaidDate: 'Paid Date',
+  1326→  invoiceTaxRate: 'Tax Rate',
+  1327→  invoiceNotes: 'Notes',
+  1328→  invoicePaymentMethod: 'Payment Method',
+  1329→  invoiceHistory: 'Invoice History',
+  1330→  invoiceMarkPaid: 'Mark as Paid',
+  1331→  invoiceRefund: 'Refund',
+  1332→  invoiceSendReminder: 'Send Reminder',
+  1333→  invoiceCancel: 'Cancel',
+  1334→  invoiceStatusChanged: 'Invoice status changed',
+  1335→  invoiceMarkPaidDesc: 'Mark this invoice as paid?',
+  1336→  invoiceRefundDesc: 'Refund this invoice amount?',
+  1337→  invoiceSendReminderDesc: 'Send payment reminder to customer?',
+  1338→  invoiceCreatedBy: 'By',
+  1339→  invoiceCliq: 'CLIQ',
+  1340→  invoiceCard: 'Card',
+  1341→  invoiceBankTransfer: 'Bank Transfer',
+  1342→  invoiceDaysOverdue: 'days overdue',
+  1343→  invoiceDueIn: 'due in',
+  1344→  invoicePaymentStatus: 'Payment Status',
+  1345→  invoiceSelectMethod: 'Select Payment Method',
+  1346→  invoiceConfirmPayment: 'Confirm Payment',
+  1347→  // Plans enhancements
+  1348→  planCompare: 'Compare Plans',
+  1349→  planSyncBanner: 'Subscribed tenants will have their permissions auto-updated',
+  1350→  planNumericLimit: 'Numeric Limit',
+  1351→  planEnableFeature: 'Enable Feature',
+  1352→  planCompareSelect: 'Select plans to compare',
+  1353→  planNoCompare: 'Select 2 or more plans to compare',
+  1354→  planEditLimits: 'Edit Limits',
+  1355→  planSubscribedTenants: 'subscribed tenants',
+  1356→  planValue: 'Value',
+  1357→  // RBAC
+  1358→  rbacTitle: 'RBAC Permission System',
+  1359→  rbacMatrix: 'Permission Matrix',
+  1360→  rbacPermissions: 'Permissions',
+  1361→  rbacInheritance: 'Permission Inheritance',
+  1362→  rbacTemplates: 'Permission Templates',
+  1363→  rbacCloneRole: 'Clone Role',
+  1364→  rbacApplyTemplate: 'Apply Template',
+  1365→  rbacSaveAsTemplate: 'Save as Template',
+  1366→  rbacEffectivePerms: 'Effective Permissions',
+  1367→  rbacInherited: 'Inherited',
+  1368→  rbacOwnPerms: 'Own',
+  1369→  rbacSystemRole: 'System Role',
+  1370→  rbacParentRole: 'Parent Role',
+  1371→  rbacNoParent: 'No Parent',
+  1372→  rbacCloneSuffix: '(Copy)',
+  1373→  rbacRoleCloned: 'Role cloned',
+  1374→  rbacSelectParent: 'Select parent role for inheritance',
+  1375→  rbacTotalPermissions: 'Total Permissions',
+  1376→  rbacModule: 'Module',
+  1377→  rbacAction: 'Action',
+  1378→  rbacView: 'View',
+  1379→  rbacCreate: 'Create',
+  1380→  rbacEdit: 'Edit',
+  1381→  rbacDelete: 'Delete',
+  1382→  rbacExport: 'Export',
+  1383→  rbacImport: 'Import',
+  1384→  rbacPrint: 'Print',
+  1385→  rbacApprove: 'Approve',
+  1386→  rbacReject: 'Reject',
+  1387→  rbacRestore: 'Restore',
+  1388→  rbacArchive: 'Archive',
+  1389→  rbacReadOnly: 'Read Only',
+  1390→  rbacStandardUser: 'Standard User',
+  1391→  rbacManager: 'Manager',
+  1392→  rbacFullAccess: 'Full Access',
+  1393→  rbacTemplateApplied: 'Template applied',
+  1394→  rbacTemplateSaved: 'Template saved',
+  1395→  rbacHidePage: 'Hide Page',
+  1396→  rbacForbidden: 'Forbidden (403)',
+  1397→  rbacJwtClaims: 'Include JWT Claims',
+  1398→  rbacMenuVisibility: 'Show/Hide Menus',
+  1399→  rbacCloneFromRole: 'Clone from Role',
+  1400→  rbacViewDetails: 'View Details',
+  1401→  rbacPermissionCount: 'Permission Count',
+  1402→  rbacUserCount: 'User Count',
+  1403→  rbacDescription: 'Description',
+  1404→}
+  1405→
+  1406→const translations: Record<Lang, T> = { ar, en }
+  1407→
+  1408→export function useT() {
+  1409→  const { locale } = useAppStore()
+  1410→  return translations[locale as Lang] || ar
+  1411→}
