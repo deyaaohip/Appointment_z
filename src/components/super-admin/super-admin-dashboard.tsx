@@ -48,7 +48,12 @@ import {
   type RbacRole, type PermissionTemplate, type ModuleKey, type ActionKey,
   hasPermission, cloneRolePermissions, getEffectivePermissions, countPermissions,
   togglePermission, applyTemplate, getInheritedVsOwn,
+  API_ENDPOINTS, UI_BUTTONS, PAGE_VISIBILITY_MAP,
+  isApiAuthorized, isButtonVisible, getHiddenPages, generateJwtClaims, simulate403,
+  METHOD_ACTION_MAP,
+  type RbacClaim, type RbacPolicy,
 } from './rbac-data'
+import { InvoicePreviewDialog } from './invoice-preview'
 
 const PER_PAGE = 7
 
@@ -931,16 +936,17 @@ function BillingPage() {
 }
 
 // ════════════════════════════════════════════════════════════════
-// PAGE 6: ROLES & PERMISSIONS (Enterprise RBAC)
+// PAGE 6: ROLES & PERMISSIONS (Enterprise RBAC — Enhanced)
 // ════════════════════════════════════════════════════════════════
 function RolesPage() {
   const { t, lang, isRTL } = useSA()
   const [roles, setRoles] = useState<RbacRole[]>(INIT_RBAC_ROLES)
   const [templates] = useState<PermissionTemplate[]>(INIT_RBAC_TEMPLATES)
-  const [dlg, setDlg] = useState<{ type: 'add' | 'edit' | 'delete' | 'matrix' | 'clone_src'; role?: RbacRole } | null>(null)
+  const [dlg, setDlg] = useState<{ type: 'add' | 'edit' | 'delete' | 'matrix' | 'clone_src' | 'details'; role?: RbacRole } | null>(null)
   const [form, setForm] = useState({ name: '', nameEn: '', desc: '', descEn: '', parentId: null as string | null, permissions: {} as Record<string, string[]> })
   const [tplDlg, setTplDlg] = useState(false)
-  const [viewTab, setViewTab] = useState<'matrix' | 'roles' | 'templates'>('roles')
+  const [viewTab, setViewTab] = useState<'roles' | 'matrix' | 'templates' | 'api' | 'buttons' | 'jwt' | 'visibility' | 'policies'>('roles')
+  const [detailRole, setDetailRole] = useState<RbacRole | null>(null)
 
   const rName = (r: RbacRole) => lang === 'en' ? r.nameEn : r.name
   const rDesc = (r: RbacRole) => lang === 'en' ? r.descriptionEn : r.description
@@ -959,15 +965,17 @@ function RolesPage() {
 
   const openMatrix = (r: RbacRole) => { setForm({ name: r.name, nameEn: r.nameEn, desc: r.description, descEn: r.descriptionEn, parentId: r.parentId, permissions: cloneRolePermissions(r) }); setDlg({ type: 'matrix', role: r }) }
 
+  const openDetails = (r: RbacRole) => { setDetailRole(r) }
+
   const handleClone = (r: RbacRole) => {
-    const clone: RbacRole = { ...r, id: Date.now().toString(), name: `${r.name} ${t.rbacCloneSuffix}`, nameEn: `${r.nameEn} (Copy)`, userCount: 0, isSystem: false, parentId: r.parentId, permissions: cloneRolePermissions(r), createdAt: new Date().toISOString().split('T')[0] }
+    const clone: RbacRole = { ...r, id: Date.now().toString(), name: `${r.name} ${t.rbacCloneSuffix}`, nameEn: `${r.nameEn} (Copy)`, userCount: 0, isSystem: false, parentId: r.parentId, permissions: cloneRolePermissions(r), createdAt: new Date().toISOString().split('T')[0], claims: r.claims ? r.claims.map(c => ({ ...c })) : [], policies: r.policies ? r.policies.map(p => ({ ...p })) : [], hiddenPages: r.hiddenPages ? [...r.hiddenPages] : [] }
     setRoles(p => [clone, ...p]); toast.success(t.rbacRoleCloned)
   }
 
   const handleSave = () => {
     if (!form.name.trim()) { toast.error(lang === 'ar' ? 'يرجى إدخال اسم الدور' : 'Please enter role name'); return }
     if (dlg?.type === 'add') {
-      const r: RbacRole = { id: Date.now().toString(), name: form.name, nameEn: form.nameEn, description: form.desc, descriptionEn: form.descEn, userCount: 0, isSystem: false, parentId: form.parentId, permissions: { ...form.permissions }, createdAt: new Date().toISOString().split('T')[0] }
+      const r: RbacRole = { id: Date.now().toString(), name: form.name, nameEn: form.nameEn, description: form.desc, descriptionEn: form.descEn, userCount: 0, isSystem: false, parentId: form.parentId, permissions: { ...form.permissions }, createdAt: new Date().toISOString().split('T')[0], claims: [], policies: [], hiddenPages: [] }
       setRoles(p => [r, ...p]); toast.success(t.roleCreated)
     } else if (dlg?.role) {
       setRoles(p => p.map(r => r.id === dlg.role!.id ? { ...r, name: form.name, nameEn: form.nameEn, description: form.desc, descriptionEn: form.descEn, parentId: form.parentId, permissions: { ...form.permissions } } : r))
@@ -995,15 +1003,29 @@ function RolesPage() {
   const effectivePerms = dlg?.role ? getEffectivePermissions(dlg.role, roles) : null
   const inheritedInfo = dlg?.role ? getInheritedVsOwn(dlg.role, roles) : null
 
+  const TABS = [
+    { key: 'roles' as const, label: t.rolesTitle },
+    { key: 'matrix' as const, label: t.rbacMatrix },
+    { key: 'templates' as const, label: t.rbacTemplates },
+    { key: 'api' as const, label: lang === 'ar' ? 'API' : 'API' },
+    { key: 'buttons' as const, label: lang === 'ar' ? 'الأزرار' : 'Buttons' },
+    { key: 'jwt' as const, label: t.rbacJwtClaims },
+    { key: 'visibility' as const, label: t.rbacMenuVisibility },
+    { key: 'policies' as const, label: lang === 'ar' ? 'السياسات' : 'Policies' },
+  ]
+
+  // Method colors
+  const methodColor = (m: string) => m === 'GET' ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30' : m === 'POST' ? 'text-sky-600 bg-sky-50 dark:bg-sky-950/30' : m === 'PUT' || m === 'PATCH' ? 'text-amber-600 bg-amber-50 dark:bg-amber-950/30' : 'text-red-600 bg-red-50 dark:bg-red-950/30'
+
   return (
     <div className="space-y-6">
       <PageTitle title={t.rbacTitle} action={<PrimaryBtn icon={Plus} label={t.addRole} onClick={openAdd} />} />
 
-      {/* View Tabs */}
-      <div className="flex gap-2">
-        {(['roles', 'matrix', 'templates'] as const).map(tab => (
-          <Button key={tab} size="sm" variant={viewTab === tab ? 'default' : 'outline'} className="text-xs rounded-full px-4" onClick={() => setViewTab(tab)}>
-            {tab === 'roles' ? t.rolesTitle : tab === 'matrix' ? t.rbacMatrix : t.rbacTemplates}
+      {/* View Tabs — scrollable */}
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {TABS.map(tab => (
+          <Button key={tab.key} size="sm" variant={viewTab === tab.key ? 'default' : 'outline'} className="text-xs rounded-full px-4 whitespace-nowrap shrink-0" onClick={() => setViewTab(tab.key)}>
+            {tab.label}
           </Button>
         ))}
       </div>
@@ -1019,6 +1041,7 @@ function RolesPage() {
                     <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-100 dark:bg-violet-900/30"><Shield className="h-5 w-5 text-violet-600" /></div>
                     <div className="flex items-center gap-1.5">
                       {r.isSystem && <Badge variant="secondary" className="text-[10px] bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400">{t.rbacSystemRole}</Badge>}
+                      {r.claims && r.claims.length > 0 && <Badge variant="secondary" className="text-[10px] bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400">{r.claims.length} Claims</Badge>}
                     </div>
                   </div>
                   <h3 className="font-bold text-base">{rName(r)}</h3>
@@ -1029,10 +1052,11 @@ function RolesPage() {
                     <span>·</span>
                     <span>{r.userCount} {t.rbacUserCount}</span>
                     {r.parentId && <><span>·</span><span className="text-sky-600">{t.rbacInherited}</span></>}
+                    {(r.policies || []).length > 0 && <><span>·</span><span className="text-red-500">{r.policies.length} {lang === 'ar' ? 'سياسات' : 'policies'}</span></>}
                   </div>
                   <div className="flex items-center justify-between pt-3 border-t">
                     <div className="flex gap-1">
-                      <ActionBtn icon={Eye} label={t.rbacMatrix} onClick={() => openMatrix(r)} />
+                      <ActionBtn icon={Eye} label={t.rbacViewDetails} onClick={() => openDetails(r)} />
                       <ActionBtn icon={Edit} label={t.edit} onClick={() => openEdit(r)} />
                       <ActionBtn icon={Copy} label={t.rbacCloneRole} onClick={() => handleClone(r)} />
                     </div>
@@ -1099,6 +1123,360 @@ function RolesPage() {
             </motion.div>
           ))}
         </div>
+      )}
+
+      {/* API Endpoints Authorization View */}
+      {viewTab === 'api' && (
+        <Card className="border-0 shadow-sm overflow-hidden">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold">{lang === 'ar' ? 'تفويض نقاط API' : 'API Endpoint Authorization'} — {lang === 'ar' ? 'اختر دوراً لمحاكاة التفويض' : 'Select a role to simulate authorization'}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-2 mb-4 flex-wrap">
+              {roles.map(r => (
+                <Button key={r.id} size="sm" variant={detailRole?.id === r.id ? 'default' : 'outline'} className="text-xs rounded-full px-3" onClick={() => setDetailRole(r)}>
+                  {rName(r)}
+                </Button>
+              ))}
+            </div>
+            {detailRole && (
+              <div className="overflow-x-auto border rounded-lg">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="bg-muted/50">
+                      <th className="p-2 text-start font-semibold sticky start-0 bg-muted/50 min-w-[60px]">Method</th>
+                      <th className="p-2 text-start font-semibold min-w-[220px]" dir="ltr">{lang === 'ar' ? 'المسار' : 'Endpoint'}</th>
+                      <th className="p-2 text-start font-semibold min-w-[120px]">{lang === 'ar' ? 'الوصف' : 'Description'}</th>
+                      <th className="p-2 text-center font-semibold min-w-[80px]">{lang === 'ar' ? 'الحالة' : 'Status'}</th>
+                      <th className="p-2 text-start font-semibold min-w-[150px]">{lang === 'ar' ? 'ملاحظات' : 'Notes'}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.entries(API_ENDPOINTS).map(([mod, endpoints]) =>
+                      endpoints.map((ep, i) => {
+                        const auth = isApiAuthorized(detailRole, ep.method, ep.path)
+                        const forbidden = simulate403(ep.path, ep.method, detailRole)
+                        return (
+                          <tr key={`${mod}-${i}`} className="border-b border-border/50 hover:bg-muted/30">
+                            <td className="p-2 sticky start-0 bg-background">
+                              <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-bold ${methodColor(ep.method)}`}>{ep.method}</span>
+                            </td>
+                            <td className="p-2 font-mono text-[11px]" dir="ltr">{ep.path}</td>
+                            <td className="p-2 text-xs">{lang === 'ar' ? ep.labelAr : ep.labelEn}</td>
+                            <td className="p-2 text-center">
+                              {auth.authorized
+                                ? <Badge className="bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 text-[10px] border-emerald-200">200 OK</Badge>
+                                : <Badge className="bg-red-50 text-red-700 dark:bg-red-950/30 text-[10px] border-red-200">403</Badge>
+                              }
+                            </td>
+                            <td className="p-2 text-xs text-muted-foreground">
+                              {!auth.authorized && forbidden ? forbidden.body.message : (lang === 'ar' ? 'مصرح' : 'Authorized')}
+                            </td>
+                          </tr>
+                        )
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Buttons Visibility View */}
+      {viewTab === 'buttons' && (
+        <Card className="border-0 shadow-sm overflow-hidden">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold">{lang === 'ar' ? 'صلاحيات الأزرار (UI Buttons)' : 'Button Permissions'}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-2 mb-4 flex-wrap">
+              {roles.map(r => (
+                <Button key={r.id} size="sm" variant={detailRole?.id === r.id ? 'default' : 'outline'} className="text-xs rounded-full px-3" onClick={() => setDetailRole(r)}>
+                  {rName(r)}
+                </Button>
+              ))}
+            </div>
+            {detailRole && (
+              <div className="space-y-4">
+                {Object.entries(UI_BUTTONS).map(([mod, buttons]) => {
+                  const modLabel = SYSTEM_MODULES.find(m => m.key === mod)
+                  if (!modLabel || buttons.length === 0) return null
+                  return (
+                    <div key={mod} className="border rounded-lg p-3">
+                      <p className="text-xs font-semibold mb-2">{lang === 'ar' ? modLabel.labelAr : modLabel.labelEn}</p>
+                      <div className="flex flex-wrap gap-2">
+                        {buttons.map(btn => {
+                          const visible = isButtonVisible(detailRole, mod, btn.key)
+                          return (
+                            <div key={btn.key} className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] ${visible ? 'bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-emerald-950/30 dark:border-emerald-800' : 'bg-red-50 border-red-200 text-red-500 dark:bg-red-950/30 dark:border-red-800 line-through opacity-60'}`}>
+                              {visible ? <CheckCircle2 className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
+                              {lang === 'ar' ? btn.labelAr : btn.labelEn}
+                              <span className="text-[9px] opacity-60">({btn.requiredAction})</span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* JWT Claims View */}
+      {viewTab === 'jwt' && (
+        <Card className="border-0 shadow-sm overflow-hidden">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold">{t.rbacJwtClaims} — {lang === 'ar' ? 'حمولات الرمز المميز' : 'Token Payloads'}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-2 mb-4 flex-wrap">
+              {roles.map(r => (
+                <Button key={r.id} size="sm" variant={detailRole?.id === r.id ? 'default' : 'outline'} className="text-xs rounded-full px-3" onClick={() => setDetailRole(r)}>
+                  {rName(r)}
+                </Button>
+              ))}
+            </div>
+            {detailRole && (
+              <div className="space-y-4">
+                {/* Role Claims Table */}
+                <div className="border rounded-lg p-4">
+                  <p className="text-xs font-semibold mb-3">{lang === 'ar' ? 'الادعاءات المخصصة' : 'Custom Claims'}</p>
+                  {(detailRole.claims || []).length === 0 ? (
+                    <p className="text-xs text-muted-foreground">{lang === 'ar' ? 'لا توجد ادعاءات مخصصة' : 'No custom claims'}</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead><tr className="border-b"><th className="p-2 text-start font-semibold">Key</th><th className="p-2 text-start font-semibold">Value</th><th className="p-2 text-start font-semibold">{lang === 'ar' ? 'النوع' : 'Type'}</th><th className="p-2 text-start font-semibold">{lang === 'ar' ? 'التسمية' : 'Label'}</th></tr></thead>
+                        <tbody>
+                          {(detailRole.claims || []).map((c, i) => (
+                            <tr key={i} className="border-b border-border/50">
+                              <td className="p-2 font-mono text-violet-600" dir="ltr">{c.key}</td>
+                              <td className="p-2 font-mono" dir="ltr">{c.value}</td>
+                              <td className="p-2"><Badge variant="secondary" className="text-[10px]">{c.type}</Badge></td>
+                              <td className="p-2">{lang === 'ar' ? c.labelAr : c.labelEn}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+                {/* JWT Payload */}
+                <div className="border rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-xs font-semibold">{lang === 'ar' ? 'حمولة JWT المُنشأة' : 'Generated JWT Payload'}</p>
+                    <Button size="sm" variant="ghost" className="h-7 text-xs gap-1" onClick={() => { navigator.clipboard.writeText(JSON.stringify(generateJwtClaims(detailRole), null, 2)); toast.success(lang === 'ar' ? 'تم النسخ' : 'Copied') }}>
+                      <Copy className="h-3 w-3" />{lang === 'ar' ? 'نسخ' : 'Copy'}
+                    </Button>
+                  </div>
+                  <pre className="bg-muted rounded-lg p-4 text-xs font-mono overflow-x-auto leading-relaxed" dir="ltr">
+                    {JSON.stringify(generateJwtClaims(detailRole), null, 2)}
+                  </pre>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Menu Visibility View */}
+      {viewTab === 'visibility' && (
+        <Card className="border-0 shadow-sm overflow-hidden">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold">{t.rbacMenuVisibility} — {lang === 'ar' ? 'إخفاء الصفحات حسب الصلاحيات' : 'Hide pages based on permissions'}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-2 mb-4 flex-wrap">
+              {roles.map(r => (
+                <Button key={r.id} size="sm" variant={detailRole?.id === r.id ? 'default' : 'outline'} className="text-xs rounded-full px-3" onClick={() => setDetailRole(r)}>
+                  {rName(r)}
+                </Button>
+              ))}
+            </div>
+            {detailRole && (
+              <div className="overflow-x-auto border rounded-lg">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="bg-muted/50">
+                      <th className="p-2 text-start font-semibold">{lang === 'ar' ? 'الصفحة' : 'Page'}</th>
+                      <th className="p-2 text-start font-semibold">{lang === 'ar' ? 'الوحدة' : 'Module'}</th>
+                      <th className="p-2 text-center font-semibold">{lang === 'ar' ? 'عرض' : 'View'}</th>
+                      <th className="p-2 text-center font-semibold">{lang === 'ar' ? 'مرئي في القائمة' : 'Menu Visible'}</th>
+                      <th className="p-2 text-center font-semibold">{lang === 'ar' ? 'الحالة' : 'Status'}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {SYSTEM_MODULES.map(mod => {
+                      const pages = PAGE_VISIBILITY_MAP[mod.key] || []
+                      const hasView = (detailRole.permissions[mod.key] || []).includes('view')
+                      const hiddenExplicit = (detailRole.hiddenPages || []).some(p => pages.includes(p))
+                      const isHidden = !hasView || hiddenExplicit
+                      return (
+                        <tr key={mod.key} className={`border-b border-border/50 ${isHidden ? 'bg-red-50/50 dark:bg-red-950/10' : ''}`}>
+                          <td className="p-2 font-medium">{pages.map(p => p).join(', ')}</td>
+                          <td className="p-2">{lang === 'ar' ? mod.labelAr : mod.labelEn}</td>
+                          <td className="p-2 text-center">
+                            {hasView ? <CheckCircle2 className="h-4 w-4 text-emerald-500 mx-auto" /> : <XCircle className="h-4 w-4 text-red-400 mx-auto" />}
+                          </td>
+                          <td className="p-2 text-center">
+                            {isHidden
+                              ? <Badge className="bg-red-50 text-red-600 dark:bg-red-950/30 text-[10px] border-red-200">{t.rbacHidePage}</Badge>
+                              : <Badge className="bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 text-[10px] border-emerald-200">{lang === 'ar' ? 'مرئي' : 'Visible'}</Badge>
+                            }
+                          </td>
+                          <td className="p-2 text-xs text-muted-foreground">
+                            {!hasView && (lang === 'ar' ? 'لا يملك صلاحية العرض' : 'No view permission')}
+                            {hasView && hiddenExplicit && (lang === 'ar' ? 'مخفي صراحةً' : 'Explicitly hidden')}
+                            {hasView && !hiddenExplicit && (lang === 'ar' ? 'مصرح' : 'Authorized')}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Policies View */}
+      {viewTab === 'policies' && (
+        <Card className="border-0 shadow-sm overflow-hidden">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold">{lang === 'ar' ? 'سياسات التحكم بالوصول' : 'Access Control Policies'}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-2 mb-4 flex-wrap">
+              {roles.map(r => (
+                <Button key={r.id} size="sm" variant={detailRole?.id === r.id ? 'default' : 'outline'} className="text-xs rounded-full px-3" onClick={() => setDetailRole(r)}>
+                  {rName(r)}
+                </Button>
+              ))}
+            </div>
+            {detailRole && (
+              (detailRole.policies || []).length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <Shield className="h-10 w-10 mx-auto mb-3 opacity-20" />
+                  <p className="text-sm">{lang === 'ar' ? 'لا توجد سياسات لهذا الدور' : 'No policies for this role'}</p>
+                  <p className="text-xs mt-1">{lang === 'ar' ? 'جميع الصلاحيات مسموحة حسب المصفوفة' : 'All permissions allowed per matrix'}</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {(detailRole.policies || []).map((policy, i) => {
+                    const modLabel = SYSTEM_MODULES.find(m => m.key === policy.module)
+                    return (
+                      <div key={policy.id || i} className={`flex items-start gap-4 p-4 rounded-lg border ${policy.effect === 'deny' ? 'border-red-200 bg-red-50/50 dark:bg-red-950/10' : 'border-emerald-200 bg-emerald-50/50 dark:bg-emerald-950/10'}`}>
+                        <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${policy.effect === 'deny' ? 'bg-red-100 dark:bg-red-900/30' : 'bg-emerald-100 dark:bg-emerald-900/30'}`}>
+                          {policy.effect === 'deny' ? <XCircle className="h-4 w-4 text-red-600" /> : <CheckCircle2 className="h-4 w-4 text-emerald-600" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-semibold text-sm">{lang === 'ar' ? policy.name : policy.nameEn}</span>
+                            <Badge className={`text-[10px] ${policy.effect === 'deny' ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>{policy.effect === 'deny' ? 'DENY' : 'ALLOW'}</Badge>
+                            <Badge variant="outline" className="text-[10px]">P{policy.priority}</Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {policy.module === '*' ? (lang === 'ar' ? 'جميع الوحدات' : 'All modules') : (modLabel ? (lang === 'ar' ? modLabel.labelAr : modLabel.labelEn) : policy.module)}
+                            {' → '}
+                            {policy.action === '*' ? (lang === 'ar' ? 'جميع الإجراءات' : 'All actions') : policy.action}
+                            {policy.condition && (
+                              <><br /><span className="font-mono text-[11px]" dir="ltr">{lang === 'ar' ? (policy.conditionAr || policy.condition) : (policy.conditionEn || policy.condition)}</span></>
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Role Details Dialog (Claims + Policies + Hidden Pages) */}
+      {detailRole && (
+        <Dialog open={!!detailRole} onOpenChange={() => setDetailRole(null)}>
+          <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto" dir={isRTL ? 'rtl' : 'ltr'}>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Shield className="h-5 w-5 text-violet-600" />
+                {rName(detailRole)} — {t.rbacViewDetails}
+              </DialogTitle>
+              <DialogDescription className="sr-only">{lang === 'ar' ? 'تفاصيل الدور' : 'Role details'}</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-5 pt-2">
+              {/* Info */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-lg bg-muted/50 p-3">
+                  <p className="text-[10px] text-muted-foreground">{t.rbacPermissionCount}</p>
+                  <p className="text-lg font-bold">{countPermissions(getEffectivePermissions(detailRole, roles))}</p>
+                </div>
+                <div className="rounded-lg bg-muted/50 p-3">
+                  <p className="text-[10px] text-muted-foreground">{t.rbacUserCount}</p>
+                  <p className="text-lg font-bold">{detailRole.userCount}</p>
+                </div>
+              </div>
+
+              {/* Claims */}
+              <div>
+                <h4 className="text-sm font-semibold mb-2">{t.rbacJwtClaims} ({(detailRole.claims || []).length})</h4>
+                {(detailRole.claims || []).length === 0 ? (
+                  <p className="text-xs text-muted-foreground">{lang === 'ar' ? 'لا توجد ادعاءات' : 'No claims'}</p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {(detailRole.claims || []).map((c, i) => (
+                      <Badge key={i} variant="outline" className="text-xs gap-1">
+                        <span className="font-mono text-violet-600" dir="ltr">{c.key}</span>
+                        <span className="text-muted-foreground">=</span>
+                        <span className="font-mono" dir="ltr">{c.value}</span>
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Policies */}
+              <div>
+                <h4 className="text-sm font-semibold mb-2">{lang === 'ar' ? 'السياسات' : 'Policies'} ({(detailRole.policies || []).length})</h4>
+                {(detailRole.policies || []).length === 0 ? (
+                  <p className="text-xs text-muted-foreground">{lang === 'ar' ? 'لا توجد سياسات' : 'No policies'}</p>
+                ) : (
+                  <div className="space-y-2">
+                    {(detailRole.policies || []).map((p, i) => (
+                      <div key={p.id || i} className={`flex items-center gap-2 text-xs rounded-lg border p-2.5 ${p.effect === 'deny' ? 'border-red-200 bg-red-50/50 dark:bg-red-950/10' : 'border-emerald-200 bg-emerald-50/50 dark:bg-emerald-950/10'}`}>
+                        {p.effect === 'deny' ? <XCircle className="h-3.5 w-3.5 text-red-500 shrink-0" /> : <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />}
+                        <span className="font-medium">{lang === 'ar' ? p.name : p.nameEn}</span>
+                        <span className="text-muted-foreground ms-auto">→ {p.module}.{p.action}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Hidden Pages */}
+              <div>
+                <h4 className="text-sm font-semibold mb-2">{t.rbacMenuVisibility} — {t.rbacHidePage} ({getHiddenPages(detailRole, roles).length})</h4>
+                {getHiddenPages(detailRole, roles).length === 0 ? (
+                  <p className="text-xs text-emerald-600">{lang === 'ar' ? 'جميع الصفحات مرئية' : 'All pages visible'}</p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {getHiddenPages(detailRole, roles).map(p => (
+                      <Badge key={p} variant="secondary" className="text-xs bg-red-50 text-red-600 dark:bg-red-950/30">{p}</Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+            <DlgFooter onCancel={() => setDetailRole(null)} onConfirm={() => { openEdit(detailRole); setDetailRole(null) }} confirmLabel={t.edit} />
+          </DialogContent>
+        </Dialog>
       )}
 
       {/* Permission Matrix Dialog (View) */}
