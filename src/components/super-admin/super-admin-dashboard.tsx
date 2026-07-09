@@ -54,6 +54,11 @@ import {
   type RbacClaim, type RbacPolicy,
 } from './rbac-data'
 import { InvoicePreviewDialog } from './invoice-preview'
+import { DatabaseMonitoringPage } from './database-monitoring-page'
+import { BackupSystemPage } from './backup-system-page'
+import { SecurityCenterPage } from './security-center-page'
+import { InputSecurityPage } from './input-security-page'
+import { SettingsModulePage } from './settings-module-page'
 
 const PER_PAGE = 7
 
@@ -2594,9 +2599,11 @@ const PAGES: Record<string, () => React.JSX.Element> = {
   sa_reports: ReportsPage,
   sa_system: SystemPage,
   sa_servers: ServersPage,
-  sa_database: DatabasePage,
-  sa_security: SecurityPage,
-  sa_settings: SettingsPage,
+  sa_database: DatabaseMonitoringPage,
+  sa_backups: BackupSystemPage,
+  sa_security: SecurityCenterPage,
+  sa_input_security: InputSecurityPage,
+  sa_settings: SettingsModulePage,
 }
 
 export function SuperAdminDashboard() {

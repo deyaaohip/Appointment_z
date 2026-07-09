@@ -15,7 +15,7 @@ import {
   LayoutDashboard, Building2, Users, Shield, Settings, Activity,
   CreditCard, Database, Server, BarChart3, FileText,
   LogOut, ChevronRight, Menu, ShieldCheck, Lock, Globe, Wrench,
-  Bell, UserCog, ChevronLeft, Wallet,
+  Bell, UserCog, ChevronLeft, Wallet, ShieldAlert, HardDrive,
 } from 'lucide-react'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -37,8 +37,10 @@ const NAV_ITEMS = [
   { id: 'sa_reports', ar: 'التقارير', en: 'Reports', icon: BarChart3, section: 'management' },
   { id: 'sa_system', ar: 'صحة النظام', en: 'System Health', icon: Activity, section: 'system' },
   { id: 'sa_servers', ar: 'الخوادم', en: 'Servers', icon: Server, section: 'system' },
-  { id: 'sa_database', ar: 'قاعدة البيانات', en: 'Database', icon: Database, section: 'system' },
-  { id: 'sa_security', ar: 'الأمان', en: 'Security', icon: Lock, section: 'system' },
+  { id: 'sa_database', ar: 'مراقبة قاعدة البيانات', en: 'DB Monitoring', icon: Database, section: 'system' },
+  { id: 'sa_backups', ar: 'النسخ الاحتياطي', en: 'Backups', icon: HardDrive, section: 'system' },
+  { id: 'sa_security', ar: 'مركز الأمان', en: 'Security Center', icon: ShieldCheck, section: 'system' },
+  { id: 'sa_input_security', ar: 'أمان المدخلات', en: 'Input Security', icon: ShieldAlert, section: 'system' },
   { id: 'sa_settings', ar: 'إعدادات المنصة', en: 'Settings', icon: Settings, section: 'system' },
 ]
 
@@ -214,8 +216,10 @@ export function SuperAdminHeader() {
     sa_reports: t.reportsTitle,
     sa_system: t.systemTitle,
     sa_servers: t.serversTitle,
-    sa_database: t.dbTitle,
-    sa_security: t.securityTitle,
+    sa_database: isRTL ? 'مراقبة قاعدة البيانات' : 'DB Monitoring',
+    sa_backups: isRTL ? 'النسخ الاحتياطي' : 'Backups',
+    sa_security: isRTL ? 'مركز الأمان' : 'Security Center',
+    sa_input_security: isRTL ? 'أمان المدخلات' : 'Input Security',
     sa_settings: t.settingsTitle,
   }
 
