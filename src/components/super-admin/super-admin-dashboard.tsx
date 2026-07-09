@@ -15,12 +15,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import {
-  Building2, Users, DollarSign, CalendarDays, Activity, CreditCard,
+  Building2, Users, CalendarDays, Activity, CreditCard,
   Settings, Shield, Eye, Edit, Trash2, Plus, BarChart3, Server,
   Database, Lock, Bell, FileText, UserCog, CheckCircle2, AlertTriangle,
   RefreshCw, Globe, UserPlus, Clock, Monitor, HardDrive, Mail, Download,
   Power, PowerOff, Save, ChevronLeft, Search, Wallet, XCircle, Info,
-  Upload, Image as ImageIcon, ClipboardCheck,
+  Upload, Image as ImageIcon, ClipboardCheck, Banknote,
 } from 'lucide-react'
 
 // ─── Imports from shared modules ───────────────────────────────
@@ -79,7 +79,7 @@ function OverviewPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <KpiCard icon={Building2} bg="bg-violet-600" label={t.totalTenants} value={tenants.length} sub={`${activeCount} ${t.active.toLowerCase()}`} trend={12} delay={0} />
         <KpiCard icon={Users} bg="bg-sky-600" label={t.totalUsers} value={INIT_USERS.length} sub={`${tenants.reduce((s, tn) => s + tn.users, 0)} ${t.users.toLowerCase()}`} trend={8} delay={0.04} />
-        <KpiCard icon={DollarSign} bg="bg-amber-500" label={t.revenue} value={`${(totalRevenue / 1000).toFixed(1)}K ${sym}`} sub={t.thisMonth} trend={18} delay={0.08} />
+        <KpiCard icon={Banknote} bg="bg-amber-500" label={t.revenue} value={`${(totalRevenue / 1000).toFixed(1)}K ${sym}`} sub={t.thisMonth} trend={18} delay={0.08} />
         <KpiCard icon={CalendarDays} bg="bg-emerald-600" label={t.totalBookings} value={totalBookings.toLocaleString()} sub={t.last30Days} trend={5} delay={0.12} />
       </div>
 
@@ -319,7 +319,7 @@ function TenantsPage() {
       </div>
 
       <Dialog open={dlg?.type === 'add' || dlg?.type === 'edit'} onOpenChange={() => setDlg(null)}>
-        <DialogContent className="max-w-md"><DialogHeader><DialogTitle>{dlg?.type === 'add' ? t.addTenantDlg : t.editTenantDlg}</DialogTitle></DialogHeader>
+        <DialogContent className="max-w-md" dir={isRTL ? 'rtl' : 'ltr'}><DialogHeader><DialogTitle>{dlg?.type === 'add' ? t.addTenantDlg : t.editTenantDlg}</DialogTitle><DialogDescription className="sr-only">{dlg?.type === 'add' ? (isRTL ? 'إضافة مستأجر جديد' : 'Add new tenant') : (isRTL ? 'تعديل بيانات المستأجر' : 'Edit tenant details')}</DialogDescription></DialogHeader>
           <div className="space-y-4 pt-2">
             <FormField label={t.nameAr}><Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} /></FormField>
             <FormField label={t.nameEn}><Input value={form.nameEn} onChange={e => setForm(p => ({ ...p, nameEn: e.target.value }))} dir="ltr" /></FormField>
@@ -337,7 +337,7 @@ function TenantsPage() {
       {/* Extend Subscription Dialog */}
       <Dialog open={!!extendDlg} onOpenChange={() => setExtendDlg(null)}>
         <DialogContent className="max-w-md" dir={isRTL ? 'rtl' : 'ltr'}>
-          <DialogHeader><DialogTitle>{t.extendSubscriptionDlg}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t.extendSubscriptionDlg}</DialogTitle><DialogDescription className="sr-only">{isRTL ? 'تمديد اشتراك المستأجر' : 'Extend tenant subscription'}</DialogDescription></DialogHeader>
           <div className="space-y-4 pt-2">
             {extendDlg && <>
               <div className="rounded-lg bg-muted/50 p-3 space-y-1">
@@ -361,9 +361,19 @@ function TenantsPage() {
                   </SelectContent>
                 </Select>
               </FormField>
+              {extendPlan && (() => {
+                const plan = PLANS.find(p => p.name === extendPlan)
+                const total = plan ? plan.price * extendMonths : 0
+                return total > 0 ? (
+                  <div className="rounded-lg bg-violet-50 dark:bg-violet-950/30 p-3 text-center">
+                    <p className="text-[10px] text-muted-foreground">{isRTL ? 'الإجمالي' : 'Total'}</p>
+                    <p className="text-lg font-bold text-violet-700 dark:text-violet-400">{total.toLocaleString()} {sym}</p>
+                  </div>
+                ) : null
+              })()}
             </>}
           </div>
-          <DlgFooter onCancel={() => setExtendDlg(null)} onConfirm={handleExtend} />
+          <DlgFooter onCancel={() => setExtendDlg(null)} onConfirm={handleExtend} confirmLabel={isRTL ? 'تمديد الاشتراك' : 'Extend Subscription'} />
         </DialogContent>
       </Dialog>
     </div>
@@ -374,7 +384,7 @@ function TenantsPage() {
 // PAGE 3: USERS (full CRUD + sort + pagination)
 // ════════════════════════════════════════════════════════════════
 function UsersPage() {
-  const { t, lang } = useSA()
+  const { t, lang, isRTL } = useSA()
   const [users, setUsers] = useState<PlatformUser[]>(INIT_USERS)
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('all')
@@ -489,7 +499,7 @@ function UsersPage() {
       </div>
 
       <Dialog open={dlg?.type === 'add' || dlg?.type === 'edit'} onOpenChange={() => setDlg(null)}>
-        <DialogContent className="max-w-md"><DialogHeader><DialogTitle>{dlg?.type === 'add' ? t.addUserDlg : t.editUserDlg}</DialogTitle></DialogHeader>
+        <DialogContent className="max-w-md" dir={isRTL ? 'rtl' : 'ltr'}><DialogHeader><DialogTitle>{dlg?.type === 'add' ? t.addUserDlg : t.editUserDlg}</DialogTitle><DialogDescription className="sr-only">{isRTL ? 'إدارة المستخدمين' : 'Manage users'}</DialogDescription></DialogHeader>
           <div className="space-y-4 pt-2">
             <FormField label={t.name}><Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} /></FormField>
             <FormField label={t.email}><Input type="email" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} dir="ltr" /></FormField>
@@ -510,7 +520,7 @@ function UsersPage() {
 const PLAN_COLORS = ['bg-gray-500', 'bg-sky-500', 'bg-violet-500', 'bg-indigo-500', 'bg-emerald-500', 'bg-amber-500', 'bg-rose-500']
 
 function PlansPage() {
-  const { t, lang } = useSA()
+  const { t, lang, isRTL } = useSA()
   const { sym, fmt } = useCurrency()
   const [plans, setPlans] = useState<Plan[]>([...PLANS])
   const [dlg, setDlg] = useState<{ type: 'add' | 'edit' | 'delete'; plan?: Plan } | null>(null)
@@ -582,7 +592,7 @@ function PlansPage() {
 
       {/* Detail Dialog */}
       <Dialog open={!!detailPlan} onOpenChange={() => setDetailPlan(null)}>
-        <DialogContent className="max-w-sm"><DialogHeader><DialogTitle>{t.planDetails}</DialogTitle></DialogHeader>
+        <DialogContent className="max-w-sm" dir={isRTL ? 'rtl' : 'ltr'}><DialogHeader><DialogTitle>{t.planDetails}</DialogTitle><DialogDescription className="sr-only">{lang === 'ar' ? 'تفاصيل الباقة' : 'Plan details'}</DialogDescription></DialogHeader>
           {detailPlan && <div className="space-y-4 pt-2">
             <div className="text-center"><p className="text-3xl font-extrabold">{detailPlan.price > 0 ? `${detailPlan.price} ${sym}` : t.free}</p><p className="text-sm text-muted-foreground mt-1">{t.monthly} · {detailPlan.tenants} {t.tenants}</p></div>
             <Separator />
@@ -594,8 +604,8 @@ function PlansPage() {
 
       {/* Add/Edit Dialog */}
       <Dialog open={dlg?.type === 'add' || dlg?.type === 'edit'} onOpenChange={() => setDlg(null)}>
-        <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>{dlg?.type === 'add' ? t.createPlan : t.editPlanDlg}</DialogTitle></DialogHeader>
+        <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto" dir={isRTL ? 'rtl' : 'ltr'}>
+          <DialogHeader><DialogTitle>{dlg?.type === 'add' ? t.createPlan : t.editPlanDlg}</DialogTitle><DialogDescription className="sr-only">{lang === 'ar' ? 'إضافة أو تعديل باقة' : 'Add or edit a plan'}</DialogDescription></DialogHeader>
           <div className="space-y-4 pt-2">
             <FormField label={lang === 'ar' ? 'اسم الباقة' : 'Plan Name'}>
               <Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder={lang === 'ar' ? 'مثال: Professional' : 'e.g. Professional'} />
@@ -687,26 +697,26 @@ function BillingPage() {
     setInvForm({ tenant: '', tenantEn: '', plan: 'Starter', amount: 0, status: 'pending' })
   }
 
-  const handleExportExcel = () => {
-    const statusLabels: Record<string, string> = { paid: isRTL ? 'مدفوع' : 'Paid', pending: isRTL ? 'معلق' : 'Pending', overdue: isRTL ? 'متأخر' : 'Overdue', failed: isRTL ? 'فاشل' : 'Failed' }
-    const headers = isRTL
-      ? ['رقم الفاتورة', 'المستأجر', 'الباقة', 'المبلغ', 'العملة', 'الحالة', 'التاريخ']
-      : ['Invoice No.', 'Tenant', 'Plan', 'Amount', 'Currency', 'Status', 'Date']
-    const rows = filtered.map(inv => [
-      inv.id, isRTL ? inv.tenant : (inv.tenantEn || inv.tenant), inv.plan,
-      inv.amount, inv.currency, statusLabels[inv.status] || inv.status, inv.date,
-    ])
-    let html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8"><style>td,th{padding:6px 10px;border:1px solid #ddd;font-size:12px}th{background:#7c3aed;color:white;font-weight:bold}tr:nth-child(even){background:#f9f5ff}</style></head><body><table dir="' + (isRTL ? 'rtl' : 'ltr') + '">'
-    html += '<tr>' + headers.map(h => `<th>${h}</th>`).join('') + '</tr>'
-    rows.forEach(r => { html += '<tr>' + r.map(c => `<td>${c}</td>`).join('') + '</tr>' })
-    html += '</table></body></html>'
-    const blob = new Blob(['\ufeff' + html], { type: 'application/vnd.ms-excel' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url; a.download = `invoices_${new Date().toISOString().split('T')[0]}.xlsx`
-    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url)
-    toast.success(isRTL ? 'تم تصدير الفواتير إلى Excel بنجاح' : 'Invoices exported to Excel successfully')
-  }
+  const handleExportExcel = useCallback(() => {
+    import('xlsx').then(XLSX => {
+      const statusLabels: Record<string, string> = { paid: isRTL ? 'مدفوع' : 'Paid', pending: isRTL ? 'معلق' : 'Pending', overdue: isRTL ? 'متأخر' : 'Overdue', failed: isRTL ? 'فاشل' : 'Failed' }
+      const headers = isRTL
+        ? ['رقم الفاتورة', 'المستأجر', 'الباقة', 'المبلغ (د.أ)', 'العملة', 'الحالة', 'التاريخ']
+        : ['Invoice No.', 'Tenant', 'Plan', 'Amount (JOD)', 'Currency', 'Status', 'Date']
+      const rows = filtered.map(inv => [
+        inv.id, isRTL ? inv.tenant : (inv.tenantEn || inv.tenant), inv.plan,
+        inv.amount, inv.currency, statusLabels[inv.status] || inv.status, inv.date,
+      ])
+      const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
+      ws['!cols'] = headers.map(() => ({ wch: 20 }))
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, isRTL ? 'الفواتير' : 'Invoices')
+      XLSX.writeFile(wb, `invoices_${new Date().toISOString().split('T')[0]}.xlsx`)
+      toast.success(isRTL ? 'تم تصدير الفواتير إلى Excel بنجاح' : 'Invoices exported to Excel successfully')
+    }).catch(() => {
+      toast.error(isRTL ? 'فشل تصدير Excel' : 'Excel export failed')
+    })
+  }, [filtered, isRTL])
 
   const handleDeleteInvoice = (inv: Invoice) => {
     setInvoices(p => p.filter(i => i.id !== inv.id)); toast.success(t.deleted); setPage(1)
@@ -723,7 +733,7 @@ function BillingPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <StatCard icon={CheckCircle2} label={t.payments} value={fmt(totalPaid)} color="text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30" />
         <StatCard icon={Clock} label={t.pending} value={fmt(totalPending)} color="text-amber-600 bg-amber-50 dark:bg-amber-950/30" />
-        <StatCard icon={DollarSign} label={t.paid} value={`${invoices.filter(i => i.status === 'paid').length}`} color="text-sky-600 bg-sky-50 dark:bg-sky-950/30" />
+        <StatCard icon={Banknote} label={t.paid} value={`${invoices.filter(i => i.status === 'paid').length}`} color="text-sky-600 bg-sky-50 dark:bg-sky-950/30" />
         <StatCard icon={AlertTriangle} label={t.overdue} value={`${invoices.filter(i => i.status === 'overdue').length}`} color="text-red-600 bg-red-50 dark:bg-red-950/30" />
       </div>
       <div className="flex gap-3">
@@ -788,7 +798,7 @@ function BillingPage() {
 
       {/* Create Invoice Dialog */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent className="max-w-md"><DialogHeader><DialogTitle>{t.createInvoice}</DialogTitle></DialogHeader>
+        <DialogContent className="max-w-md" dir={isRTL ? 'rtl' : 'ltr'}><DialogHeader><DialogTitle>{t.createInvoice}</DialogTitle><DialogDescription className="sr-only">{isRTL ? 'إنشاء فاتورة جديدة' : 'Create a new invoice'}</DialogDescription></DialogHeader>
           <div className="space-y-4 pt-2">
             <FormField label={t.tenant}>
               <Select value={invForm.tenant} onValueChange={v => {
@@ -837,7 +847,7 @@ function BillingPage() {
 // PAGE 6: ROLES (full CRUD)
 // ════════════════════════════════════════════════════════════════
 function RolesPage() {
-  const { t, lang } = useSA()
+  const { t, lang, isRTL } = useSA()
   const [roles, setRoles] = useState<Role[]>(INIT_ROLES)
   const [addOpen, setAddOpen] = useState(false)
   const [editRole, setEditRole] = useState<Role | null>(null)
@@ -892,7 +902,7 @@ function RolesPage() {
       </div>
 
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent className="max-w-md"><DialogHeader><DialogTitle>{t.addRoleDlg}</DialogTitle></DialogHeader>
+        <DialogContent className="max-w-md" dir={isRTL ? 'rtl' : 'ltr'}><DialogHeader><DialogTitle>{t.addRoleDlg}</DialogTitle><DialogDescription className="sr-only">{isRTL ? 'إضافة دور جديد' : 'Add new role'}</DialogDescription></DialogHeader>
           <div className="space-y-4 pt-2">
             <FormField label={t.roleName}><Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} /></FormField>
             <FormField label={t.roleNameEn}><Input value={form.nameEn} onChange={e => setForm(p => ({ ...p, nameEn: e.target.value }))} dir="ltr" /></FormField>
@@ -903,7 +913,7 @@ function RolesPage() {
       </Dialog>
 
       <Dialog open={!!editRole} onOpenChange={() => setEditRole(null)}>
-        <DialogContent className="max-w-md"><DialogHeader><DialogTitle>{t.editRoleDlg}</DialogTitle></DialogHeader>
+        <DialogContent className="max-w-md" dir={isRTL ? 'rtl' : 'ltr'}><DialogHeader><DialogTitle>{t.editRoleDlg}</DialogTitle><DialogDescription className="sr-only">{isRTL ? 'تعديل الدور' : 'Edit role'}</DialogDescription></DialogHeader>
           <div className="space-y-4 pt-2">
             <FormField label={t.roleName}><Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} /></FormField>
             <FormField label={t.roleNameEn}><Input value={form.nameEn} onChange={e => setForm(p => ({ ...p, nameEn: e.target.value }))} dir="ltr" /></FormField>
@@ -977,7 +987,7 @@ function AuditPage() {
 // PAGE 8: NOTIFICATIONS (full CRUD on templates)
 // ════════════════════════════════════════════════════════════════
 function NotificationsPage() {
-  const { t, lang } = useSA()
+  const { t, lang, isRTL } = useSA()
   const [templates, setTemplates] = useState<NotificationTemplate[]>(NOTIF_TEMPLATES)
   const [sendOpen, setSendOpen] = useState(false)
   const [msg, setMsg] = useState({ title: '', body: '', target: 'all' })
@@ -1033,7 +1043,7 @@ function NotificationsPage() {
       </div>
 
       <Dialog open={sendOpen} onOpenChange={setSendOpen}>
-        <DialogContent className="max-w-md"><DialogHeader><DialogTitle>{t.sendNotifDlg}</DialogTitle></DialogHeader>
+        <DialogContent className="max-w-md" dir={isRTL ? 'rtl' : 'ltr'}><DialogHeader><DialogTitle>{t.sendNotifDlg}</DialogTitle><DialogDescription className="sr-only">{isRTL ? 'إرسال إشعار' : 'Send notification'}</DialogDescription></DialogHeader>
           <div className="space-y-4 pt-2">
             <FormField label={t.title}><Input value={msg.title} onChange={e => setMsg(p => ({ ...p, title: e.target.value }))} /></FormField>
             <FormField label={t.content}><Input value={msg.body} onChange={e => setMsg(p => ({ ...p, body: e.target.value }))} /></FormField>
@@ -1141,7 +1151,7 @@ function SystemPage() {
 // PAGE 11: SERVERS
 // ════════════════════════════════════════════════════════════════
 function ServersPage() {
-  const { t, lang } = useSA()
+  const { t, lang, isRTL } = useSA()
   const [servers, setServers] = useState<ServerType[]>(SERVERS)
   const [addOpen, setAddOpen] = useState(false)
   const [newName, setNewName] = useState('')
@@ -1211,7 +1221,7 @@ function ServersPage() {
         ))}
       </div>
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent className="max-w-sm"><DialogHeader><DialogTitle>{t.addServerDlg}</DialogTitle></DialogHeader>
+        <DialogContent className="max-w-sm" dir={isRTL ? 'rtl' : 'ltr'}><DialogHeader><DialogTitle>{t.addServerDlg}</DialogTitle><DialogDescription className="sr-only">{isRTL ? 'إضافة خادم جديد' : 'Add new server'}</DialogDescription></DialogHeader>
           <div className="space-y-4 pt-2">
             <FormField label={t.serverName}><Input value={newName} onChange={e => setNewName(e.target.value)} placeholder="API Server #3" dir="ltr" /></FormField>
             <FormField label={t.region}><Select value={newRegion} onValueChange={setNewRegion}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="riyadh">{lang === 'en' ? 'Riyadh' : 'الرياض'}</SelectItem><SelectItem value="jeddah">{lang === 'en' ? 'Jeddah' : 'جدة'}</SelectItem><SelectItem value="dubai">{lang === 'en' ? 'Dubai' : 'دبي'}</SelectItem></SelectContent></Select></FormField>
@@ -1523,6 +1533,35 @@ function CliqPaymentsPage() {
     <div className="space-y-5">
       <PageTitle title={t.cliqTitle} action={<PrimaryBtn icon={Plus} label={t.newCliqPayment} onClick={() => setNewPayOpen(true)} />} />
 
+      {/* CLIQ Bank Info Card */}
+      <Card className="border-0 shadow-sm border-l-4 border-l-violet-500">
+        <CardContent className="p-4 sm:p-5">
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-100 dark:bg-violet-900/30">
+              <Wallet className="h-5 w-5 text-violet-600" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h3 className="text-sm font-bold mb-1">{lang === 'ar' ? 'معلومات التحويل عبر CLIQ' : 'CLIQ Transfer Information'}</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2">
+                <div>
+                  <p className="text-[10px] text-muted-foreground">{lang === 'ar' ? 'البنك' : 'Bank'}</p>
+                  <p className="text-xs font-semibold">{DEFAULT_CLIQ_CONFIG.bankName}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-muted-foreground">{lang === 'ar' ? 'الاسم المستعار (Alias)' : 'Alias'}</p>
+                  <p className="text-xs font-bold text-violet-600 font-mono" dir="ltr">{DEFAULT_CLIQ_CONFIG.cliqAlias}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-muted-foreground">{lang === 'ar' ? 'صاحب الحساب' : 'Account Holder'}</p>
+                  <p className="text-xs font-semibold" dir="ltr">{DEFAULT_CLIQ_CONFIG.accountHolder}</p>
+                </div>
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-2 leading-relaxed">{lang === 'en' ? DEFAULT_CLIQ_CONFIG.instructionsEn : DEFAULT_CLIQ_CONFIG.instructions}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <StatCard icon={Wallet} label={t.cliqTotalPending} value={fmt(payments.filter(p => p.status === 'pending_verification').reduce((s, p) => s + p.amount, 0))} color="text-amber-600 bg-amber-50 dark:bg-amber-950/30" />
         <StatCard icon={Clock} label={t.cliqPending} value={String(pendingCount)} color="text-amber-600 bg-amber-50 dark:bg-amber-950/30" />
@@ -1606,7 +1645,7 @@ function CliqPaymentsPage() {
 
       {/* Detail Dialog */}
       <Dialog open={!!detail} onOpenChange={() => setDetail(null)}>
-        <DialogContent className="max-w-lg"><DialogHeader><DialogTitle>{t.cliqTitle}</DialogTitle></DialogHeader>
+        <DialogContent className="max-w-lg" dir={isRTL ? 'rtl' : 'ltr'}><DialogHeader><DialogTitle>{t.cliqTitle}</DialogTitle><DialogDescription className="sr-only">{isRTL ? 'تفاصيل الدفع' : 'Payment details'}</DialogDescription></DialogHeader>
           {detail && <div className="space-y-4 pt-2">
             <div className="grid grid-cols-2 gap-3">
               <div className="rounded-lg bg-muted/50 p-3"><p className="text-[10px] text-muted-foreground">{t.tenant}</p><p className="text-sm font-semibold mt-0.5">{cliqTenantName(detail, lang)}</p></div>
@@ -1642,7 +1681,7 @@ function CliqPaymentsPage() {
 
       {/* Request Info Dialog */}
       <Dialog open={actionDlg?.type === 'info'} onOpenChange={() => setActionDlg(null)}>
-        <DialogContent className="max-w-md"><DialogHeader><DialogTitle>{t.cliqRequestInfo}</DialogTitle></DialogHeader>
+        <DialogContent className="max-w-md" dir={isRTL ? 'rtl' : 'ltr'}><DialogHeader><DialogTitle>{t.cliqRequestInfo}</DialogTitle><DialogDescription className="sr-only">{isRTL ? 'طلب معلومات إضافية' : 'Request additional info'}</DialogDescription></DialogHeader>
           <div className="space-y-4 pt-2">
             <FormField label={t.cliqInfoRequestPrompt}><Textarea value={reasonText} onChange={e => setReasonText(e.target.value)} placeholder={t.cliqInfoRequestPrompt} rows={3} /></FormField>
           </div>
@@ -1653,7 +1692,7 @@ function CliqPaymentsPage() {
       {/* New Payment Dialog */}
       <Dialog open={newPayOpen} onOpenChange={setNewPayOpen}>
         <DialogContent className="max-w-md" dir={isRTL ? 'rtl' : 'ltr'}>
-          <DialogHeader><DialogTitle>{t.newCliqPaymentDlg}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t.newCliqPaymentDlg}</DialogTitle><DialogDescription className="sr-only">{isRTL ? 'تسجيل دفع CLIQ جديد' : 'Register new CLIQ payment'}</DialogDescription></DialogHeader>
           <div className="space-y-4 pt-2">
             <FormField label={t.tenant}>
               <Select value={newPay.tenantName} onValueChange={v => {

@@ -107,7 +107,7 @@ function SidebarContent({ collapsed, onNavigate }: { collapsed: boolean; onNavig
                         const navButton = (
                           <button key={item.id} onClick={() => handleNav(item.id)} className={`flex items-center gap-2.5 w-full rounded-lg px-2.5 py-2 text-[13px] font-medium transition-all duration-150 group ${isActive ? 'bg-violet-50 text-violet-700 dark:bg-violet-950/40 dark:text-violet-400' : 'text-muted-foreground hover:bg-muted hover:text-foreground'} ${collapsed ? 'justify-center px-0' : ''}`}>
                             <Icon className={`h-4 w-4 shrink-0 ${isActive ? 'text-violet-600 dark:text-violet-400' : ''}`} />
-                            {!collapsed && <span className="truncate">{label}</span>}
+                            {!collapsed && <span className={`truncate flex-1 ${isRTL ? 'text-right' : 'text-left'}`}>{label}</span>}
                             {isActive && !collapsed && <div className="ms-auto h-1.5 w-1.5 rounded-full bg-violet-600 dark:bg-violet-400" />}
                           </button>
                         )
