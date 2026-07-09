@@ -41,8 +41,10 @@ import {
   EmptyRow, SearchInput, SortableTH, Pagination, TableFooter, DlgFooter,
   gaugeColor, genericSort, paginate, useCurrency,
 } from './sa-helpers'
+import { TenantWizard, type TenantFormData } from './tenant-wizard'
+import { TenantDetailsDialog } from './tenant-details-dialog'
 
-const PER_PAGE = 5
+const PER_PAGE = 7
 
 // ─── Bilingual field helper for logs ───────────────────────────
 function logMsg(l: SysLog, lang: Lang) { return lang === 'en' ? l.messageEn : l.message }
@@ -172,6 +174,8 @@ function TenantsPage() {
   const [extendDlg, setExtendDlg] = useState<Tenant | null>(null)
   const [extendMonths, setExtendMonths] = useState(12)
   const [extendPlan, setExtendPlan] = useState('')
+  const [wizardOpen, setWizardOpen] = useState(false)
+  const [detailTenant, setDetailTenant] = useState<Tenant | null>(null)
 
   const filtered = useMemo(() => {
     let list = [...tenants]
@@ -183,20 +187,57 @@ function TenantsPage() {
   const { items, totalPages } = paginate(filtered, page, PER_PAGE)
   const handleSort = (key: string) => setSort(p => p.key === key ? { key, dir: p.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' })
 
-  const openAdd = () => { setForm({ name: '', nameEn: '', email: '', country: '', plan: 'Starter' }); setDlg({ type: 'add' }) }
+  const openAdd = () => { setWizardOpen(true) }
   const openEdit = (tn: Tenant) => { setForm({ name: tn.name, nameEn: tn.nameEn, email: tn.email, country: tn.country, plan: tn.plan }); setDlg({ type: 'edit', tenant: tn }) }
+
+  // Wizard-based tenant creation with full validation
+  const handleWizardSave = useCallback((data: TenantFormData) => {
+    // Duplicate checks
+    const emailExists = tenants.some(tn => tn.email.toLowerCase() === data.email.toLowerCase())
+    if (emailExists) { toast.error(isRTL ? 'البريد الإلكتروني مستخدم بالفعل' : 'Email already exists'); return }
+    const nameArExists = tenants.some(tn => tn.name === data.nameAr.trim())
+    if (nameArExists) { toast.error(isRTL ? 'اسم المستأجر (عربي) مستخدم بالفعل' : 'Tenant Arabic name already exists'); return }
+    const nameEnExists = tenants.some(tn => tn.nameEn === data.nameEn.trim())
+    if (nameEnExists) { toast.error(isRTL ? 'اسم المستأجر (إنجليزي) مستخدم بالفعل' : 'Tenant English name already exists'); return }
+
+    // Calculate subscription end date based on billing cycle
+    const cycleMonths = data.billingCycle === 'quarterly' ? 3 : data.billingCycle === 'yearly' ? 12 : 1
+    const endDate = new Date(data.startDate)
+    endDate.setMonth(endDate.getMonth() + cycleMonths)
+
+    const newTenant: Tenant = {
+      id: Date.now().toString(),
+      name: data.nameAr,
+      nameEn: data.nameEn,
+      email: data.email,
+      country: data.country,
+      plan: data.plan,
+      bookings: 0,
+      revenue: 0,
+      users: 1,
+      status: 'active',
+      createdAt: data.startDate,
+      subscriptionStatus: 'active',
+      subscriptionEndDate: endDate.toISOString().split('T')[0],
+    }
+    // Atomic update: add tenant + create invoice in one state batch
+    setTenants(prev => [newTenant, ...prev])
+    setPage(1)
+    setFilter('all')
+    setSearch('')
+  }, [tenants, isRTL])
 
   const handleSave = useCallback(() => {
     if (!form.name.trim()) { toast.error(t.enterTenantName); return }
     if (form.email && !form.email.includes('@')) { toast.error(t.enterValidEmail); return }
-    if (dlg?.type === 'add') {
-      const n: Tenant = { id: Date.now().toString(), ...form, bookings: 0, revenue: 0, users: 1, status: 'trial', createdAt: new Date().toISOString().split('T')[0], subscriptionStatus: 'trial', subscriptionEndDate: '' }
-      setTenants(p => [n, ...p]); toast.success(t.added.replace('{name}', form.name))
-    } else if (dlg?.tenant) {
+    if (dlg?.type === 'edit' && dlg.tenant) {
+      // Check for duplicates on edit (excluding self)
+      const dupEmail = tenants.some(tn => tn.id !== dlg.tenant!.id && tn.email.toLowerCase() === form.email.toLowerCase())
+      if (dupEmail) { toast.error(isRTL ? 'البريد الإلكتروني مستخدم بالفعل' : 'Email already exists'); return }
       setTenants(p => p.map(tn => tn.id === dlg.tenant!.id ? { ...tn, ...form } : tn)); toast.success(t.updated)
     }
     setDlg(null); setPage(1)
-  }, [form, dlg, t])
+  }, [form, dlg, t, tenants, isRTL])
 
   const handleDelete = (tn: Tenant) => { setTenants(p => p.filter(x => x.id !== tn.id)); toast.success(t.deleted); setPage(1) }
   const handleToggleStatus = (tn: Tenant) => {
@@ -223,6 +264,9 @@ function TenantsPage() {
   }
 
   const tnName = (tn: Tenant) => bField(tn, 'name', lang)
+
+  // Existing tenants for wizard duplicate check
+  const existingTenants = useMemo(() => tenants.map(tn => ({ email: tn.email, name: tn.name, nameEn: tn.nameEn })), [tenants])
 
   return (
     <div className="space-y-5">
@@ -273,7 +317,7 @@ function TenantsPage() {
                   </TableCell>
                   <TableCell className="pe-5">
                     <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <ActionBtn icon={Eye} label={t.view} onClick={() => toast.info(t.details.replace('{name}', tnName(tn)))} />
+                      <ActionBtn icon={Eye} label={t.view} onClick={() => setDetailTenant(tn)} />
                       <ActionBtn icon={Edit} label={t.edit} onClick={() => openEdit(tn)} />
                       <ActionBtn icon={CalendarDays} label={t.extendSubscription} onClick={() => openExtend(tn)} />
                       <ActionBtn icon={tn.status === 'suspended' ? Power : PowerOff} label={tn.status === 'suspended' ? t.active : t.suspended} onClick={() => handleToggleStatus(tn)} />
@@ -309,6 +353,7 @@ function TenantsPage() {
               {tn.subscriptionEndDate && <span className="text-[10px] text-muted-foreground">{t.subscriptionEnd}: {tn.subscriptionEndDate}</span>}
             </div>
             <div className="flex items-center justify-end gap-1 pt-2 border-t">
+              <ActionBtn icon={Eye} onClick={() => setDetailTenant(tn)} />
               <ActionBtn icon={CalendarDays} label={t.extendSubscription} onClick={() => openExtend(tn)} />
               <ActionBtn icon={Edit} label={t.edit} onClick={() => openEdit(tn)} />
               <ActionBtn icon={tn.status === 'suspended' ? Power : PowerOff} label={tn.status === 'suspended' ? t.active : t.suspended} onClick={() => handleToggleStatus(tn)} />
@@ -318,8 +363,8 @@ function TenantsPage() {
         ))}
       </div>
 
-      <Dialog open={dlg?.type === 'add' || dlg?.type === 'edit'} onOpenChange={() => setDlg(null)}>
-        <DialogContent className="max-w-md" dir={isRTL ? 'rtl' : 'ltr'}><DialogHeader><DialogTitle>{dlg?.type === 'add' ? t.addTenantDlg : t.editTenantDlg}</DialogTitle><DialogDescription className="sr-only">{dlg?.type === 'add' ? (isRTL ? 'إضافة مستأجر جديد' : 'Add new tenant') : (isRTL ? 'تعديل بيانات المستأجر' : 'Edit tenant details')}</DialogDescription></DialogHeader>
+      <Dialog open={dlg?.type === 'edit'} onOpenChange={() => setDlg(null)}>
+        <DialogContent className="max-w-md" dir={isRTL ? 'rtl' : 'ltr'}><DialogHeader><DialogTitle>{t.editTenantDlg}</DialogTitle><DialogDescription className="sr-only">{isRTL ? 'تعديل بيانات المستأجر' : 'Edit tenant details'}</DialogDescription></DialogHeader>
           <div className="space-y-4 pt-2">
             <FormField label={t.nameAr}><Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} /></FormField>
             <FormField label={t.nameEn}><Input value={form.nameEn} onChange={e => setForm(p => ({ ...p, nameEn: e.target.value }))} dir="ltr" /></FormField>
@@ -376,6 +421,12 @@ function TenantsPage() {
           <DlgFooter onCancel={() => setExtendDlg(null)} onConfirm={handleExtend} confirmLabel={isRTL ? 'تمديد الاشتراك' : 'Extend Subscription'} />
         </DialogContent>
       </Dialog>
+
+      {/* Multi-step Tenant Creation Wizard */}
+      <TenantWizard open={wizardOpen} onClose={() => setWizardOpen(false)} onSave={handleWizardSave} existingTenants={existingTenants} />
+
+      {/* Tenant Details Dialog */}
+      {detailTenant && <TenantDetailsDialog tenant={detailTenant} open={!!detailTenant} onClose={() => setDetailTenant(null)} />}
     </div>
   )
 }
@@ -802,7 +853,7 @@ function BillingPage() {
           <div className="space-y-4 pt-2">
             <FormField label={t.tenant}>
               <Select value={invForm.tenant} onValueChange={v => {
-                const tn = INIT_TENANTS.find(t => t.name === v || t.nameEn === v)
+                const tn = INIT_TENANTS.find(x => x.name === v || x.nameEn === v)
                 setInvForm(p => ({ ...p, tenant: tn?.name || v, tenantEn: tn?.nameEn || v }))
               }}>
                 <SelectTrigger><SelectValue placeholder={isRTL ? 'اختر المستأجر' : 'Select tenant'} /></SelectTrigger>
@@ -1696,7 +1747,7 @@ function CliqPaymentsPage() {
           <div className="space-y-4 pt-2">
             <FormField label={t.tenant}>
               <Select value={newPay.tenantName} onValueChange={v => {
-                const tn = INIT_TENANTS.find(t => t.name === v || t.nameEn === v)
+                const tn = INIT_TENANTS.find(x => x.name === v || x.nameEn === v)
                 setNewPay(p => ({ ...p, tenantName: tn?.name || v, tenantNameEn: tn?.nameEn || v }))
               }}>
                 <SelectTrigger><SelectValue placeholder={isRTL ? 'اختر المستأجر' : 'Select tenant'} /></SelectTrigger>

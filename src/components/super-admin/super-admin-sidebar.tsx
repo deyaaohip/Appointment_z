@@ -59,7 +59,7 @@ function SidebarContent({ collapsed, onNavigate }: { collapsed: boolean; onNavig
   const handleNav = (viewId: string) => { setSuperAdminView(viewId); if (onNavigate) onNavigate() }
 
   return (
-    <div className={`flex flex-col h-full ${isRTL ? 'text-right' : 'text-left'}`} dir={isRTL ? 'rtl' : 'ltr'}>
+    <div className="flex flex-col h-full" style={{ textAlign: isRTL ? 'right' : 'left', direction: isRTL ? 'rtl' : 'ltr' }} dir={isRTL ? 'rtl' : 'ltr'}>
       {/* Logo */}
       <div className="flex items-center gap-3 px-4 py-4">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 shadow-lg shadow-violet-600/20">
@@ -87,8 +87,8 @@ function SidebarContent({ collapsed, onNavigate }: { collapsed: boolean; onNavig
                   <TooltipContent side={isRTL ? 'left' : 'right'}>{isRTL ? section.ar : section.en}</TooltipContent>
                 </Tooltip>
               ) : (
-                <button onClick={() => toggleSection(section.id)} className={`flex items-center gap-2 w-full px-2 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase ${isRTL ? 'tracking-tight' : 'tracking-wider'} hover:text-foreground transition-colors`}>
-                  <span className={`flex-1 ${isRTL ? 'text-right' : 'text-left'}`}>{isRTL ? section.ar : section.en}</span>
+                <button onClick={() => toggleSection(section.id)} className={`flex items-center gap-2 w-full px-2 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase ${isRTL ? 'tracking-tight' : 'tracking-wider'} hover:text-foreground transition-colors`} style={{ justifyContent: isRTL ? 'flex-end' : 'flex-start' }}>
+                  <span style={{ textAlign: isRTL ? 'right' : 'left' }}>{isRTL ? section.ar : section.en}</span>
                   {isRTL
                     ? <ChevronLeft className={`h-3 w-3 transition-transform ${expandedSections[section.id] ? 'rotate-90' : ''}`} />
                     : <ChevronRight className={`h-3 w-3 transition-transform ${expandedSections[section.id] ? 'rotate-90' : ''}`} />
@@ -107,7 +107,7 @@ function SidebarContent({ collapsed, onNavigate }: { collapsed: boolean; onNavig
                         const navButton = (
                           <button key={item.id} onClick={() => handleNav(item.id)} className={`flex items-center gap-2.5 w-full rounded-lg px-2.5 py-2 text-[13px] font-medium transition-all duration-150 group ${isActive ? 'bg-violet-50 text-violet-700 dark:bg-violet-950/40 dark:text-violet-400' : 'text-muted-foreground hover:bg-muted hover:text-foreground'} ${collapsed ? 'justify-center px-0' : ''}`}>
                             <Icon className={`h-4 w-4 shrink-0 ${isActive ? 'text-violet-600 dark:text-violet-400' : ''}`} />
-                            {!collapsed && <span className={`truncate flex-1 ${isRTL ? 'text-right' : 'text-left'}`}>{label}</span>}
+                            {!collapsed && <span className="truncate flex-1" style={{ textAlign: isRTL ? 'right' : 'left' }}>{label}</span>}
                             {isActive && !collapsed && <div className="ms-auto h-1.5 w-1.5 rounded-full bg-violet-600 dark:bg-violet-400" />}
                           </button>
                         )
@@ -133,7 +133,7 @@ function SidebarContent({ collapsed, onNavigate }: { collapsed: boolean; onNavig
             <button className="flex items-center gap-2.5 w-full rounded-lg p-2 hover:bg-muted transition-colors">
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-indigo-500 text-white font-bold text-xs">{currentUser?.name?.charAt(0) || 'SA'}</div>
               {!collapsed && (
-                <div className={`flex-1 min-w-0 ${isRTL ? 'text-right' : 'text-left'}`}>
+                <div className="flex-1 min-w-0" style={{ textAlign: isRTL ? 'right' : 'left' }}>
                   <p className="text-sm font-semibold truncate">{currentUser?.name || (isRTL ? 'مدير النظام' : 'Super Admin')}</p>
                   <p className="text-[10px] text-muted-foreground truncate">{currentUser?.email || 'admin@bookflow.com'}</p>
                 </div>

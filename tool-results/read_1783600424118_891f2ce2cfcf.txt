@@ -1,0 +1,402 @@
+   200→
+   201→  const handleDelete = (tn: Tenant) => { setTenants(p => p.filter(x => x.id !== tn.id)); toast.success(t.deleted); setPage(1) }
+   202→  const handleToggleStatus = (tn: Tenant) => {
+   203→    const newStatus = tn.status === 'suspended' ? 'active' : 'suspended'
+   204→    setTenants(p => p.map(x => x.id === tn.id ? { ...x, status: newStatus } : x))
+   205→    toast.success(newStatus === 'suspended' ? t.tenantSuspended : t.tenantActivated)
+   206→    setPage(1)
+   207→  }
+   208→
+   209→  const openExtend = (tn: Tenant) => { setExtendDlg(tn); setExtendPlan(tn.plan); setExtendMonths(12) }
+   210→  const handleExtend = () => {
+   211→    if (!extendDlg) return
+   212→    const startDate = extendDlg.subscriptionEndDate && extendDlg.subscriptionEndDate > new Date().toISOString().split('T')[0]
+   213→      ? new Date(extendDlg.subscriptionEndDate) : new Date()
+   214→    const newEnd = new Date(startDate)
+   215→    newEnd.setMonth(newEnd.getMonth() + extendMonths)
+   216→    setTenants(p => p.map(x => x.id === extendDlg.id ? {
+   217→      ...x, plan: extendPlan || x.plan,
+   218→      subscriptionStatus: 'active', status: 'active',
+   219→      subscriptionEndDate: newEnd.toISOString().split('T')[0]
+   220→    } : x))
+   221→    toast.success(t.subscriptionExtended)
+   222→    setExtendDlg(null)
+   223→  }
+   224→
+   225→  const tnName = (tn: Tenant) => bField(tn, 'name', lang)
+   226→
+   227→  return (
+   228→    <div className="space-y-5">
+   229→      <PageTitle title={t.tenantMgmt} action={<PrimaryBtn icon={Plus} label={t.addTenant} onClick={openAdd} />} />
+   230→      <div className="flex flex-col sm:flex-row gap-3">
+   231→        <SearchInput value={search} onChange={v => { setSearch(v); setPage(1) }} placeholder={t.tenantSearch} />
+   232→        <Select value={filter} onValueChange={v => { setFilter(v); setPage(1) }}>
+   233→          <SelectTrigger className="w-full sm:w-44 h-10"><SelectValue /></SelectTrigger>
+   234→          <SelectContent>
+   235→            <SelectItem value="all">{t.allStatuses}</SelectItem>
+   236→            <SelectItem value="active">{t.active}</SelectItem>
+   237→            <SelectItem value="trial">{t.trial}</SelectItem>
+   238→            <SelectItem value="suspended">{t.suspended}</SelectItem>
+   239→          </SelectContent>
+   240→        </Select>
+   241→      </div>
+   242→
+   243→      <Card className="border-0 shadow-sm overflow-hidden hidden md:block">
+   244→        <div className="overflow-x-auto">
+   245→          <Table>
+   246→            <TableHeader><TableRow className="bg-muted/50 hover:bg-muted/50">
+   247→              <SortableTH label={t.tenant} sortKey="name" currentSort={sort} onSort={handleSort} className="ps-5" />
+   248→              <SortableTH label={t.plan} sortKey="plan" currentSort={sort} onSort={handleSort} />
+   249→              <SortableTH label={t.bookings} sortKey="bookings" currentSort={sort} onSort={handleSort} align="end" />
+   250→              <SortableTH label={t.tenantRevenue} sortKey="revenue" currentSort={sort} onSort={handleSort} align="end" />
+   251→              <SortableTH label={t.status} sortKey="status" currentSort={sort} onSort={handleSort} />
+   252→              <TableHead className="px-3 font-semibold text-xs uppercase tracking-wider">{t.subscriptionStatus}</TableHead>
+   253→              <TableHead className="pe-5 font-semibold text-xs uppercase tracking-wider text-end">{t.actions}</TableHead>
+   254→            </TableRow></TableHeader>
+   255→            <TableBody>
+   256→              {items.length === 0 ? <EmptyRow colSpan={7} /> : items.map(tn => (
+   257→                <TableRow key={tn.id} className="group hover:bg-muted/20 transition-colors">
+   258→                  <TableCell className="ps-5">
+   259→                    <div className="flex items-center gap-3">
+   260→                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-900/30 text-violet-600 font-bold text-xs">{tnName(tn).charAt(0)}</div>
+   261→                      <div className="min-w-0"><p className="font-medium text-sm truncate max-w-[200px]">{tnName(tn)}</p><p className="text-xs text-muted-foreground truncate max-w-[200px]" dir="ltr">{tn.email}</p></div>
+   262→                    </div>
+   263→                  </TableCell>
+   264→                  <TableCell className="px-3"><Badge variant="secondary" className="font-medium text-xs">{tn.plan}</Badge></TableCell>
+   265→                  <TableCell className="px-3 text-end tabular-nums text-sm">{tn.bookings.toLocaleString()}</TableCell>
+   266→                  <TableCell className="px-3 text-end font-semibold tabular-nums text-sm">{tn.revenue.toLocaleString()} <span className="text-xs font-normal text-muted-foreground">{sym}</span></TableCell>
+   267→                  <TableCell className="px-3"><StatusBadge status={tn.status} locale={lang} /></TableCell>
+   268→                  <TableCell className="px-3">
+   269→                    <div className="space-y-0.5">
+   270→                      <StatusBadge status={tn.subscriptionStatus} locale={lang} />
+   271→                      {tn.subscriptionEndDate && <p className="text-[10px] text-muted-foreground">{t.subscriptionEnd}: {tn.subscriptionEndDate}</p>}
+   272→                    </div>
+   273→                  </TableCell>
+   274→                  <TableCell className="pe-5">
+   275→                    <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+   276→                      <ActionBtn icon={Eye} label={t.view} onClick={() => toast.info(t.details.replace('{name}', tnName(tn)))} />
+   277→                      <ActionBtn icon={Edit} label={t.edit} onClick={() => openEdit(tn)} />
+   278→                      <ActionBtn icon={CalendarDays} label={t.extendSubscription} onClick={() => openExtend(tn)} />
+   279→                      <ActionBtn icon={tn.status === 'suspended' ? Power : PowerOff} label={tn.status === 'suspended' ? t.active : t.suspended} onClick={() => handleToggleStatus(tn)} />
+   280→                      <ActionBtn icon={Trash2} onClick={() => setDlg({ type: 'delete', tenant: tn })} danger />
+   281→                    </div>
+   282→                  </TableCell>
+   283→                </TableRow>
+   284→              ))}
+   285→            </TableBody>
+   286→          </Table>
+   287→        </div>
+   288→        <TableFooter current={items.length} total={filtered.length} entity={t.tenant.toLowerCase()} />
+   289→        <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+   290→      </Card>
+   291→
+   292→      <div className="md:hidden space-y-3">
+   293→        {items.length === 0 ? <Card className="border-0 shadow-sm"><CardContent className="py-16 text-center text-muted-foreground text-sm">{t.noResults}</CardContent></Card> : items.map(tn => (
+   294→          <Card key={tn.id} className="border-0 shadow-sm"><CardContent className="p-4">
+   295→            <div className="flex items-start justify-between gap-3 mb-3">
+   296→              <div className="flex items-center gap-3 min-w-0">
+   297→                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-900/30 text-violet-600 font-bold text-sm">{tnName(tn).charAt(0)}</div>
+   298→                <div className="min-w-0"><p className="font-semibold text-sm truncate">{tnName(tn)}</p><p className="text-xs text-muted-foreground truncate" dir="ltr">{tn.email}</p></div>
+   299→              </div>
+   300→              <StatusBadge status={tn.status} locale={lang} />
+   301→            </div>
+   302→            <div className="grid grid-cols-3 gap-3 mb-3 text-center">
+   303→              <div className="rounded-lg bg-muted/50 p-2"><p className="text-[10px] text-muted-foreground">{t.plan}</p><p className="text-xs font-semibold mt-0.5">{tn.plan}</p></div>
+   304→              <div className="rounded-lg bg-muted/50 p-2"><p className="text-[10px] text-muted-foreground">{t.bookings}</p><p className="text-xs font-semibold mt-0.5 tabular-nums">{tn.bookings.toLocaleString()}</p></div>
+   305→              <div className="rounded-lg bg-muted/50 p-2"><p className="text-[10px] text-muted-foreground">{t.tenantRevenue}</p><p className="text-xs font-semibold mt-0.5 tabular-nums">{tn.revenue.toLocaleString()} {sym}</p></div>
+   306→            </div>
+   307→            <div className="flex items-center gap-2 mb-3">
+   308→              <StatusBadge status={tn.subscriptionStatus} locale={lang} />
+   309→              {tn.subscriptionEndDate && <span className="text-[10px] text-muted-foreground">{t.subscriptionEnd}: {tn.subscriptionEndDate}</span>}
+   310→            </div>
+   311→            <div className="flex items-center justify-end gap-1 pt-2 border-t">
+   312→              <ActionBtn icon={CalendarDays} label={t.extendSubscription} onClick={() => openExtend(tn)} />
+   313→              <ActionBtn icon={Edit} label={t.edit} onClick={() => openEdit(tn)} />
+   314→              <ActionBtn icon={tn.status === 'suspended' ? Power : PowerOff} label={tn.status === 'suspended' ? t.active : t.suspended} onClick={() => handleToggleStatus(tn)} />
+   315→              <ActionBtn icon={Trash2} onClick={() => setDlg({ type: 'delete', tenant: tn })} danger />
+   316→            </div>
+   317→          </CardContent></Card>
+   318→        ))}
+   319→      </div>
+   320→
+   321→      <Dialog open={dlg?.type === 'add' || dlg?.type === 'edit'} onOpenChange={() => setDlg(null)}>
+   322→        <DialogContent className="max-w-md" dir={isRTL ? 'rtl' : 'ltr'}><DialogHeader><DialogTitle>{dlg?.type === 'add' ? t.addTenantDlg : t.editTenantDlg}</DialogTitle><DialogDescription className="sr-only">{dlg?.type === 'add' ? (isRTL ? 'إضافة مستأجر جديد' : 'Add new tenant') : (isRTL ? 'تعديل بيانات المستأجر' : 'Edit tenant details')}</DialogDescription></DialogHeader>
+   323→          <div className="space-y-4 pt-2">
+   324→            <FormField label={t.nameAr}><Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} /></FormField>
+   325→            <FormField label={t.nameEn}><Input value={form.nameEn} onChange={e => setForm(p => ({ ...p, nameEn: e.target.value }))} dir="ltr" /></FormField>
+   326→            <FormField label={t.email}><Input type="email" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} dir="ltr" /></FormField>
+   327→            <div className="grid grid-cols-2 gap-3">
+   328→              <FormField label={t.country}><Input value={form.country} onChange={e => setForm(p => ({ ...p, country: e.target.value }))} /></FormField>
+   329→              <FormField label={t.plan}><Select value={form.plan} onValueChange={v => setForm(p => ({ ...p, plan: v }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{PLANS.map(p => <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>)}</SelectContent></Select></FormField>
+   330→            </div>
+   331→          </div>
+   332→          <DlgFooter onCancel={() => setDlg(null)} onConfirm={handleSave} />
+   333→        </DialogContent>
+   334→      </Dialog>
+   335→      <ConfirmDialog open={dlg?.type === 'delete'} onOpenChange={() => setDlg(null)} title={t.deleteTenantDlg} desc={t.deleteTenantDesc.replace('{name}', dlg?.tenant?.name || '')} onConfirm={() => { if (dlg?.tenant) handleDelete(dlg.tenant) }} danger />
+   336→
+   337→      {/* Extend Subscription Dialog */}
+   338→      <Dialog open={!!extendDlg} onOpenChange={() => setExtendDlg(null)}>
+   339→        <DialogContent className="max-w-md" dir={isRTL ? 'rtl' : 'ltr'}>
+   340→          <DialogHeader><DialogTitle>{t.extendSubscriptionDlg}</DialogTitle><DialogDescription className="sr-only">{isRTL ? 'تمديد اشتراك المستأجر' : 'Extend tenant subscription'}</DialogDescription></DialogHeader>
+   341→          <div className="space-y-4 pt-2">
+   342→            {extendDlg && <>
+   343→              <div className="rounded-lg bg-muted/50 p-3 space-y-1">
+   344→                <p className="font-semibold text-sm">{tnName(extendDlg)}</p>
+   345→                <div className="flex items-center gap-2">
+   346→                  <StatusBadge status={extendDlg.subscriptionStatus} locale={lang} />
+   347→                  {extendDlg.subscriptionEndDate && <span className="text-[11px] text-muted-foreground">{t.subscriptionEnd}: {extendDlg.subscriptionEndDate}</span>}
+   348→                </div>
+   349→              </div>
+   350→              <FormField label={t.plan}>
+   351→                <Select value={extendPlan} onValueChange={setExtendPlan}>
+   352→                  <SelectTrigger><SelectValue /></SelectTrigger>
+   353→                  <SelectContent>{PLANS.filter(p => p.price > 0).map(p => <SelectItem key={p.id} value={p.name}>{p.name} — {p.price} {sym}/{t.perMonth}</SelectItem>)}</SelectContent>
+   354→                </Select>
+   355→              </FormField>
+   356→              <FormField label={t.durationMonths}>
+   357→                <Select value={String(extendMonths)} onValueChange={v => setExtendMonths(Number(v))}>
+   358→                  <SelectTrigger><SelectValue /></SelectTrigger>
+   359→                  <SelectContent>
+   360→                    {[1, 3, 6, 12, 24].map(m => <SelectItem key={m} value={String(m)}>{m} {t.months}</SelectItem>)}
+   361→                  </SelectContent>
+   362→                </Select>
+   363→              </FormField>
+   364→              {extendPlan && (() => {
+   365→                const plan = PLANS.find(p => p.name === extendPlan)
+   366→                const total = plan ? plan.price * extendMonths : 0
+   367→                return total > 0 ? (
+   368→                  <div className="rounded-lg bg-violet-50 dark:bg-violet-950/30 p-3 text-center">
+   369→                    <p className="text-[10px] text-muted-foreground">{isRTL ? 'الإجمالي' : 'Total'}</p>
+   370→                    <p className="text-lg font-bold text-violet-700 dark:text-violet-400">{total.toLocaleString()} {sym}</p>
+   371→                  </div>
+   372→                ) : null
+   373→              })()}
+   374→            </>}
+   375→          </div>
+   376→          <DlgFooter onCancel={() => setExtendDlg(null)} onConfirm={handleExtend} confirmLabel={isRTL ? 'تمديد الاشتراك' : 'Extend Subscription'} />
+   377→        </DialogContent>
+   378→      </Dialog>
+   379→    </div>
+   380→  )
+   381→}
+   382→
+   383→// ════════════════════════════════════════════════════════════════
+   384→// PAGE 3: USERS (full CRUD + sort + pagination)
+   385→// ════════════════════════════════════════════════════════════════
+   386→function UsersPage() {
+   387→  const { t, lang, isRTL } = useSA()
+   388→  const [users, setUsers] = useState<PlatformUser[]>(INIT_USERS)
+   389→  const [search, setSearch] = useState('')
+   390→  const [filter, setFilter] = useState('all')
+   391→  const [page, setPage] = useState(1)
+   392→  const [sort, setSort] = useState<SortState>({ key: 'name', dir: 'asc' })
+   393→  const [dlg, setDlg] = useState<{ type: string; user?: PlatformUser } | null>(null)
+   394→  const [form, setForm] = useState({ name: '', email: '', tenant: '', role: 'owner' })
+   395→
+   396→  const ROLE_MAP: Record<string, string> = { owner: t.owner, manager: t.manager, receptionist: t.receptionist, accountant: t.accountant }
+   397→
+   398→  const filtered = useMemo(() => {
+   399→    let list = [...users]
+   400→    if (filter !== 'all') list = list.filter(u => u.status === filter)
+   401→    if (search) { const q = search.toLowerCase(); list = list.filter(u => u.name.includes(q) || u.email.toLowerCase().includes(q) || u.tenant.includes(q)) }
+   402→    return genericSort(list, sort.key, sort.dir, lang)
+   403→  }, [users, search, filter, sort, lang])
+   404→
+   405→  const { items, totalPages } = paginate(filtered, page, PER_PAGE)
+   406→  const handleSort = (key: string) => setSort(p => p.key === key ? { key, dir: p.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' })
+   407→
+   408→  const openAdd = () => { setForm({ name: '', email: '', tenant: '', role: 'owner' }); setDlg({ type: 'add' }) }
+   409→  const openEdit = (u: PlatformUser) => { setForm({ name: u.name, email: u.email, tenant: u.tenant, role: u.role }); setDlg({ type: 'edit', user: u }) }
+   410→
+   411→  const handleSave = useCallback(() => {
+   412→    if (!form.name.trim() || !form.email.trim()) { toast.error(t.enterNameAndEmail); return }
+   413→    if (dlg?.type === 'add') {
+   414→      setUsers(p => [{ id: Date.now().toString(), ...form, tenantEn: '', status: 'active', lastLogin: new Date().toISOString() }, ...p])
+   415→      toast.success(t.added.replace('{name}', form.name))
+   416→    } else if (dlg?.user) {
+   417→      setUsers(p => p.map(u => u.id === dlg.user!.id ? { ...u, ...form } : u)); toast.success(t.updated)
+   418→    }
+   419→    setDlg(null); setPage(1)
+   420→  }, [form, dlg, t])
+   421→
+   422→  const handleDelete = (u: PlatformUser) => { setUsers(p => p.filter(x => x.id !== u.id)); toast.success(t.userDeleted); setPage(1) }
+   423→  const handleToggleStatus = (u: PlatformUser) => {
+   424→    const newStatus = u.status === 'suspended' ? 'active' : 'suspended'
+   425→    setUsers(p => p.map(x => x.id === u.id ? { ...x, status: newStatus } : x))
+   426→    toast.success(newStatus === 'suspended' ? t.userSuspended : t.userActivated)
+   427→  }
+   428→
+   429→  return (
+   430→    <div className="space-y-5">
+   431→      <PageTitle title={t.userMgmt} action={<PrimaryBtn icon={UserPlus} label={t.addUser} onClick={openAdd} />} />
+   432→      <div className="flex flex-col sm:flex-row gap-3">
+   433→        <SearchInput value={search} onChange={v => { setSearch(v); setPage(1) }} placeholder={t.userSearch} />
+   434→        <Select value={filter} onValueChange={v => { setFilter(v); setPage(1) }}>
+   435→          <SelectTrigger className="w-full sm:w-44 h-10"><SelectValue /></SelectTrigger>
+   436→          <SelectContent><SelectItem value="all">{t.all}</SelectItem><SelectItem value="active">{t.active}</SelectItem><SelectItem value="suspended">{t.suspended}</SelectItem></SelectContent>
+   437→        </Select>
+   438→      </div>
+   439→
+   440→      <Card className="border-0 shadow-sm overflow-hidden hidden md:block">
+   441→        <div className="overflow-x-auto">
+   442→          <Table><TableHeader><TableRow className="bg-muted/50 hover:bg-muted/50">
+   443→            <SortableTH label={t.user} sortKey="name" currentSort={sort} onSort={handleSort} className="ps-5" />
+   444→            <SortableTH label={t.email} sortKey="email" currentSort={sort} onSort={handleSort} />
+   445→            <SortableTH label={t.tenant} sortKey="tenant" currentSort={sort} onSort={handleSort} />
+   446→            <SortableTH label={t.role} sortKey="role" currentSort={sort} onSort={handleSort} />
+   447→            <SortableTH label={t.status} sortKey="status" currentSort={sort} onSort={handleSort} />
+   448→            <TableHead className="pe-5 font-semibold text-xs uppercase tracking-wider text-end">{t.actions}</TableHead>
+   449→          </TableRow></TableHeader>
+   450→          <TableBody>
+   451→            {items.length === 0 ? <EmptyRow colSpan={6} /> : items.map(u => (
+   452→              <TableRow key={u.id} className="group hover:bg-muted/20 transition-colors">
+   453→                <TableCell className="ps-5">
+   454→                  <div className="flex items-center gap-3">
+   455→                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky-100 dark:bg-sky-900/30 text-sky-600 font-bold text-xs">{u.name.charAt(0)}</div>
+   456→                    <span className="font-medium text-sm">{u.name}</span>
+   457→                  </div>
+   458→                </TableCell>
+   459→                <TableCell className="px-3 text-sm text-muted-foreground" dir="ltr">{u.email}</TableCell>
+   460→                <TableCell className="px-3 text-sm">{userTenant(u, lang)}</TableCell>
+   461→                <TableCell className="px-3"><Badge variant="secondary" className="text-xs">{ROLE_MAP[u.role] || u.role}</Badge></TableCell>
+   462→                <TableCell className="px-3"><StatusBadge status={u.status} locale={lang} /></TableCell>
+   463→                <TableCell className="pe-5">
+   464→                  <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+   465→                    <ActionBtn icon={Edit} label={t.edit} onClick={() => openEdit(u)} />
+   466→                    <ActionBtn icon={u.status === 'suspended' ? Power : PowerOff} label={u.status === 'suspended' ? t.active : t.suspended} onClick={() => handleToggleStatus(u)} />
+   467→                    <ActionBtn icon={Trash2} onClick={() => setDlg({ type: 'delete', user: u })} danger />
+   468→                  </div>
+   469→                </TableCell>
+   470→              </TableRow>
+   471→            ))}
+   472→          </TableBody></Table>
+   473→        </div>
+   474→        <TableFooter current={items.length} total={filtered.length} entity={t.user.toLowerCase()} />
+   475→        <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+   476→      </Card>
+   477→
+   478→      <div className="md:hidden space-y-3">
+   479→        {items.length === 0 ? <Card className="border-0 shadow-sm"><CardContent className="py-16 text-center text-muted-foreground text-sm">{t.noResults}</CardContent></Card> : items.map(u => (
+   480→          <Card key={u.id} className="border-0 shadow-sm"><CardContent className="p-4">
+   481→            <div className="flex items-start justify-between gap-3 mb-3">
+   482→              <div className="flex items-center gap-3 min-w-0">
+   483→                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-sky-100 dark:bg-sky-900/30 text-sky-600 font-bold text-sm">{u.name.charAt(0)}</div>
+   484→                <div className="min-w-0"><p className="font-semibold text-sm truncate">{u.name}</p><p className="text-xs text-muted-foreground truncate" dir="ltr">{u.email}</p></div>
+   485→              </div>
+   486→              <StatusBadge status={u.status} locale={lang} />
+   487→            </div>
+   488→            <div className="grid grid-cols-2 gap-3 mb-3">
+   489→              <div className="rounded-lg bg-muted/50 p-2"><p className="text-[10px] text-muted-foreground">{t.tenant}</p><p className="text-xs font-semibold mt-0.5 truncate">{userTenant(u, lang)}</p></div>
+   490→              <div className="rounded-lg bg-muted/50 p-2"><p className="text-[10px] text-muted-foreground">{t.role}</p><p className="text-xs font-semibold mt-0.5">{ROLE_MAP[u.role] || u.role}</p></div>
+   491→            </div>
+   492→            <div className="flex items-center justify-end gap-1 pt-2 border-t">
+   493→              <ActionBtn icon={Edit} label={t.edit} onClick={() => openEdit(u)} />
+   494→              <ActionBtn icon={u.status === 'suspended' ? Power : PowerOff} label={u.status === 'suspended' ? t.active : t.suspended} onClick={() => handleToggleStatus(u)} />
+   495→              <ActionBtn icon={Trash2} onClick={() => setDlg({ type: 'delete', user: u })} danger />
+   496→            </div>
+   497→          </CardContent></Card>
+   498→        ))}
+   499→      </div>
+   500→
+   501→      <Dialog open={dlg?.type === 'add' || dlg?.type === 'edit'} onOpenChange={() => setDlg(null)}>
+   502→        <DialogContent className="max-w-md" dir={isRTL ? 'rtl' : 'ltr'}><DialogHeader><DialogTitle>{dlg?.type === 'add' ? t.addUserDlg : t.editUserDlg}</DialogTitle><DialogDescription className="sr-only">{isRTL ? 'إدارة المستخدمين' : 'Manage users'}</DialogDescription></DialogHeader>
+   503→          <div className="space-y-4 pt-2">
+   504→            <FormField label={t.name}><Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} /></FormField>
+   505→            <FormField label={t.email}><Input type="email" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} dir="ltr" /></FormField>
+   506→            <FormField label={t.tenant}><Input value={form.tenant} onChange={e => setForm(p => ({ ...p, tenant: e.target.value }))} /></FormField>
+   507→            <FormField label={t.role}><Select value={form.role} onValueChange={v => setForm(p => ({ ...p, role: v }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="owner">{t.owner}</SelectItem><SelectItem value="manager">{t.manager}</SelectItem><SelectItem value="receptionist">{t.receptionist}</SelectItem><SelectItem value="accountant">{t.accountant}</SelectItem></SelectContent></Select></FormField>
+   508→          </div>
+   509→          <DlgFooter onCancel={() => setDlg(null)} onConfirm={handleSave} />
+   510→        </DialogContent>
+   511→      </Dialog>
+   512→      <ConfirmDialog open={dlg?.type === 'delete'} onOpenChange={() => setDlg(null)} title={t.deleteUserDlg} desc={t.confirmDeleteUser.replace('{name}', dlg?.user?.name || '')} onConfirm={() => { if (dlg?.user) handleDelete(dlg.user) }} danger />
+   513→    </div>
+   514→  )
+   515→}
+   516→
+   517→// ════════════════════════════════════════════════════════════════
+   518→// PAGE 4: PLANS (Full CRUD + JOD currency)
+   519→// ════════════════════════════════════════════════════════════════
+   520→const PLAN_COLORS = ['bg-gray-500', 'bg-sky-500', 'bg-violet-500', 'bg-indigo-500', 'bg-emerald-500', 'bg-amber-500', 'bg-rose-500']
+   521→
+   522→function PlansPage() {
+   523→  const { t, lang, isRTL } = useSA()
+   524→  const { sym, fmt } = useCurrency()
+   525→  const [plans, setPlans] = useState<Plan[]>([...PLANS])
+   526→  const [dlg, setDlg] = useState<{ type: 'add' | 'edit' | 'delete'; plan?: Plan } | null>(null)
+   527→  const [detailPlan, setDetailPlan] = useState<Plan | null>(null)
+   528→  const emptyFeature = { ar: '', en: '' }
+   529→  const [form, setForm] = useState({ name: '', price: 0, tenants: 0, color: 'bg-violet-500', popular: false, features: [{ ar: '', en: '' }] as { ar: string; en: string }[] })
+   530→
+   531→  const openAdd = () => {
+   532→    setForm({ name: '', price: 0, tenants: 0, color: 'bg-violet-500', popular: false, features: [{ ar: '', en: '' }] })
+   533→    setDlg({ type: 'add' })
+   534→  }
+   535→  const openEdit = (p: Plan) => {
+   536→    setForm({ name: p.name, price: p.price, tenants: p.tenants, color: p.color, popular: p.popular, features: [...p.features] })
+   537→    setDlg({ type: 'edit', plan: p })
+   538→  }
+   539→
+   540→  const handleSave = useCallback(() => {
+   541→    if (!form.name.trim()) { toast.error(lang === 'ar' ? 'يرجى إدخال اسم الباقة' : 'Please enter plan name'); return }
+   542→    const cleanFeatures = form.features.filter(f => f.ar.trim() || f.en.trim())
+   543→    if (cleanFeatures.length === 0) { toast.error(lang === 'ar' ? 'أضف ميزة واحدة على الأقل' : 'Add at least one feature'); return }
+   544→    if (dlg?.type === 'add') {
+   545→      const p: Plan = { id: Date.now().toString(), name: form.name, price: form.price, tenants: form.tenants, features: cleanFeatures, color: form.color, popular: form.popular, currency: 'JOD' }
+   546→      setPlans(prev => [...prev, p]); toast.success(lang === 'ar' ? 'تم إنشاء الباقة' : 'Plan created')
+   547→    } else if (dlg?.plan) {
+   548→      setPlans(prev => prev.map(p => p.id === dlg.plan!.id ? { ...p, name: form.name, price: form.price, tenants: form.tenants, features: cleanFeatures, color: form.color, popular: form.popular } : p))
+   549→      toast.success(t.updated)
+   550→    }
+   551→    setDlg(null)
+   552→  }, [form, dlg, t, lang])
+   553→
+   554→  const handleDelete = () => {
+   555→    if (!dlg?.plan) return
+   556→    setPlans(prev => prev.filter(p => p.id !== dlg.plan!.id)); toast.success(t.deleted); setDlg(null)
+   557→  }
+   558→
+   559→  const addFeature = () => setForm(p => ({ ...p, features: [...p.features, { ar: '', en: '' }] }))
+   560→  const removeFeature = (i: number) => setForm(p => ({ ...p, features: p.features.filter((_, idx) => idx !== i) }))
+   561→  const updateFeature = (i: number, field: 'ar' | 'en', val: string) => {
+   562→    setForm(p => { const f = [...p.features]; f[i] = { ...f[i], [field]: val }; return { ...p, features: f } })
+   563→  }
+   564→
+   565→  return (
+   566→    <div className="space-y-6">
+   567→      <PageTitle title={t.plansTitle} action={<PrimaryBtn icon={Plus} label={t.createPlan} onClick={openAdd} />} />
+   568→      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 sm:gap-5">
+   569→        {plans.map((p, i) => (
+   570→          <motion.div key={p.id} variants={fade} initial="hidden" animate="visible" transition={{ delay: i * 0.04 }}>
+   571→            <Card className={`h-full flex flex-col transition-all hover:shadow-lg border-0 shadow-sm ${p.popular ? 'ring-2 ring-violet-500 shadow-violet-500/10' : ''}`}>
+   572→              <CardContent className="flex-1 flex flex-col items-center p-5 sm:p-6 pt-7">
+   573→                {p.popular && <Badge className="bg-violet-600 text-white mb-3 -mt-1 text-[10px]">{t.mostPopular}</Badge>}
+   574→                <div className={`h-12 w-12 rounded-2xl ${p.color} flex items-center justify-center mb-4 shadow-lg`}><CreditCard className="h-6 w-6 text-white" /></div>
+   575→                <h3 className="font-bold text-base">{p.name}</h3>
+   576→                <p className="text-3xl font-extrabold mt-3 mb-1">{p.price > 0 ? `${p.price}` : t.free}</p>
+   577→                <p className="text-xs text-muted-foreground mb-5">{p.price > 0 ? `${sym} ${t.perMonth}` : ''} · {p.tenants} {t.tenants}</p>
+   578→                <Separator className="w-full mb-5" />
+   579→                <ul className="space-y-2.5 w-full text-start flex-1">{p.features.map((f, j) => (
+   580→                  <li key={j} className="flex items-start gap-2 text-xs sm:text-sm"><CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" /><span>{lang === 'en' ? f.en : f.ar}</span></li>
+   581→                ))}</ul>
+   582→                <div className="flex gap-2 w-full mt-6">
+   583→                  <Button className={`flex-1 ${p.popular ? 'bg-violet-600 hover:bg-violet-700 text-white' : ''}`} variant={p.popular ? 'default' : 'outline'} onClick={() => setDetailPlan(p)}>{t.view}</Button>
+   584→                  <ActionBtn icon={Edit} label={t.edit} onClick={() => openEdit(p)} />
+   585→                  <ActionBtn icon={Trash2} onClick={() => setDlg({ type: 'delete', plan: p })} danger />
+   586→                </div>
+   587→              </CardContent>
+   588→            </Card>
+   589→          </motion.div>
+   590→        ))}
+   591→      </div>
+   592→
+   593→      {/* Detail Dialog */}
+   594→      <Dialog open={!!detailPlan} onOpenChange={() => setDetailPlan(null)}>
+   595→        <DialogContent className="max-w-sm" dir={isRTL ? 'rtl' : 'ltr'}><DialogHeader><DialogTitle>{t.planDetails}</DialogTitle><DialogDescription className="sr-only">{lang === 'ar' ? 'تفاصيل الباقة' : 'Plan details'}</DialogDescription></DialogHeader>
+   596→          {detailPlan && <div className="space-y-4 pt-2">
+   597→            <div className="text-center"><p className="text-3xl font-extrabold">{detailPlan.price > 0 ? `${detailPlan.price} ${sym}` : t.free}</p><p className="text-sm text-muted-foreground mt-1">{t.monthly} · {detailPlan.tenants} {t.tenants}</p></div>
+   598→            <Separator />
+   599→            <ul className="space-y-2">{detailPlan.features.map((f, i) => (<li key={i} className="flex items-center gap-2 text-sm"><CheckCircle2 className="h-4 w-4 text-emerald-500" />{lang === 'en' ? f.en : f.ar}</li>))}</ul>
+
+[showing lines 200-599 of 1775; use offset=600 with limit to continue reading]
