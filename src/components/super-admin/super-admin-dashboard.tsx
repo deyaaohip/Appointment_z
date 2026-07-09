@@ -876,7 +876,9 @@ function BillingPage() {
             <div className="flex items-center justify-between pt-2 border-t">
               <span className="font-bold text-sm">{inv.amount.toLocaleString()} <span className="text-xs font-normal text-muted-foreground">{sym}</span></span>
               <div className="flex gap-1">
+                <ActionBtn icon={Eye} onClick={() => setPreviewInv(inv)} />
                 {inv.status !== 'paid' && <ActionBtn icon={CheckCircle2} onClick={() => handleMarkPaid(inv)} />}
+                {inv.status === 'paid' && <ActionBtn icon={RefreshCw} label={t.invoiceRefund} onClick={() => handleStatusChange(inv.id, 'refunded')} />}
                 <ActionBtn icon={Download} onClick={() => handleExportExcel()} />
                 <ActionBtn icon={Trash2} onClick={() => handleDeleteInvoice(inv)} danger />
               </div>
@@ -941,12 +943,15 @@ function BillingPage() {
 function RolesPage() {
   const { t, lang, isRTL } = useSA()
   const [roles, setRoles] = useState<RbacRole[]>(INIT_RBAC_ROLES)
-  const [templates] = useState<PermissionTemplate[]>(INIT_RBAC_TEMPLATES)
-  const [dlg, setDlg] = useState<{ type: 'add' | 'edit' | 'delete' | 'matrix' | 'clone_src' | 'details'; role?: RbacRole } | null>(null)
+  const [templates, setTemplates] = useState<PermissionTemplate[]>(INIT_RBAC_TEMPLATES)
+  const [dlg, setDlg] = useState<{ type: 'add' | 'edit' | 'delete' | 'matrix' | 'clone_src' | 'details' | 'policy' | 'save_tpl'; role?: RbacRole } | null>(null)
   const [form, setForm] = useState({ name: '', nameEn: '', desc: '', descEn: '', parentId: null as string | null, permissions: {} as Record<string, string[]> })
   const [tplDlg, setTplDlg] = useState(false)
   const [viewTab, setViewTab] = useState<'roles' | 'matrix' | 'templates' | 'api' | 'buttons' | 'jwt' | 'visibility' | 'policies'>('roles')
   const [detailRole, setDetailRole] = useState<RbacRole | null>(null)
+  const [policyForm, setPolicyForm] = useState({ name: '', nameEn: '', effect: 'deny' as 'allow' | 'deny', module: '*' as string, action: '*' as string, condition: '', conditionAr: '', conditionEn: '', priority: 1 })
+  const [editingPolicyId, setEditingPolicyId] = useState<string | null>(null)
+  const [saveTplForm, setSaveTplForm] = useState({ name: '', nameEn: '', desc: '', descEn: '' })
 
   const rName = (r: RbacRole) => lang === 'en' ? r.nameEn : r.name
   const rDesc = (r: RbacRole) => lang === 'en' ? r.descriptionEn : r.description
@@ -997,6 +1002,77 @@ function RolesPage() {
     const perms = applyTemplate(tpl)
     setForm(p => ({ ...p, permissions: perms }))
     setTplDlg(false); toast.success(t.rbacTemplateApplied)
+  }
+
+  // Policy management
+  const openAddPolicy = () => {
+    setEditingPolicyId(null)
+    setPolicyForm({ name: '', nameEn: '', effect: 'deny', module: '*', action: '*', condition: '', conditionAr: '', conditionEn: '', priority: 1 })
+    setDlg({ type: 'policy', role: detailRole || undefined })
+  }
+
+  const openEditPolicy = (policy: RbacPolicy) => {
+    setEditingPolicyId(policy.id)
+    setPolicyForm({ name: policy.name, nameEn: policy.nameEn, effect: policy.effect, module: policy.module, action: policy.action, condition: policy.condition || '', conditionAr: policy.conditionAr || '', conditionEn: policy.conditionEn || '', priority: policy.priority })
+    setDlg({ type: 'policy', role: detailRole || undefined })
+  }
+
+  const handleSavePolicy = () => {
+    if (!policyForm.name.trim() || !dlg?.role) return
+    const newPolicy: RbacPolicy = {
+      id: editingPolicyId || `p-${Date.now()}`,
+      name: policyForm.name,
+      nameEn: policyForm.nameEn,
+      effect: policyForm.effect,
+      module: policyForm.module,
+      action: policyForm.action,
+      condition: policyForm.condition || undefined,
+      conditionAr: policyForm.conditionAr || undefined,
+      conditionEn: policyForm.conditionEn || undefined,
+      priority: policyForm.priority,
+    }
+    setRoles(p => p.map(r => {
+      if (r.id !== dlg.role!.id) return r
+      const policies = [...(r.policies || [])]
+      if (editingPolicyId) {
+        const idx = policies.findIndex(pp => pp.id === editingPolicyId)
+        if (idx >= 0) policies[idx] = newPolicy
+      } else {
+        policies.push(newPolicy)
+      }
+      return { ...r, policies }
+    }))
+    toast.success(editingPolicyId ? t.rbacPolicyUpdated : t.rbacPolicyCreated)
+    setDlg(null)
+    // Refresh detailRole
+    setRoles(p => p)
+  }
+
+  const handleDeletePolicy = (policyId: string) => {
+    if (!detailRole) return
+    setRoles(p => p.map(r => r.id === detailRole.id ? { ...r, policies: (r.policies || []).filter(pp => pp.id !== policyId) } : r))
+    toast.success(t.rbacPolicyDeleted)
+  }
+
+  // Save as Template
+  const openSaveTemplate = () => {
+    setSaveTplForm({ name: '', nameEn: '', desc: '', descEn: '' })
+    setDlg({ type: 'save_tpl', role: detailRole || undefined })
+  }
+
+  const handleSaveTemplate = () => {
+    if (!saveTplForm.name.trim() || !dlg?.role) return
+    const newTpl: PermissionTemplate = {
+      id: `tpl-${Date.now()}`,
+      name: saveTplForm.name,
+      nameEn: saveTplForm.nameEn,
+      description: saveTplForm.desc,
+      descriptionEn: saveTplForm.descEn,
+      permissions: cloneRolePermissions(dlg.role),
+    }
+    setTemplates(p => [...p, newTpl])
+    toast.success(t.rbacTemplateSaved)
+    setDlg(null)
   }
 
   const permCount = (r: RbacRole) => countPermissions(r.permissions)
@@ -1106,22 +1182,28 @@ function RolesPage() {
         </Card>
       )}
 
-      {/* Templates View */}
+      {/* Templates View — Default + Custom */}
       {viewTab === 'templates' && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {templates.map((tpl, i) => (
-            <motion.div key={tpl.id} variants={fade} initial="hidden" animate="visible" transition={{ delay: i * 0.04 }}>
-              <Card className="group transition-all hover:shadow-lg border-0 shadow-sm cursor-pointer" onClick={() => handleApplyTemplate(tpl)}>
-                <CardContent className="p-5 text-center">
-                  <div className="h-12 w-12 rounded-2xl bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center mx-auto mb-3"><Shield className="h-6 w-6 text-violet-600" /></div>
-                  <h3 className="font-bold text-sm">{lang === 'ar' ? tpl.name : tpl.nameEn}</h3>
-                  <p className="text-xs text-muted-foreground mt-1 mb-3">{lang === 'ar' ? tpl.description : tpl.descriptionEn}</p>
-                  <Badge variant="secondary" className="text-[10px]">{countPermissions(tpl.permissions)} {t.rbacPermissions}</Badge>
-                  <p className="text-[10px] text-violet-600 mt-3 group-hover:underline">{t.rbacApplyTemplate}</p>
-                </CardContent>
-              </Card>
-            </motion.div>
-          ))}
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {templates.map((tpl, i) => {
+              const isCustom = !INIT_RBAC_TEMPLATES.some(t => t.id === tpl.id)
+              return (
+                <motion.div key={tpl.id} variants={fade} initial="hidden" animate="visible" transition={{ delay: i * 0.04 }}>
+                  <Card className="group transition-all hover:shadow-lg border-0 shadow-sm cursor-pointer" onClick={() => { setViewTab('roles'); setDlg({ type: 'add' }); handleApplyTemplate(tpl) }}>
+                    <CardContent className="p-5 text-center">
+                      <div className="h-12 w-12 rounded-2xl bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center mx-auto mb-3"><Shield className="h-6 w-6 text-violet-600" /></div>
+                      <h3 className="font-bold text-sm">{lang === 'ar' ? tpl.name : tpl.nameEn}</h3>
+                      <p className="text-xs text-muted-foreground mt-1 mb-3">{lang === 'ar' ? tpl.description : tpl.descriptionEn}</p>
+                      <Badge variant="secondary" className="text-[10px]">{countPermissions(tpl.permissions)} {t.rbacPermissions}</Badge>
+                      {isCustom && <Badge variant="outline" className="text-[9px] ms-1">{lang === 'ar' ? 'مخصص' : 'Custom'}</Badge>}
+                      <p className="text-[10px] text-violet-600 mt-3 group-hover:underline">{t.rbacApplyTemplate}</p>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              )
+            })}
+          </div>
         </div>
       )}
 
@@ -1345,17 +1427,21 @@ function RolesPage() {
         </Card>
       )}
 
-      {/* Policies View */}
+      {/* Policies View — Interactive Management */}
       {viewTab === 'policies' && (
         <Card className="border-0 shadow-sm overflow-hidden">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold">{lang === 'ar' ? 'سياسات التحكم بالوصول' : 'Access Control Policies'}</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-semibold">{lang === 'ar' ? 'سياسات التحكم بالوصول' : 'Access Control Policies'}</CardTitle>
+              {detailRole && <Button size="sm" className="gap-1.5 h-8 text-xs bg-violet-600 hover:bg-violet-700 text-white" onClick={openAddPolicy}><Plus className="h-3.5 w-3.5" />{t.rbacAddPolicy}</Button>}
+            </div>
           </CardHeader>
           <CardContent>
             <div className="flex gap-2 mb-4 flex-wrap">
               {roles.map(r => (
                 <Button key={r.id} size="sm" variant={detailRole?.id === r.id ? 'default' : 'outline'} className="text-xs rounded-full px-3" onClick={() => setDetailRole(r)}>
                   {rName(r)}
+                  {(r.policies || []).length > 0 && <Badge variant="secondary" className="ms-1.5 text-[9px] px-1.5 h-4">{r.policies!.length}</Badge>}
                 </Button>
               ))}
             </div>
@@ -1363,8 +1449,9 @@ function RolesPage() {
               (detailRole.policies || []).length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
                   <Shield className="h-10 w-10 mx-auto mb-3 opacity-20" />
-                  <p className="text-sm">{lang === 'ar' ? 'لا توجد سياسات لهذا الدور' : 'No policies for this role'}</p>
+                  <p className="text-sm">{t.rbacNoPolicies}</p>
                   <p className="text-xs mt-1">{lang === 'ar' ? 'جميع الصلاحيات مسموحة حسب المصفوفة' : 'All permissions allowed per matrix'}</p>
+                  <Button size="sm" variant="outline" className="mt-4 gap-1.5 text-xs" onClick={openAddPolicy}><Plus className="h-3.5 w-3.5" />{t.rbacAddPolicy}</Button>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -1382,13 +1469,17 @@ function RolesPage() {
                             <Badge variant="outline" className="text-[10px]">P{policy.priority}</Badge>
                           </div>
                           <p className="text-xs text-muted-foreground">
-                            {policy.module === '*' ? (lang === 'ar' ? 'جميع الوحدات' : 'All modules') : (modLabel ? (lang === 'ar' ? modLabel.labelAr : modLabel.labelEn) : policy.module)}
+                            {policy.module === '*' ? t.rbacPolicyAllModules : (modLabel ? (lang === 'ar' ? modLabel.labelAr : modLabel.labelEn) : policy.module)}
                             {' → '}
-                            {policy.action === '*' ? (lang === 'ar' ? 'جميع الإجراءات' : 'All actions') : policy.action}
+                            {policy.action === '*' ? t.rbacPolicyAllActions : policy.action}
                             {policy.condition && (
                               <><br /><span className="font-mono text-[11px]" dir="ltr">{lang === 'ar' ? (policy.conditionAr || policy.condition) : (policy.conditionEn || policy.condition)}</span></>
                             )}
                           </p>
+                        </div>
+                        <div className="flex gap-1 shrink-0">
+                          <ActionBtn icon={Edit} onClick={() => openEditPolicy(policy)} />
+                          <ActionBtn icon={Trash2} onClick={() => handleDeletePolicy(policy.id)} danger />
                         </div>
                       </div>
                     )
@@ -1475,6 +1566,11 @@ function RolesPage() {
               </div>
             </div>
             <DlgFooter onCancel={() => setDetailRole(null)} onConfirm={() => { openEdit(detailRole); setDetailRole(null) }} confirmLabel={t.edit} />
+            <div className="flex justify-center pt-2">
+              <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={() => { openSaveTemplate() }}>
+                <Copy className="h-3.5 w-3.5" />{t.rbacSaveAsTemplate}
+              </Button>
+            </div>
           </DialogContent>
         </Dialog>
       )}
@@ -1612,7 +1708,69 @@ function RolesPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirm */}
+      {/* Policy Add/Edit Dialog */}
+      <Dialog open={dlg?.type === 'policy'} onOpenChange={() => setDlg(null)}>
+        <DialogContent className="max-w-md" dir={isRTL ? 'rtl' : 'ltr'}>
+          <DialogHeader><DialogTitle>{editingPolicyId ? t.rbacEditPolicy : t.rbacAddPolicy}</DialogTitle><DialogDescription className="sr-only">{lang === 'ar' ? 'إدارة السياسات' : 'Policy management'}</DialogDescription></DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="grid grid-cols-2 gap-3">
+              <FormField label={t.rbacPolicyName}><Input value={policyForm.name} onChange={e => setPolicyForm(p => ({ ...p, name: e.target.value }))} /></FormField>
+              <FormField label={t.rbacPolicyName + ' (EN)'}><Input value={policyForm.nameEn} onChange={e => setPolicyForm(p => ({ ...p, nameEn: e.target.value }))} dir="ltr" /></FormField>
+            </div>
+            <FormField label={t.rbacPolicyEffect}>
+              <Select value={policyForm.effect} onValueChange={v => setPolicyForm(p => ({ ...p, effect: v as 'allow' | 'deny' }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="deny"><span className="text-red-600">DENY — {lang === 'ar' ? 'رفض' : 'Reject'}</span></SelectItem>
+                  <SelectItem value="allow"><span className="text-emerald-600">ALLOW — {lang === 'ar' ? 'سماح' : 'Permit'}</span></SelectItem>
+                </SelectContent>
+              </Select>
+            </FormField>
+            <div className="grid grid-cols-2 gap-3">
+              <FormField label={t.rbacPolicyModule}>
+                <Select value={policyForm.module} onValueChange={v => setPolicyForm(p => ({ ...p, module: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="*">{t.rbacPolicyAllModules}</SelectItem>
+                    {SYSTEM_MODULES.map(m => <SelectItem key={m.key} value={m.key}>{lang === 'ar' ? m.labelAr : m.labelEn}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </FormField>
+              <FormField label={t.rbacPolicyAction}>
+                <Select value={policyForm.action} onValueChange={v => setPolicyForm(p => ({ ...p, action: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="*">{t.rbacPolicyAllActions}</SelectItem>
+                    {PERMISSION_ACTIONS.map(a => <SelectItem key={a.key} value={a.key}>{lang === 'ar' ? a.labelAr : a.labelEn}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </FormField>
+            </div>
+            <FormField label={t.rbacPolicyPriority}><Input type="number" min={1} max={99} value={policyForm.priority} onChange={e => setPolicyForm(p => ({ ...p, priority: Number(e.target.value) }))} /></FormField>
+            <FormField label={t.rbacPolicyCondition}><Input value={policyForm.condition} onChange={e => setPolicyForm(p => ({ ...p, condition: e.target.value }))} placeholder='e.g. tenant.status === "active"' dir="ltr" /></FormField>
+          </div>
+          <DlgFooter onCancel={() => setDlg(null)} onConfirm={handleSavePolicy} confirmLabel={t.save} />
+        </DialogContent>
+      </Dialog>
+
+      {/* Save as Template Dialog */}
+      <Dialog open={dlg?.type === 'save_tpl'} onOpenChange={() => setDlg(null)}>
+        <DialogContent className="max-w-md" dir={isRTL ? 'rtl' : 'ltr'}>
+          <DialogHeader><DialogTitle>{t.rbacSaveAsTemplate}</DialogTitle><DialogDescription className="sr-only">{lang === 'ar' ? 'حفظ الصلاحيات كقالب' : 'Save permissions as template'}</DialogDescription></DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="grid grid-cols-2 gap-3">
+              <FormField label={t.rbacTemplateName}><Input value={saveTplForm.name} onChange={e => setSaveTplForm(p => ({ ...p, name: e.target.value }))} /></FormField>
+              <FormField label={t.rbacTemplateName + ' (EN)'}><Input value={saveTplForm.nameEn} onChange={e => setSaveTplForm(p => ({ ...p, nameEn: e.target.value }))} dir="ltr" /></FormField>
+            </div>
+            <FormField label={t.rbacTemplateDesc}><Textarea value={saveTplForm.desc} onChange={e => setSaveTplForm(p => ({ ...p, desc: e.target.value }))} rows={2} /></FormField>
+            <div className="rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
+              {lang === 'ar' ? 'سيتم حفظ صلاحيات الدور الحالية كقالب جديد يمكن تطبيقه على أي دور آخر' : 'Current role permissions will be saved as a new template applicable to any role'}
+            </div>
+          </div>
+          <DlgFooter onCancel={() => setDlg(null)} onConfirm={handleSaveTemplate} confirmLabel={t.save} />
+        </DialogContent>
+      </Dialog>
+
       <ConfirmDialog open={dlg?.type === 'delete'} onOpenChange={() => setDlg(null)} title={t.delete} desc={t.confirmDeleteRole.replace('{name}', dlg?.role ? rName(dlg.role) : '')} onConfirm={handleDelete} danger />
     </div>
   )

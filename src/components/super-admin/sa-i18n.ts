@@ -495,6 +495,31 @@ interface T {
   rbacPermissionCount: string
   rbacUserCount: string
   rbacDescription: string
+  rbacAddPolicy: string
+  rbacEditPolicy: string
+  rbacDeletePolicy: string
+  rbacPolicyName: string
+  rbacPolicyEffect: string
+  rbacPolicyModule: string
+  rbacPolicyAction: string
+  rbacPolicyCondition: string
+  rbacPolicyPriority: string
+  rbacPolicyAllModules: string
+  rbacPolicyAllActions: string
+  rbacPolicyCreated: string
+  rbacPolicyUpdated: string
+  rbacPolicyDeleted: string
+  rbacNoPolicies: string
+  rbacSaveAsTemplate: string
+  rbacTemplateName: string
+  rbacTemplateDesc: string
+  rbacTemplateSaved: string
+  rbacSimulationMode: string
+  rbacSimulateRole: string
+  rbacExitSimulation: string
+  rbac403Message: string
+  rbacEnforcePermissions: string
+  rbacEffectivePermsCalc: string
 }
 
 const ar: T = {
@@ -959,6 +984,31 @@ const ar: T = {
   rbacPermissionCount: 'عدد الصلاحيات',
   rbacUserCount: 'عدد المستخدمين',
   rbacDescription: 'الوصف',
+  rbacAddPolicy: 'إضافة سياسة',
+  rbacEditPolicy: 'تعديل السياسة',
+  rbacDeletePolicy: 'حذف السياسة',
+  rbacPolicyName: 'اسم السياسة',
+  rbacPolicyEffect: 'التأثير',
+  rbacPolicyModule: 'الوحدة',
+  rbacPolicyAction: 'الإجراء',
+  rbacPolicyCondition: 'الشرط',
+  rbacPolicyPriority: 'الأولوية',
+  rbacPolicyAllModules: 'جميع الوحدات',
+  rbacPolicyAllActions: 'جميع الإجراءات',
+  rbacPolicyCreated: 'تم إنشاء السياسة',
+  rbacPolicyUpdated: 'تم تحديث السياسة',
+  rbacPolicyDeleted: 'تم حذف السياسة',
+  rbacNoPolicies: 'لا توجد سياسات مخصصة',
+  rbacSaveAsTemplate: 'حفظ كقالب',
+  rbacTemplateName: 'اسم القالب',
+  rbacTemplateDesc: 'وصف القالب',
+  rbacTemplateSaved: 'تم حفظ القالب بنجاح',
+  rbacSimulationMode: 'وضع المحاكاة',
+  rbacSimulateRole: 'محاكاة دور',
+  rbacExitSimulation: 'إنهاء المحاكاة',
+  rbac403Message: 'غير مصرح - 403 Forbidden',
+  rbacEnforcePermissions: 'تفعيل التفويض',
+  rbacEffectivePermsCalc: 'حساب الصلاحيات الفعالة',
 }
 
 const en: T = {
@@ -1401,6 +1451,31 @@ const en: T = {
   rbacPermissionCount: 'Permission Count',
   rbacUserCount: 'User Count',
   rbacDescription: 'Description',
+  rbacAddPolicy: 'Add Policy',
+  rbacEditPolicy: 'Edit Policy',
+  rbacDeletePolicy: 'Delete Policy',
+  rbacPolicyName: 'Policy Name',
+  rbacPolicyEffect: 'Effect',
+  rbacPolicyModule: 'Module',
+  rbacPolicyAction: 'Action',
+  rbacPolicyCondition: 'Condition',
+  rbacPolicyPriority: 'Priority',
+  rbacPolicyAllModules: 'All Modules',
+  rbacPolicyAllActions: 'All Actions',
+  rbacPolicyCreated: 'Policy created',
+  rbacPolicyUpdated: 'Policy updated',
+  rbacPolicyDeleted: 'Policy deleted',
+  rbacNoPolicies: 'No custom policies',
+  rbacSaveAsTemplate: 'Save as Template',
+  rbacTemplateName: 'Template Name',
+  rbacTemplateDesc: 'Template Description',
+  rbacTemplateSaved: 'Template saved successfully',
+  rbacSimulationMode: 'Simulation Mode',
+  rbacSimulateRole: 'Simulate Role',
+  rbacExitSimulation: 'Exit Simulation',
+  rbac403Message: 'Unauthorized - 403 Forbidden',
+  rbacEnforcePermissions: 'Enforce Permissions',
+  rbacEffectivePermsCalc: 'Effective Permissions Calculator',
 }
 
 const translations: Record<Lang, T> = { ar, en }

@@ -1,0 +1,669 @@
+     1→// ─── Enterprise RBAC Data System ────────────────────────────────
+     2→
+     3→// ─── API Endpoints per module ──────────────────────────────────
+     4→export const API_ENDPOINTS: Record<string, { method: string; path: string; labelAr: string; labelEn: string }[]> = {
+     5→  tenants: [
+     6→    { method: 'GET', path: '/api/tenants', labelAr: 'قائمة المستأجرين', labelEn: 'List Tenants' },
+     7→    { method: 'POST', path: '/api/tenants', labelAr: 'إنشاء مستأجر', labelEn: 'Create Tenant' },
+     8→    { method: 'GET', path: '/api/tenants/:id', labelAr: 'تفاصيل المستأجر', labelEn: 'Get Tenant' },
+     9→    { method: 'PUT', path: '/api/tenants/:id', labelAr: 'تعديل المستأجر', labelEn: 'Update Tenant' },
+    10→    { method: 'DELETE', path: '/api/tenants/:id', labelAr: 'حذف المستأجر', labelEn: 'Delete Tenant' },
+    11→    { method: 'POST', path: '/api/tenants/:id/suspend', labelAr: 'تعليق المستأجر', labelEn: 'Suspend Tenant' },
+    12→    { method: 'POST', path: '/api/tenants/:id/activate', labelAr: 'تفعيل المستأجر', labelEn: 'Activate Tenant' },
+    13→  ],
+    14→  users: [
+    15→    { method: 'GET', path: '/api/users', labelAr: 'قائمة المستخدمين', labelEn: 'List Users' },
+    16→    { method: 'POST', path: '/api/users', labelAr: 'إنشاء مستخدم', labelEn: 'Create User' },
+    17→    { method: 'PUT', path: '/api/users/:id', labelAr: 'تعديل مستخدم', labelEn: 'Update User' },
+    18→    { method: 'DELETE', path: '/api/users/:id', labelAr: 'حذف مستخدم', labelEn: 'Delete User' },
+    19→    { method: 'POST', path: '/api/users/:id/suspend', labelAr: 'تعليق مستخدم', labelEn: 'Suspend User' },
+    20→    { method: 'GET', path: '/api/users/export', labelAr: 'تصدير المستخدمين', labelEn: 'Export Users' },
+    21→  ],
+    22→  plans: [
+    23→    { method: 'GET', path: '/api/plans', labelAr: 'قائمة الباقات', labelEn: 'List Plans' },
+    24→    { method: 'POST', path: '/api/plans', labelAr: 'إنشاء باقة', labelEn: 'Create Plan' },
+    25→    { method: 'PUT', path: '/api/plans/:id', labelAr: 'تعديل باقة', labelEn: 'Update Plan' },
+    26→    { method: 'DELETE', path: '/api/plans/:id', labelAr: 'حذف باقة', labelEn: 'Delete Plan' },
+    27→  ],
+    28→  billing: [
+    29→    { method: 'GET', path: '/api/invoices', labelAr: 'قائمة الفواتير', labelEn: 'List Invoices' },
+    30→    { method: 'POST', path: '/api/invoices', labelAr: 'إنشاء فاتورة', labelEn: 'Create Invoice' },
+    31→    { method: 'GET', path: '/api/invoices/:id', labelAr: 'تفاصيل الفاتورة', labelEn: 'Get Invoice' },
+    32→    { method: 'POST', path: '/api/invoices/:id/pay', labelAr: 'دفع فاتورة', labelEn: 'Pay Invoice' },
+    33→    { method: 'POST', path: '/api/invoices/:id/refund', labelAr: 'إرجاع فاتورة', labelEn: 'Refund Invoice' },
+    34→    { method: 'GET', path: '/api/invoices/export', labelAr: 'تصدير الفواتير', labelEn: 'Export Invoices' },
+    35→  ],
+    36→  roles: [
+    37→    { method: 'GET', path: '/api/roles', labelAr: 'قائمة الأدوار', labelEn: 'List Roles' },
+    38→    { method: 'POST', path: '/api/roles', labelAr: 'إنشاء دور', labelEn: 'Create Role' },
+    39→    { method: 'PUT', path: '/api/roles/:id', labelAr: 'تعديل دور', labelEn: 'Update Role' },
+    40→    { method: 'DELETE', path: '/api/roles/:id', labelAr: 'حذف دور', labelEn: 'Delete Role' },
+    41→    { method: 'POST', path: '/api/roles/:id/clone', labelAr: 'نسخ دور', labelEn: 'Clone Role' },
+    42→  ],
+    43→  audit: [
+    44→    { method: 'GET', path: '/api/audit-logs', labelAr: 'سجل العمليات', labelEn: 'Audit Logs' },
+    45→    { method: 'GET', path: '/api/audit-logs/export', labelAr: 'تصدير السجل', labelEn: 'Export Logs' },
+    46→  ],
+    47→  notifications: [
+    48→    { method: 'GET', path: '/api/notifications/templates', labelAr: 'قوالب الإشعارات', labelEn: 'Notification Templates' },
+    49→    { method: 'POST', path: '/api/notifications/send', labelAr: 'إرسال إشعار', labelEn: 'Send Notification' },
+    50→    { method: 'PUT', path: '/api/notifications/templates/:id', labelAr: 'تعديل قالب', labelEn: 'Update Template' },
+    51→  ],
+    52→  reports: [
+    53→    { method: 'GET', path: '/api/reports', labelAr: 'قائمة التقارير', labelEn: 'List Reports' },
+    54→    { method: 'POST', path: '/api/reports/:id/generate', labelAr: 'توليد تقرير', labelEn: 'Generate Report' },
+    55→    { method: 'GET', path: '/api/reports/:id/download', labelAr: 'تحميل تقرير', labelEn: 'Download Report' },
+    56→  ],
+    57→  system: [
+    58→    { method: 'GET', path: '/api/system/health', labelAr: 'صحة النظام', labelEn: 'System Health' },
+    59→    { method: 'POST', path: '/api/system/refresh', labelAr: 'تحديث النظام', labelEn: 'Refresh System' },
+    60→  ],
+    61→  servers: [
+    62→    { method: 'GET', path: '/api/servers', labelAr: 'قائمة الخوادم', labelEn: 'List Servers' },
+    63→    { method: 'POST', path: '/api/servers', labelAr: 'إضافة خادم', labelEn: 'Add Server' },
+    64→    { method: 'POST', path: '/api/servers/:id/restart', labelAr: 'إعادة تشغيل', labelEn: 'Restart Server' },
+    65→    { method: 'DELETE', path: '/api/servers/:id', labelAr: 'حذف خادم', labelEn: 'Delete Server' },
+    66→  ],
+    67→  database: [
+    68→    { method: 'GET', path: '/api/database/status', labelAr: 'حالة قاعدة البيانات', labelEn: 'DB Status' },
+    69→    { method: 'POST', path: '/api/database/backup', labelAr: 'نسخ احتياطي', labelEn: 'Create Backup' },
+    70→    { method: 'GET', path: '/api/database/backups', labelAr: 'قائمة النسخ', labelEn: 'List Backups' },
+    71→  ],
+    72→  security: [
+    73→    { method: 'GET', path: '/api/security/settings', labelAr: 'إعدادات الأمان', labelEn: 'Security Settings' },
+    74→    { method: 'PUT', path: '/api/security/settings', labelAr: 'تعديل إعدادات الأمان', labelEn: 'Update Security' },
+    75→    { method: 'GET', path: '/api/security/attempts', labelAr: 'محاولات الدخول', labelEn: 'Login Attempts' },
+    76→  ],
+    77→  cliq: [
+    78→    { method: 'GET', path: '/api/cliq/payments', labelAr: 'مدفوعات CLIQ', labelEn: 'CLIQ Payments' },
+    79→    { method: 'POST', path: '/api/cliq/payments/:id/approve', labelAr: 'موافقة الدفع', labelEn: 'Approve Payment' },
+    80→    { method: 'POST', path: '/api/cliq/payments/:id/reject', labelAr: 'رفض الدفع', labelEn: 'Reject Payment' },
+    81→    { method: 'GET', path: '/api/cliq/config', labelAr: 'إعدادات CLIQ', labelEn: 'CLIQ Config' },
+    82→    { method: 'PUT', path: '/api/cliq/config', labelAr: 'تعديل إعدادات CLIQ', labelEn: 'Update CLIQ Config' },
+    83→  ],
+    84→}
+    85→
+    86→// ─── UI Buttons per module ──────────────────────────────────────
+    87→export const UI_BUTTONS: Record<string, { key: string; labelAr: string; labelEn: string; requiredAction: string }[]> = {
+    88→  tenants: [
+    89→    { key: 'btn_add', labelAr: 'إضافة مستأجر', labelEn: 'Add Tenant', requiredAction: 'create' },
+    90→    { key: 'btn_edit', labelAr: 'تعديل', labelEn: 'Edit', requiredAction: 'edit' },
+    91→    { key: 'btn_delete', labelAr: 'حذف', labelEn: 'Delete', requiredAction: 'delete' },
+    92→    { key: 'btn_suspend', labelAr: 'تعليق', labelEn: 'Suspend', requiredAction: 'edit' },
+    93→    { key: 'btn_extend', labelAr: 'تمديد اشتراك', labelEn: 'Extend', requiredAction: 'edit' },
+    94→    { key: 'btn_export', labelAr: 'تصدير Excel', labelEn: 'Export Excel', requiredAction: 'export' },
+    95→  ],
+    96→  users: [
+    97→    { key: 'btn_add', labelAr: 'إضافة مستخدم', labelEn: 'Add User', requiredAction: 'create' },
+    98→    { key: 'btn_edit', labelAr: 'تعديل', labelEn: 'Edit', requiredAction: 'edit' },
+    99→    { key: 'btn_delete', labelAr: 'حذف', labelEn: 'Delete', requiredAction: 'delete' },
+   100→    { key: 'btn_toggle', labelAr: 'تعليق/تفعيل', labelEn: 'Toggle Status', requiredAction: 'edit' },
+   101→    { key: 'btn_export', labelAr: 'تصدير', labelEn: 'Export', requiredAction: 'export' },
+   102→  ],
+   103→  billing: [
+   104→    { key: 'btn_create', labelAr: 'إنشاء فاتورة', labelEn: 'Create Invoice', requiredAction: 'create' },
+   105→    { key: 'btn_view', labelAr: 'عرض', labelEn: 'View', requiredAction: 'view' },
+   106→    { key: 'btn_mark_paid', labelAr: 'تحديد كمدفوع', labelEn: 'Mark Paid', requiredAction: 'approve' },
+   107→    { key: 'btn_refund', labelAr: 'إرجاع', labelEn: 'Refund', requiredAction: 'reject' },
+   108→    { key: 'btn_export', labelAr: 'تصدير Excel', labelEn: 'Export Excel', requiredAction: 'export' },
+   109→    { key: 'btn_print', labelAr: 'طباعة', labelEn: 'Print', requiredAction: 'print' },
+   110→    { key: 'btn_send_email', labelAr: 'إرسال بالبريد', labelEn: 'Send Email', requiredAction: 'view' },
+   111→    { key: 'btn_download_pdf', labelAr: 'تحميل PDF', labelEn: 'Download PDF', requiredAction: 'export' },
+   112→  ],
+   113→  plans: [
+   114→    { key: 'btn_add', labelAr: 'إنشاء باقة', labelEn: 'Create Plan', requiredAction: 'create' },
+   115→    { key: 'btn_edit', labelAr: 'تعديل', labelEn: 'Edit', requiredAction: 'edit' },
+   116→    { key: 'btn_delete', labelAr: 'حذف', labelEn: 'Delete', requiredAction: 'delete' },
+   117→  ],
+   118→  roles: [
+   119→    { key: 'btn_add', labelAr: 'إضافة دور', labelEn: 'Add Role', requiredAction: 'create' },
+   120→    { key: 'btn_edit', labelAr: 'تعديل', labelEn: 'Edit', requiredAction: 'edit' },
+   121→    { key: 'btn_delete', labelAr: 'حذف', labelEn: 'Delete', requiredAction: 'delete' },
+   122→    { key: 'btn_clone', labelAr: 'نسخ', labelEn: 'Clone', requiredAction: 'create' },
+   123→    { key: 'btn_matrix', labelAr: 'عرض المصفوفة', labelEn: 'View Matrix', requiredAction: 'view' },
+   124→  ],
+   125→  audit: [
+   126→    { key: 'btn_export', labelAr: 'تصدير السجل', labelEn: 'Export Logs', requiredAction: 'export' },
+   127→  ],
+   128→  cliq: [
+   129→    { key: 'btn_approve', labelAr: 'موافقة', labelEn: 'Approve', requiredAction: 'approve' },
+   130→    { key: 'btn_reject', labelAr: 'رفض', labelEn: 'Reject', requiredAction: 'reject' },
+   131→    { key: 'btn_request_info', labelAr: 'طلب معلومات', labelEn: 'Request Info', requiredAction: 'edit' },
+   132→    { key: 'btn_new_payment', labelAr: 'تسجيل دفع جديد', labelEn: 'New Payment', requiredAction: 'create' },
+   133→  ],
+   134→}
+   135→
+   136→// ─── Page visibility mapping (module -> sidebar view ID) ───────
+   137→export const PAGE_VISIBILITY_MAP: Record<string, string[]> = {
+   138→  tenants: ['sa_tenants'],
+   139→  users: ['sa_users'],
+   140→  plans: ['sa_plans'],
+   141→  billing: ['sa_billing'],
+   142→  roles: ['sa_roles'],
+   143→  audit: ['sa_audit'],
+   144→  notifications: ['sa_notifications'],
+   145→  reports: ['sa_reports'],
+   146→  system: ['sa_system'],
+   147→  servers: ['sa_servers'],
+   148→  database: ['sa_database'],
+   149→  security: ['sa_security'],
+   150→  cliq: ['sa_cliq'],
+   151→}
+   152→
+   153→// ─── System Modules ────────────────────────────────────────────
+   154→export const SYSTEM_MODULES = [
+   155→  { key: 'tenants', labelAr: 'المستأجرين', labelEn: 'Tenants', icon: 'Building2' },
+   156→  { key: 'users', labelAr: 'المستخدمين', labelEn: 'Users', icon: 'Users' },
+   157→  { key: 'plans', labelAr: 'الباقات', labelEn: 'Plans', icon: 'CreditCard' },
+   158→  { key: 'billing', labelAr: 'الفواتير', labelEn: 'Billing', icon: 'FileText' },
+   159→  { key: 'roles', labelAr: 'الأدوار والصلاحيات', labelEn: 'Roles & Permissions', icon: 'Shield' },
+   160→  { key: 'audit', labelAr: 'سجل العمليات', labelEn: 'Audit Log', icon: 'ClipboardCheck' },
+   161→  { key: 'notifications', labelAr: 'الإشعارات', labelEn: 'Notifications', icon: 'Bell' },
+   162→  { key: 'reports', labelAr: 'التقارير', labelEn: 'Reports', icon: 'BarChart3' },
+   163→  { key: 'system', labelAr: 'النظام', labelEn: 'System', icon: 'Settings' },
+   164→  { key: 'servers', labelAr: 'الخوادم', labelEn: 'Servers', icon: 'Server' },
+   165→  { key: 'database', labelAr: 'قاعدة البيانات', labelEn: 'Database', icon: 'Database' },
+   166→  { key: 'security', labelAr: 'الأمان', labelEn: 'Security', icon: 'Lock' },
+   167→  { key: 'cliq', labelAr: 'CLIQ المدفوعات', labelEn: 'CLIQ Payments', icon: 'Wallet' },
+   168→] as const
+   169→
+   170→export type ModuleKey = typeof SYSTEM_MODULES[number]['key']
+   171→
+   172→// ─── Permission Actions ────────────────────────────────────────
+   173→export const PERMISSION_ACTIONS = [
+   174→  { key: 'view', labelAr: 'عرض', labelEn: 'View' },
+   175→  { key: 'create', labelAr: 'إنشاء', labelEn: 'Create' },
+   176→  { key: 'edit', labelAr: 'تعديل', labelEn: 'Edit' },
+   177→  { key: 'delete', labelAr: 'حذف', labelEn: 'Delete' },
+   178→  { key: 'export', labelAr: 'تصدير', labelEn: 'Export' },
+   179→  { key: 'import', labelAr: 'استيراد', labelEn: 'Import' },
+   180→  { key: 'print', labelAr: 'طباعة', labelEn: 'Print' },
+   181→  { key: 'approve', labelAr: 'موافقة', labelEn: 'Approve' },
+   182→  { key: 'reject', labelAr: 'رفض', labelEn: 'Reject' },
+   183→  { key: 'restore', labelAr: 'استعادة', labelEn: 'Restore' },
+   184→  { key: 'archive', labelAr: 'أرشفة', labelEn: 'Archive' },
+   185→] as const
+   186→
+   187→export type ActionKey = typeof PERMISSION_ACTIONS[number]['key']
+   188→
+   189→// ─── RbacRole Interface ────────────────────────────────────────
+   190→export interface RbacRole {
+   191→  id: string
+   192→  name: string
+   193→  nameEn: string
+   194→  description: string
+   195→  descriptionEn: string
+   196→  userCount: number
+   197→  isSystem: boolean
+   198→  parentId: string | null
+   199→  permissions: Record<string, string[]> // module key -> action keys
+   200→  createdAt: string
+   201→  // Enhanced RBAC fields
+   202→  claims: RbacClaim[]
+   203→  policies: RbacPolicy[]
+   204→  hiddenPages: string[] // sidebar view IDs this role cannot see
+   205→}
+   206→
+   207→// ─── Claims (JWT-like) ─────────────────────────────────────────
+   208→export interface RbacClaim {
+   209→  key: string       // e.g. 'role', 'tenant_id', 'plan', 'max_users'
+   210→  value: string     // e.g. 'super_admin', 'tenant-1', 'enterprise', '100'
+   211→  type: 'role' | 'tenant' | 'plan' | 'limit' | 'custom'
+   212→  labelAr: string
+   213→  labelEn: string
+   214→}
+   215→
+   216→// ─── Policy (deny/allow rules) ─────────────────────────────────
+   217→export interface RbacPolicy {
+   218→  id: string
+   219→  name: string
+   220→  nameEn: string
+   221→  effect: 'allow' | 'deny'
+   222→  module: string       // module key or '*'
+   223→  action: string      // action key or '*'
+   224→  condition?: string  // e.g. 'tenant.status === "active"'
+   225→  conditionAr?: string
+   226→  conditionEn?: string
+   227→  priority: number     // lower = higher priority
+   228→}
+   229→
+   230→// ─── Permission Template ───────────────────────────────────────
+   231→export interface PermissionTemplate {
+   232→  id: string
+   233→  name: string
+   234→  nameEn: string
+   235→  description: string
+   236→  descriptionEn: string
+   237→  permissions: Record<string, string[]>
+   238→}
+   239→
+   240→// ─── Helper: All actions for a module ──────────────────────────
+   241→function allActions(): string[] {
+   242→  return PERMISSION_ACTIONS.map(a => a.key)
+   243→}
+   244→
+   245→// ─── Default Role Permissions ──────────────────────────────────
+   246→function superAdminPerms(): Record<string, string[]> {
+   247→  const p: Record<string, string[]> = {}
+   248→  SYSTEM_MODULES.forEach(m => { p[m.key] = allActions() })
+   249→  return p
+   250→}
+   251→
+   252→function tenantOwnerPerms(): Record<string, string[]> {
+   253→  return {
+   254→    tenants: ['view', 'edit', 'export', 'print'],
+   255→    users: ['view', 'create', 'edit', 'delete', 'export', 'print'],
+   256→    plans: ['view'],
+   257→    billing: ['view', 'create', 'export', 'print'],
+   258→    roles: ['view'],
+   259→    audit: ['view', 'export'],
+   260→    notifications: ['view'],
+   261→    reports: ['view', 'export', 'print'],
+   262→    system: ['view'],
+   263→    servers: [],
+   264→    database: [],
+   265→    security: ['view'],
+   266→    cliq: ['view'],
+   267→  }
+   268→}
+   269→
+   270→function branchManagerPerms(): Record<string, string[]> {
+   271→  return {
+   272→    tenants: ['view'],
+   273→    users: ['view', 'create', 'edit', 'export'],
+   274→    plans: ['view'],
+   275→    billing: ['view', 'export', 'print'],
+   276→    roles: ['view'],
+   277→    audit: ['view'],
+   278→    notifications: ['view'],
+   279→    reports: ['view', 'export'],
+   280→    system: [],
+   281→    servers: [],
+   282→    database: [],
+   283→    security: [],
+   284→    cliq: ['view'],
+   285→  }
+   286→}
+   287→
+   288→function receptionistPerms(): Record<string, string[]> {
+   289→  return {
+   290→    tenants: ['view'],
+   291→    users: ['view'],
+   292→    plans: ['view'],
+   293→    billing: ['view', 'print'],
+   294→    roles: [],
+   295→    audit: [],
+   296→    notifications: ['view'],
+   297→    reports: ['view'],
+   298→    system: [],
+   299→    servers: [],
+   300→    database: [],
+   301→    security: [],
+   302→    cliq: [],
+   303→  }
+   304→}
+   305→
+   306→function accountantPerms(): Record<string, string[]> {
+   307→  return {
+   308→    tenants: ['view'],
+   309→    users: ['view'],
+   310→    plans: ['view'],
+   311→    billing: ['view', 'create', 'edit', 'export', 'print', 'approve', 'reject'],
+   312→    roles: [],
+   313→    audit: ['view', 'export'],
+   314→    notifications: ['view'],
+   315→    reports: ['view', 'export', 'print'],
+   316→    system: [],
+   317→    servers: [],
+   318→    database: [],
+   319→    security: ['view'],
+   320→    cliq: ['view', 'approve', 'reject'],
+   321→  }
+   322→}
+   323→
+   324→// ─── Method-to-action mapping for API auth ──────────────────────
+   325→export const METHOD_ACTION_MAP: Record<string, string> = {
+   326→  GET: 'view', POST: 'create', PUT: 'edit', PATCH: 'edit', DELETE: 'delete',
+   327→}
+   328→
+   329→/** Check if an API endpoint is authorized for a role */
+   330→export function isApiAuthorized(role: RbacRole, method: string, path: string): { authorized: boolean; reason: string } {
+   331→  // Find which module this endpoint belongs to
+   332→  for (const [mod, endpoints] of Object.entries(API_ENDPOINTS)) {
+   333→    const match = endpoints.find(e => e.path === path && e.method === method)
+   334→    if (match) {
+   335→      // Check policies first (deny rules take priority)
+   336→      for (const policy of (role.policies || []).sort((a, b) => a.priority - b.priority)) {
+   337→        if (policy.module === '*' || policy.module === mod) {
+   338→          if (policy.action === '*' || policy.action === METHOD_ACTION_MAP[method]) {
+   339→            if (policy.effect === 'deny') {
+   340→              return { authorized: false, reason: policy.nameEn || policy.name }
+   341→            }
+   342→          }
+   343→        }
+   344→      }
+   345→      // Check permissions
+   346→      const required = METHOD_ACTION_MAP[method] || 'view'
+   347→      const allowed = role.permissions[mod] || []
+   348→      if (allowed.includes(required)) {
+   349→        return { authorized: true, reason: '' }
+   350→      }
+   351→      return { authorized: false, reason: `Missing '${required}' on module '${mod}'` }
+   352→    }
+   353→  }
+   354→  // Endpoint not in registry — allow by default for Super Admin
+   355→  return { authorized: true, reason: '' }
+   356→}
+   357→
+   358→/** Check button visibility for a role */
+   359→export function isButtonVisible(role: RbacRole, module: string, buttonKey: string): boolean {
+   360→  const buttons = UI_BUTTONS[module] || []
+   361→  const btn = buttons.find(b => b.key === buttonKey)
+   362→  if (!btn) return true // unknown button — show by default
+   363→  return (role.permissions[module] || []).includes(btn.requiredAction)
+   364→}
+   365→
+   366→/** Get hidden pages for a role */
+   367→export function getHiddenPages(role: RbacRole, allRoles: RbacRole[]): string[] {
+   368→  const effective = getEffectivePermissions(role, allRoles)
+   369→  const hidden: string[] = []
+   370→  SYSTEM_MODULES.forEach(m => {
+   371→    const perms = effective[m.key] || []
+   372→    if (!perms.includes('view')) {
+   373→      const pages = PAGE_VISIBILITY_MAP[m.key] || []
+   374→      hidden.push(...pages)
+   375→    }
+   376→  })
+   377→  // Add explicitly hidden pages
+   378→  if (role.hiddenPages) hidden.push(...role.hiddenPages)
+   379→  return [...new Set(hidden)]
+   380→}
+   381→
+   382→/** Generate mock JWT claims payload for a role */
+   383→export function generateJwtClaims(role: RbacRole): Record<string, string> {
+   384→  const claims: Record<string, string> = {
+   385→    sub: role.id,
+   386→    role: role.nameEn.toLowerCase().replace(/\s+/g, '_'),
+   387→    name: role.nameEn,
+   388→    nameAr: role.name,
+   389→    iss: 'bookflow-sa',
+   390→    aud: 'bookflow-platform',
+   391→    iat: Math.floor(Date.now() / 1000).toString(),
+   392→    exp: Math.floor(Date.now() / 1000 + 86400).toString(),
+   393→  }
+   394→  // Add custom claims from role
+   395→  ;(role.claims || []).forEach(c => { claims[c.key] = c.value })
+   396→  // Add permissions as compact claim
+   397→  const permsStr = Object.entries(role.permissions)
+   398→    .filter(([, actions]) => actions.length > 0)
+   399→    .map(([mod, actions]) => `${mod}:${actions.join(',')}`)
+   400→    .join(';')
+   401→  claims.permissions = permsStr
+   402→  return claims
+   403→}
+   404→
+   405→/** Simulate a 403 response for unauthorized API access */
+   406→export function simulate403(endpoint: string, method: string, role: RbacRole): { status: number; body: { error: string; message: string; required: string } } | null {
+   407→  const { authorized, reason } = isApiAuthorized(role, method, endpoint)
+   408→  if (!authorized) {
+   409→    return {
+   410→      status: 403,
+   411→      body: {
+   412→        error: 'Forbidden',
+   413→        message: reason,
+   414→        required: `${method} ${endpoint}`,
+   415→      },
+   416→    }
+   417→  }
+   418→  return null
+   419→}
+   420→
+   421→// ─── Initial Roles (with Claims, Policies, hiddenPages) ────────
+   422→export const INIT_RBAC_ROLES: RbacRole[] = [
+   423→  {
+   424→    id: 'rbac-1', name: 'مدير النظام', nameEn: 'Super Admin',
+   425→    description: 'صلاحيات كاملة على جميع وحدات المنصة بدون استثناء',
+   426→    descriptionEn: 'Full access to all platform modules without exception',
+   427→    userCount: 1, isSystem: true, parentId: null,
+   428→    permissions: superAdminPerms(), createdAt: '2025-01-01',
+   429→    claims: [
+   430→      { key: 'role', value: 'super_admin', type: 'role', labelAr: 'الدور', labelEn: 'Role' },
+   431→      { key: 'scope', value: 'platform', type: 'custom', labelAr: 'النطاق', labelEn: 'Scope' },
+   432→      { key: 'access_level', value: 'full', type: 'custom', labelAr: 'مستوى الوصول', labelEn: 'Access Level' },
+   433→    ],
+   434→    policies: [],
+   435→    hiddenPages: [],
+   436→  },
+   437→  {
+   438→    id: 'rbac-2', name: 'مالك المستأجر', nameEn: 'Tenant Owner',
+   439→    description: 'صلاحيات كاملة على المستأجر مع وصول محدود للوحدات النظامية',
+   440→    descriptionEn: 'Full tenant access with limited system module access',
+   441→    userCount: 8, isSystem: true, parentId: 'rbac-1',
+   442→    permissions: tenantOwnerPerms(), createdAt: '2025-01-01',
+   443→    claims: [
+   444→      { key: 'role', value: 'tenant_owner', type: 'role', labelAr: 'الدور', labelEn: 'Role' },
+   445→      { key: 'scope', value: 'tenant', type: 'tenant', labelAr: 'النطاق', labelEn: 'Scope' },
+   446→      { key: 'max_users', value: '100', type: 'limit', labelAr: 'الحد الأقصى للمستخدمين', labelEn: 'Max Users' },
+   447→    ],
+   448→    policies: [
+   449→      { id: 'p-1', name: 'منع حذف النظام', nameEn: 'Deny System Delete', effect: 'deny', module: 'system', action: 'delete', priority: 1 },
+   450→    ],
+   451→    hiddenPages: ['sa_servers', 'sa_database'],
+   452→  },
+   453→  {
+   454→    id: 'rbac-3', name: 'مدير الفرع', nameEn: 'Branch Manager',
+   455→    description: 'إدارة الفرع والموظفين مع صلاحيات محدودة',
+   456→    descriptionEn: 'Branch and employee management with limited permissions',
+   457→    userCount: 15, isSystem: true, parentId: 'rbac-2',
+   458→    permissions: branchManagerPerms(), createdAt: '2025-01-01',
+   459→    claims: [
+   460→      { key: 'role', value: 'branch_manager', type: 'role', labelAr: 'الدور', labelEn: 'Role' },
+   461→      { key: 'scope', value: 'branch', type: 'tenant', labelAr: 'النطاق', labelEn: 'Scope' },
+   462→      { key: 'max_users', value: '25', type: 'limit', labelAr: 'الحد الأقصى للمستخدمين', labelEn: 'Max Users' },
+   463→    ],
+   464→    policies: [
+   465→      { id: 'p-2', name: 'منع حذف المستأجر', nameEn: 'Deny Tenant Delete', effect: 'deny', module: 'tenants', action: 'delete', priority: 1 },
+   466→      { id: 'p-3', name: 'منع تعديل الفواتير', nameEn: 'Deny Invoice Edit', effect: 'deny', module: 'billing', action: 'edit', priority: 1 },
+   467→    ],
+   468→    hiddenPages: ['sa_system', 'sa_servers', 'sa_database', 'sa_security', 'sa_roles', 'sa_audit'],
+   469→  },
+   470→  {
+   471→    id: 'rbac-4', name: 'موظف استقبال', nameEn: 'Receptionist',
+   472→    description: 'عرض الحجوزات والعملاء فقط',
+   473→    descriptionEn: 'View bookings and customers only',
+   474→    userCount: 42, isSystem: true, parentId: null,
+   475→    permissions: receptionistPerms(), createdAt: '2025-01-01',
+   476→    claims: [
+   477→      { key: 'role', value: 'receptionist', type: 'role', labelAr: 'الدور', labelEn: 'Role' },
+   478→      { key: 'scope', value: 'branch', type: 'tenant', labelAr: 'النطاق', labelEn: 'Scope' },
+   479→    ],
+   480→    policies: [
+   481→      { id: 'p-4', name: 'منع إنشاء الفواتير', nameEn: 'Deny Invoice Create', effect: 'deny', module: 'billing', action: 'create', priority: 1 },
+   482→    ],
+   483→    hiddenPages: ['sa_system', 'sa_servers', 'sa_database', 'sa_security', 'sa_roles', 'sa_audit', 'sa_cliq', 'sa_reports'],
+   484→  },
+   485→  {
+   486→    id: 'rbac-5', name: 'محاسب', nameEn: 'Accountant',
+   487→    description: 'عرض التقارير والفواتير مع إمكانية الموافقة على المدفوعات',
+   488→    descriptionEn: 'Reports and invoices access with payment approval',
+   489→    userCount: 6, isSystem: true, parentId: null,
+   490→    permissions: accountantPerms(), createdAt: '2025-01-01',
+   491→    claims: [
+   492→      { key: 'role', value: 'accountant', type: 'role', labelAr: 'الدور', labelEn: 'Role' },
+   493→      { key: 'scope', value: 'tenant', type: 'tenant', labelAr: 'النطاق', labelEn: 'Scope' },
+   494→      { key: 'can_approve_payments', value: 'true', type: 'custom', labelAr: 'يمكن الموافقة على المدفوعات', labelEn: 'Can Approve Payments' },
+   495→    ],
+   496→    policies: [
+   497→      { id: 'p-5', name: 'منع حذف المستخدمين', nameEn: 'Deny User Delete', effect: 'deny', module: 'users', action: 'delete', priority: 1 },
+   498→    ],
+   499→    hiddenPages: ['sa_system', 'sa_servers', 'sa_database', 'sa_security', 'sa_roles'],
+   500→  },
+   501→]
+   502→
+   503→// ─── Permission Templates ──────────────────────────────────────
+   504→export const INIT_RBAC_TEMPLATES: PermissionTemplate[] = [
+   505→  {
+   506→    id: 'tpl-1', name: 'قراءة فقط', nameEn: 'Read Only',
+   507→    description: 'صلاحيات العرض فقط لجميع الوحدات',
+   508→    descriptionEn: 'View-only permissions for all modules',
+   509→    permissions: Object.fromEntries(SYSTEM_MODULES.map(m => [m.key, ['view']])),
+   510→  },
+   511→  {
+   512→    id: 'tpl-2', name: 'مستخدم عادي', nameEn: 'Standard User',
+   513→    description: 'عرض وإنشاء وتعديل على الوحدات الأساسية',
+   514→    descriptionEn: 'View, create, edit on core modules',
+   515→    permissions: Object.fromEntries(SYSTEM_MODULES.map(m => {
+   516→      const core = ['tenants', 'users', 'plans', 'billing']
+   517→      return [m.key, core.includes(m.key) ? ['view', 'create', 'edit', 'export', 'print'] : ['view']]
+   518→    })),
+   519→  },
+   520→  {
+   521→    id: 'tpl-3', name: 'مدير', nameEn: 'Manager',
+   522→    description: 'صلاحيات إدارية شاملة مع الحذف',
+   523→    descriptionEn: 'Comprehensive management with delete',
+   524→    permissions: Object.fromEntries(SYSTEM_MODULES.map(m => {
+   525→      const excluded = ['system', 'servers', 'database', 'security']
+   526→      return [m.key, excluded.includes(m.key) ? ['view'] : ['view', 'create', 'edit', 'delete', 'export', 'print', 'approve', 'reject', 'archive']]
+   527→    })),
+   528→  },
+   529→  {
+   530→    id: 'tpl-4', name: 'صلاحيات كاملة', nameEn: 'Full Access',
+   531→    description: 'جميع الصلاحيات على جميع الوحدات',
+   532→    descriptionEn: 'All permissions on all modules',
+   533→    permissions: Object.fromEntries(SYSTEM_MODULES.map(m => [m.key, allActions()])),
+   534→  },
+   535→]
+   536→
+   537→// ─── Helper Functions ──────────────────────────────────────────
+   538→
+   539→/** Check if a role has a specific permission */
+   540→export function hasPermission(role: RbacRole, module: string, action: string): boolean {
+   541→  return role.permissions[module]?.includes(action) || false
+   542→}
+   543→
+   544→/** Get all permissions for a specific module */
+   545→export function getPermissionsForModule(role: RbacRole, module: string): string[] {
+   546→  return role.permissions[module] || []
+   547→}
+   548→
+   549→/** Deep clone role permissions */
+   550→export function cloneRolePermissions(role: RbacRole): Record<string, string[]> {
+   551→  const cloned: Record<string, string[]> = {}
+   552→  Object.entries(role.permissions).forEach(([mod, actions]) => {
+   553→    cloned[mod] = [...actions]
+   554→  })
+   555→  return cloned
+   556→}
+   557→
+   558→/** Get effective permissions including inherited from parent */
+   559→export function getEffectivePermissions(role: RbacRole, allRoles: RbacRole[]): Record<string, string[]> {
+   560→  const effective: Record<string, string[]> = {}
+   561→  const ownPerms = cloneRolePermissions(role)
+   562→
+   563→  // Start with parent permissions if exists
+   564→  if (role.parentId) {
+   565→    const parent = allRoles.find(r => r.id === role.parentId)
+   566→    if (parent) {
+   567→      const parentEffective = getEffectivePermissions(parent, allRoles)
+   568→      Object.entries(parentEffective).forEach(([mod, actions]) => {
+   569→        effective[mod] = [...actions]
+   570→      })
+   571→    }
+   572→  }
+   573→
+   574→  // Merge own permissions (own takes precedence)
+   575→  Object.entries(ownPerms).forEach(([mod, actions]) => {
+   576→    if (effective[mod]) {
+   577→      // Union of parent + own
+   578→      const combined = new Set([...effective[mod], ...actions])
+   579→      effective[mod] = Array.from(combined)
+   580→    } else {
+   581→      effective[mod] = [...actions]
+   582→    }
+   583→  })
+   584→
+   585→  // Ensure all modules exist in the result
+   586→  SYSTEM_MODULES.forEach(m => {
+   587→    if (!effective[m.key]) effective[m.key] = []
+   588→  })
+   589→
+   590→  return effective
+   591→}
+   592→
+   593→/** Get permissions that are inherited vs own */
+   594→export function getInheritedVsOwn(role: RbacRole, allRoles: RbacRole[]): {
+   595→  inherited: Record<string, string[]>
+   596→  own: Record<string, string[]>
+   597→} {
+   598→  const inherited: Record<string, string[]> = {}
+   599→  const own: Record<string, string[]> = {}
+   600→
+   601→  if (role.parentId) {
+   602→    const parent = allRoles.find(r => r.id === role.parentId)
+   603→    if (parent) {
+   604→      const parentEffective = getEffectivePermissions(parent, allRoles)
+   605→      Object.entries(parentEffective).forEach(([mod, actions]) => {
+   606→        inherited[mod] = [...actions]
+   607→      })
+   608→    }
+   609→  }
+   610→
+   611→  Object.entries(role.permissions).forEach(([mod, actions]) => {
+   612→    own[mod] = [...actions]
+   613→  })
+   614→
+   615→  return { inherited, own }
+   616→}
+   617→
+   618→/** Count total permissions for a role */
+   619→export function countPermissions(perms: Record<string, string[]>): number {
+   620→  return Object.values(perms).reduce((sum, actions) => sum + actions.length, 0)
+   621→}
+   622→
+   623→/** Build permission matrix for display */
+   624→export function getPermissionMatrix(roles: RbacRole[]): {
+   625→  module: typeof SYSTEM_MODULES[number]
+   626→  action: typeof PERMISSION_ACTIONS[number]
+   627→  roles: Record<string, boolean>
+   628→}[] {
+   629→  const matrix: { module: typeof SYSTEM_MODULES[number]; action: typeof PERMISSION_ACTIONS[number]; roles: Record<string, boolean> }[] = []
+   630→
+   631→  SYSTEM_MODULES.forEach(mod => {
+   632→    PERMISSION_ACTIONS.forEach(action => {
+   633→      const row: { module: typeof SYSTEM_MODULES[number]; action: typeof PERMISSION_ACTIONS[number]; roles: Record<string, boolean> } = {
+   634→        module: mod,
+   635→        action,
+   636→        roles: {},
+   637→      }
+   638→      roles.forEach(role => {
+   639→        row.roles[role.id] = hasPermission(role, mod.key, action.key)
+   640→      })
+   641→      matrix.push(row)
+   642→    })
+   643→  })
+   644→
+   645→  return matrix
+   646→}
+   647→
+   648→/** Toggle a permission for a role */
+   649→export function togglePermission(role: RbacRole, module: string, action: string): Record<string, string[]> {
+   650→  const perms = cloneRolePermissions(role)
+   651→  if (!perms[module]) perms[module] = []
+   652→
+   653→  if (perms[module].includes(action)) {
+   654→    perms[module] = perms[module].filter(a => a !== action)
+   655→  } else {
+   656→    perms[module].push(action)
+   657→  }
+   658→
+   659→  return perms
+   660→}
+   661→
+   662→/** Apply a template to a role */
+   663→export function applyTemplate(template: PermissionTemplate): Record<string, string[]> {
+   664→  const perms: Record<string, string[]> = {}
+   665→  Object.entries(template.permissions).forEach(([mod, actions]) => {
+   666→    perms[mod] = [...actions]
+   667→  })
+   668→  return perms
+   669→}

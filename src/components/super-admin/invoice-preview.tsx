@@ -335,7 +335,126 @@ export function InvoicePreviewDialog({
     printWin.document.close()
   }
 
-  const handleDownloadPDF = () => handlePrint()
+  const handleDownloadPDF = () => {
+    const content = printRef.current
+    if (!content) return
+    const printWin = window.open('', '_blank', 'width=800,height=600')
+    if (!printWin) {
+      toast.error(ar ? 'فشل فتح نافذة التحميل' : 'Failed to open download window')
+      return
+    }
+    const tenantName = isRTL ? invoice.tenant : (invoice.tenantEn || invoice.tenant)
+    const payLabel = invoice.paymentMethod
+      ? (invoice.paymentMethod === 'cliq'
+        ? (ar ? 'CLIQ تحويل' : 'CLIQ Transfer')
+        : invoice.paymentMethod === 'card'
+          ? (ar ? 'بطاقة ائتمان' : 'Credit Card')
+          : (ar ? 'تحويل بنكي' : 'Bank Transfer'))
+      : ''
+    printWin.document.write(`<!DOCTYPE html>
+<html dir="${isRTL ? 'rtl' : 'ltr'}"><head>
+<title>${ar ? 'فاتورة' : 'Invoice'} ${invoice.id}</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Inter',Segoe UI,Tahoma,sans-serif; padding:40px; color:#1a1a2e; background:#fff; }
+  .inv { max-width:720px; margin:0 auto; border:1px solid #e5e7eb; border-radius:16px; padding:36px; }
+  .hdr { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:28px; padding-bottom:20px; border-bottom:2px solid #7c3aed; }
+  .logo-area h1 { font-size:28px; font-weight:800; background:linear-gradient(135deg,#7c3aed,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent; }
+  .logo-area p { font-size:11px; color:#888; margin-top:2px; }
+  .inv-meta { text-align:right; }
+  .inv-meta .id { font-size:16px; font-weight:800; font-family:monospace; color:#7c3aed; }
+  .inv-meta .date { font-size:12px; color:#888; margin-top:4px; }
+  .two-col { display:grid; grid-template-columns:1fr 1fr; gap:28px; margin-bottom:24px; }
+  .col-title { font-size:10px; text-transform:uppercase; letter-spacing:0.8px; color:#888; margin-bottom:8px; font-weight:600; }
+  .col-line { font-size:13px; margin-bottom:4px; }
+  .col-line strong { font-weight:600; }
+  .col-line .muted { color:#888; font-size:12px; }
+  table.items { width:100%; border-collapse:collapse; margin:20px 0; }
+  table.items th { background:#f5f3ff; padding:10px 14px; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#555; border-bottom:2px solid #ddd6fe; text-align:${isRTL ? 'right' : 'left'}; }
+  table.items th.r, table.items td.r { text-align:right; }
+  table.items td { padding:12px 14px; font-size:13px; border-bottom:1px solid #f3f4f6; }
+  .totals { margin-left:auto; width:260px; }
+  .tot-row { display:flex; justify-content:space-between; padding:5px 0; font-size:13px; }
+  .tot-row .lbl { color:#888; }
+  .tot-row.grand { border-top:2px solid #7c3aed; padding-top:10px; margin-top:4px; font-size:18px; font-weight:800; color:#7c3aed; }
+  .pay-box { margin:20px 0; padding:14px; background:#f5f3ff; border-radius:10px; border:1px solid #ddd6fe; }
+  .pay-box .title { font-size:12px; font-weight:700; color:#7c3aed; margin-bottom:4px; }
+  .pay-box .val { font-size:13px; }
+  .qr-section { display:flex; align-items:center; gap:20px; margin:20px 0; padding:16px; background:#fafafa; border-radius:12px; border:1px solid #f0f0f0; }
+  .qr-section .info { font-size:11px; color:#888; line-height:1.6; }
+  .notes { margin:16px 0; padding:12px 14px; background:#fffbeb; border:1px solid #fde68a; border-radius:8px; font-size:12px; color:#92400e; }
+  .notes .title { font-weight:700; margin-bottom:4px; }
+  .ftr { margin-top:24px; padding-top:16px; border-top:1px solid #e5e7eb; text-align:center; font-size:11px; color:#aaa; line-height:1.8; }
+  @media print { body { padding:20px; } .inv { border:none; box-shadow:none; } }
+</style></head><body>
+<div class="inv">
+  <div class="hdr">
+    <div class="logo-area">
+      <h1>BookFlow</h1>
+      <p>${ar ? 'منصة الحجز الإلكتروني' : 'Electronic Booking Platform'}</p>
+      <p style="margin-top:6px;font-size:12px;color:#666;">
+        ${ar ? 'عمان، الأردن | support@bookflow.com | +962 7 9999 0000' : 'Amman, Jordan | support@bookflow.com | +962 7 9999 0000'}
+      </p>
+      <p style="font-size:12px;color:#666;">CLIQ: BOOKFLOWJO</p>
+    </div>
+    <div class="inv-meta">
+      <div class="id">${invoice.id}</div>
+      <div class="date">${ar ? 'تاريخ الإنشاء' : 'Date'}: ${invoice.date}</div>
+      <div class="date">${ar ? 'تاريخ الاستحقاق' : 'Due'}: ${invoice.dueDate}</div>
+    </div>
+  </div>
+  <div class="two-col">
+    <div>
+      <div class="col-title">${ar ? 'بيانات المستأجر' : 'Bill To'}</div>
+      <div class="col-line"><strong>${tenantName}</strong></div>
+      <div class="col-line"><span class="muted">${ar ? 'الباقة:' : 'Plan:'}</span> <strong>${invoice.plan}</strong></div>
+      <div class="col-line"><span class="muted">${ar ? 'العملة:' : 'Currency:'}</span> <strong>${invoice.currency}</strong></div>
+    </div>
+    <div>
+      <div class="col-title">${ar ? 'تفاصيل الفاتورة' : 'Invoice Details'}</div>
+      <div class="col-line"><span class="muted">${ar ? 'الرقم:' : 'No:'}</span> <strong>${invoice.id}</strong></div>
+      <div class="col-line"><span class="muted">${ar ? 'التاريخ:' : 'Date:'}</span> <strong>${invoice.date}</strong></div>
+      <div class="col-line"><span class="muted">${ar ? 'الاستحقاق:' : 'Due:'}</span> <strong>${invoice.dueDate}</strong></div>
+      ${invoice.paidDate ? `<div class="col-line"><span class="muted">${ar ? 'المدفوع:' : 'Paid:'}</span> <strong>${invoice.paidDate}</strong></div>` : ''}
+    </div>
+  </div>
+  <table class="items">
+    <thead><tr>
+      <th>${ar ? 'البند' : 'Item'}</th>
+      <th>${ar ? 'الكمية' : 'Qty'}</th>
+      <th class="r">${ar ? 'سعر الوحدة' : 'Unit Price'}</th>
+      <th class="r">${ar ? 'الإجمالي' : 'Total'}</th>
+    </tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>${ar ? `اشتراك ${invoice.plan}` : `${invoice.plan} Subscription`}</strong><br/><span style="font-size:11px;color:#888">${ar ? 'شهري' : 'Monthly'}</span></td>
+        <td>1</td>
+        <td class="r">${fmtAmount(subtotal)}</td>
+        <td class="r" style="font-weight:600">${fmtAmount(subtotal)}</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="totals">
+    <div class="tot-row"><span class="lbl">${ar ? 'المجموع الفرعي' : 'Subtotal'}</span><span>${fmtAmount(subtotal)}</span></div>
+    <div class="tot-row"><span class="lbl">${ar ? `الضريبة (${invoice.taxRate}%)` : `Tax (${invoice.taxRate}%)`}</span><span>${fmtAmount(taxAmount)}</span></div>
+    <div class="tot-row grand"><span>${ar ? 'الإجمالي شامل الضريبة' : 'Total incl. Tax'}</span><span>${fmtAmount(total)}</span></div>
+  </div>
+  ${payLabel ? `<div class="pay-box"><div class="title">${ar ? 'طريقة الدفع' : 'Payment Method'}</div><div class="val">${payLabel}${refNumber ? ` — ${refNumber}` : ''}${invoice.paidDate ? ` | ${ar ? 'تاريخ الدفع' : 'Paid'}: ${invoice.paidDate}` : ''}</div></div>` : ''}
+  ${invoice.notes ? `<div class="notes"><div class="title">${ar ? 'ملاحظات' : 'Notes'}</div>${invoice.notes}</div>` : ''}
+  <div class="ftr">
+    ${ar ? 'شكراً لاستخدامكم منصة BookFlow' : 'Thank you for using BookFlow Platform'}<br/>
+    bookflow.com | support@bookflow.com
+  </div>
+</div>
+<script>
+  // Auto-download as PDF using print dialog (Ctrl+P / Cmd+P)
+  setTimeout(function(){ window.print(); }, 300);
+</script>
+</body></html>`)
+    printWin.document.close()
+    toast.success(ar ? `جاري تحميل ${invoice.id} كـ PDF` : `Downloading ${invoice.id} as PDF`)
+  }
 
   const handleSendEmail = async () => {
     setSending(true)

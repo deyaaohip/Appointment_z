@@ -1,0 +1,602 @@
+   724→function BillingPage() {
+   725→  const { t, lang, isRTL } = useSA()
+   726→  const { fmt, sym } = useCurrency()
+   727→  const [invoices, setInvoices] = useState<Invoice[]>([...INVOICES])
+   728→  const [filter, setFilter] = useState('all')
+   729→  const [page, setPage] = useState(1)
+   730→  const [sort, setSort] = useState<SortState>({ key: 'date', dir: 'desc' })
+   731→  const [addOpen, setAddOpen] = useState(false)
+   732→  const [invForm, setInvForm] = useState({ tenant: '', tenantEn: '', plan: 'Starter', amount: 0, status: 'pending' as string })
+   733→  const [previewInv, setPreviewInv] = useState<Invoice | null>(null)
+   734→
+   735→  const filtered = useMemo(() => {
+   736→    let list = filter === 'all' ? [...invoices] : invoices.filter(i => i.status === filter)
+   737→    return genericSort(list, sort.key, sort.dir, lang)
+   738→  }, [invoices, filter, sort, lang])
+   739→  const { items, totalPages } = paginate(filtered, page, PER_PAGE)
+   740→  const handleSort = (key: string) => setSort(p => p.key === key ? { key, dir: p.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' })
+   741→  const totalPaid = invoices.filter(i => i.status === 'paid').reduce((s, i) => s + i.amount, 0)
+   742→  const totalPending = invoices.filter(i => i.status === 'pending' || i.status === 'overdue').reduce((s, i) => s + i.amount, 0)
+   743→
+   744→  const handleStatusChange = useCallback((invoiceId: string, newStatus: string, method?: string) => {
+   745→    setInvoices(p => p.map(i => {
+   746→      if (i.id !== invoiceId) return i
+   747→      const updated = { ...i, status: newStatus }
+   748→      if (newStatus === 'paid') {
+   749→        updated.paidDate = new Date().toISOString().split('T')[0]
+   750→        updated.paymentMethod = method || 'cliq'
+   751→        updated.history = [...(i.history || []), {
+   752→          date: new Date().toISOString(), action: 'دفعة ناجحة', actionEn: 'Payment received',
+   753→          details: `تم الدفع عبر ${method === 'card' ? 'بطاقة ائتمان' : method === 'bank_transfer' ? 'تحويل بنكي' : 'CLIQ'}`,
+   754→          detailsEn: `Paid via ${method === 'card' ? 'credit card' : method === 'bank_transfer' ? 'bank transfer' : 'CLIQ'}`,
+   755→          by: 'Super Admin',
+   756→        }]
+   757→      } else if (newStatus === 'refunded') {
+   758→        updated.history = [...(i.history || []), {
+   759→          date: new Date().toISOString(), action: 'إرجاع', actionEn: 'Refunded',
+   760→          details: 'تم إرجاع مبلغ الفاتورة', detailsEn: 'Invoice amount refunded', by: 'Super Admin',
+   761→        }]
+   762→      }
+   763→      return updated
+   764→    }))
+   765→    toast.success(t.invoiceStatusChanged)
+   766→  }, [])
+   767→
+   768→  const handleMarkPaid = (inv: Invoice) => { handleStatusChange(inv.id, 'paid') }
+   769→
+   770→  const handleCreateInvoice = () => {
+   771→    if (!invForm.tenant.trim()) { toast.error(isRTL ? 'يرجى اختيار المستأجر' : 'Please select a tenant'); return }
+   772→    if (invForm.amount <= 0) { toast.error(isRTL ? 'يرجى إدخال مبلغ صحيح' : 'Please enter a valid amount'); return }
+   773→    const newId = `INV-${String(invoices.length + 1).padStart(3, '0')}`
+   774→    const today = new Date().toISOString().split('T')[0]
+   775→    const dueDate = new Date(); dueDate.setDate(dueDate.getDate() + 30)
+   776→    const inv: Invoice = {
+   777→      id: newId, tenant: invForm.tenant, tenantEn: invForm.tenantEn,
+   778→      amount: invForm.amount, status: invForm.status,
+   779→      date: today, dueDate: dueDate.toISOString().split('T')[0], paidDate: null,
+   780→      plan: invForm.plan, currency: 'JOD', taxRate: 16, notes: '', paymentMethod: '',
+   781→      history: [{ date: new Date().toISOString(), action: 'إنشاء الفاتورة', actionEn: 'Invoice created', details: `فاتورة اشتراك ${invForm.plan}`, detailsEn: `${invForm.plan} subscription invoice`, by: 'Super Admin' }],
+   782→    }
+   783→    setInvoices(p => [inv, ...p]); toast.success(isRTL ? `تم إنشاء الفاتورة ${newId}` : `Invoice ${newId} created`); setAddOpen(false)
+   784→    setInvForm({ tenant: '', tenantEn: '', plan: 'Starter', amount: 0, status: 'pending' })
+   785→  }
+   786→
+   787→  const handleExportExcel = useCallback(() => {
+   788→    import('xlsx').then(XLSX => {
+   789→      const statusLabels: Record<string, string> = { paid: isRTL ? 'مدفوع' : 'Paid', pending: isRTL ? 'معلق' : 'Pending', overdue: isRTL ? 'متأخر' : 'Overdue', failed: isRTL ? 'فاشل' : 'Failed' }
+   790→      const headers = isRTL
+   791→        ? ['رقم الفاتورة', 'المستأجر', 'الباقة', 'المبلغ (د.أ)', 'العملة', 'الحالة', 'التاريخ']
+   792→        : ['Invoice No.', 'Tenant', 'Plan', 'Amount (JOD)', 'Currency', 'Status', 'Date']
+   793→      const rows = filtered.map(inv => [
+   794→        inv.id, isRTL ? inv.tenant : (inv.tenantEn || inv.tenant), inv.plan,
+   795→        inv.amount, inv.currency, statusLabels[inv.status] || inv.status, inv.date,
+   796→      ])
+   797→      const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
+   798→      ws['!cols'] = headers.map(() => ({ wch: 20 }))
+   799→      const wb = XLSX.utils.book_new()
+   800→      XLSX.utils.book_append_sheet(wb, ws, isRTL ? 'الفواتير' : 'Invoices')
+   801→      XLSX.writeFile(wb, `invoices_${new Date().toISOString().split('T')[0]}.xlsx`)
+   802→      toast.success(isRTL ? 'تم تصدير الفواتير إلى Excel بنجاح' : 'Invoices exported to Excel successfully')
+   803→    }).catch(() => {
+   804→      toast.error(isRTL ? 'فشل تصدير Excel' : 'Excel export failed')
+   805→    })
+   806→  }, [filtered, isRTL])
+   807→
+   808→  const handleDeleteInvoice = (inv: Invoice) => {
+   809→    setInvoices(p => p.filter(i => i.id !== inv.id)); toast.success(t.deleted); setPage(1)
+   810→  }
+   811→
+   812→  return (
+   813→    <div className="space-y-5">
+   814→      <PageTitle title={t.billingTitle} action={
+   815→        <div className="flex gap-2">
+   816→          <Button variant="outline" className="gap-2 h-9" onClick={handleExportExcel}><Download className="h-4 w-4" />{t.exportExcel}</Button>
+   817→          <PrimaryBtn icon={Plus} label={t.createInvoice} onClick={() => setAddOpen(true)} />
+   818→        </div>
+   819→      } />
+   820→      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+   821→        <StatCard icon={CheckCircle2} label={t.payments} value={fmt(totalPaid)} color="text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30" />
+   822→        <StatCard icon={Clock} label={t.pending} value={fmt(totalPending)} color="text-amber-600 bg-amber-50 dark:bg-amber-950/30" />
+   823→        <StatCard icon={Banknote} label={t.paid} value={`${invoices.filter(i => i.status === 'paid').length}`} color="text-sky-600 bg-sky-50 dark:bg-sky-950/30" />
+   824→        <StatCard icon={AlertTriangle} label={t.overdue} value={`${invoices.filter(i => i.status === 'overdue').length}`} color="text-red-600 bg-red-50 dark:bg-red-950/30" />
+   825→      </div>
+   826→      <div className="flex gap-3">
+   827→        <Select value={filter} onValueChange={v => { setFilter(v); setPage(1) }}>
+   828→          <SelectTrigger className="w-44 h-10"><SelectValue /></SelectTrigger>
+   829→          <SelectContent><SelectItem value="all">{t.all}</SelectItem><SelectItem value="paid">{t.paid}</SelectItem><SelectItem value="pending">{t.pending}</SelectItem><SelectItem value="overdue">{t.overdue}</SelectItem><SelectItem value="failed">{t.failed}</SelectItem></SelectContent>
+   830→        </Select>
+   831→      </div>
+   832→
+   833→      <Card className="border-0 shadow-sm overflow-hidden hidden md:block">
+   834→        <div className="overflow-x-auto">
+   835→          <Table><TableHeader><TableRow className="bg-muted/50 hover:bg-muted/50">
+   836→            <SortableTH label={t.invoiceNo} sortKey="id" currentSort={sort} onSort={handleSort} className="ps-5" />
+   837→            <SortableTH label={t.tenant} sortKey="tenant" currentSort={sort} onSort={handleSort} />
+   838→            <SortableTH label={t.plan} sortKey="plan" currentSort={sort} onSort={handleSort} className="hidden lg:table-cell" />
+   839→            <SortableTH label={t.amount} sortKey="amount" currentSort={sort} onSort={handleSort} align="end" />
+   840→            <SortableTH label={t.status} sortKey="status" currentSort={sort} onSort={handleSort} />
+   841→            <TableHead className="pe-5 font-semibold text-xs uppercase tracking-wider text-end">{t.actions}</TableHead>
+   842→          </TableRow></TableHeader>
+   843→          <TableBody>
+   844→            {items.length === 0 ? <EmptyRow colSpan={6} /> : items.map(inv => (
+   845→            <TableRow key={inv.id} className="group hover:bg-muted/20 transition-colors">
+   846→              <TableCell className="ps-5 font-mono text-sm font-semibold">{inv.id}</TableCell>
+   847→              <TableCell className="px-3 text-sm">{invTenant(inv, lang)}</TableCell>
+   848→              <TableCell className="px-3 hidden lg:table-cell"><Badge variant="secondary" className="text-xs">{inv.plan}</Badge></TableCell>
+   849→              <TableCell className="px-3 text-end font-semibold tabular-nums text-sm">{inv.amount.toLocaleString()} <span className="text-xs font-normal text-muted-foreground">{sym}</span></TableCell>
+   850→              <TableCell className="px-3"><StatusBadge status={inv.status} locale={lang} /></TableCell>
+   851→              <TableCell className="pe-5">
+   852→                <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+   853→                  <ActionBtn icon={Eye} label={t.view} onClick={() => setPreviewInv(inv)} />
+   854→                  {inv.status === 'pending' && <ActionBtn icon={CheckCircle2} label={t.invoiceMarkPaid} onClick={() => handleStatusChange(inv.id, 'paid')} />}
+   855→                  {inv.status === 'overdue' && <ActionBtn icon={AlertTriangle} onClick={() => { handleStatusChange(inv.id, 'pending'); toast.success(t.invoiceSendReminderDesc) }} />}
+   856→                  {inv.status === 'paid' && <ActionBtn icon={RefreshCw} label={t.invoiceRefund} onClick={() => handleStatusChange(inv.id, 'refunded')} />}
+   857→                  <ActionBtn icon={Download} onClick={handleExportExcel} />
+   858→                  <ActionBtn icon={Trash2} onClick={() => handleDeleteInvoice(inv)} danger />
+   859→                </div>
+   860→              </TableCell>
+   861→            </TableRow>
+   862→          ))}
+   863→          </TableBody></Table>
+   864→        </div>
+   865→        <TableFooter current={items.length} total={filtered.length} entity={isRTL ? 'فاتورة' : 'invoices'} />
+   866→        <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+   867→      </Card>
+   868→
+   869→      <div className="md:hidden space-y-3">
+   870→        {items.length === 0 ? <Card className="border-0 shadow-sm"><CardContent className="py-16 text-center text-muted-foreground text-sm">{t.noResults}</CardContent></Card> : items.map(inv => (
+   871→          <Card key={inv.id} className="border-0 shadow-sm"><CardContent className="p-4">
+   872→            <div className="flex items-start justify-between gap-3 mb-3">
+   873→              <div className="min-w-0"><p className="font-mono text-sm font-bold">{inv.id}</p><p className="text-xs text-muted-foreground mt-0.5">{invTenant(inv, lang)}</p></div>
+   874→              <StatusBadge status={inv.status} locale={lang} />
+   875→            </div>
+   876→            <div className="flex items-center justify-between pt-2 border-t">
+   877→              <span className="font-bold text-sm">{inv.amount.toLocaleString()} <span className="text-xs font-normal text-muted-foreground">{sym}</span></span>
+   878→              <div className="flex gap-1">
+   879→                {inv.status !== 'paid' && <ActionBtn icon={CheckCircle2} onClick={() => handleMarkPaid(inv)} />}
+   880→                <ActionBtn icon={Download} onClick={() => handleExportExcel()} />
+   881→                <ActionBtn icon={Trash2} onClick={() => handleDeleteInvoice(inv)} danger />
+   882→              </div>
+   883→            </div>
+   884→          </CardContent></Card>
+   885→        ))}
+   886→      </div>
+   887→
+   888→      {/* Create Invoice Dialog */}
+   889→      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+   890→        <DialogContent className="max-w-md" dir={isRTL ? 'rtl' : 'ltr'}><DialogHeader><DialogTitle>{t.createInvoice}</DialogTitle><DialogDescription className="sr-only">{isRTL ? 'إنشاء فاتورة جديدة' : 'Create a new invoice'}</DialogDescription></DialogHeader>
+   891→          <div className="space-y-4 pt-2">
+   892→            <FormField label={t.tenant}>
+   893→              <Select value={invForm.tenant} onValueChange={v => {
+   894→                const tn = INIT_TENANTS.find(x => x.name === v || x.nameEn === v)
+   895→                setInvForm(p => ({ ...p, tenant: tn?.name || v, tenantEn: tn?.nameEn || v }))
+   896→              }}>
+   897→                <SelectTrigger><SelectValue placeholder={isRTL ? 'اختر المستأجر' : 'Select tenant'} /></SelectTrigger>
+   898→                <SelectContent>
+   899→                  {INIT_TENANTS.map(tn => <SelectItem key={tn.id} value={lang === 'en' ? tn.nameEn : tn.name}>{lang === 'en' ? tn.nameEn : tn.name}</SelectItem>)}
+   900→                </SelectContent>
+   901→              </Select>
+   902→            </FormField>
+   903→            <div className="grid grid-cols-2 gap-3">
+   904→              <FormField label={t.plan}>
+   905→                <Select value={invForm.plan} onValueChange={v => {
+   906→                  setInvForm(p => ({ ...p, plan: v }))
+   907→                  const plan = PLANS.find(pl => pl.name === v)
+   908→                  if (plan) setInvForm(p => ({ ...p, amount: plan.price }))
+   909→                }}>
+   910→                  <SelectTrigger><SelectValue /></SelectTrigger>
+   911→                  <SelectContent>{PLANS.map(p => <SelectItem key={p.id} value={p.name}>{p.name} ({p.price} {sym})</SelectItem>)}</SelectContent>
+   912→                </Select>
+   913→              </FormField>
+   914→              <FormField label={t.amount}>
+   915→                <Input type="number" value={invForm.amount || ''} onChange={e => setInvForm(p => ({ ...p, amount: Number(e.target.value) }))} />
+   916→              </FormField>
+   917→            </div>
+   918→            <FormField label={t.status}>
+   919→              <Select value={invForm.status} onValueChange={v => setInvForm(p => ({ ...p, status: v }))}>
+   920→                <SelectTrigger><SelectValue /></SelectTrigger>
+   921→                <SelectContent>
+   922→                  <SelectItem value="pending">{t.pending}</SelectItem>
+   923→                  <SelectItem value="paid">{t.paid}</SelectItem>
+   924→                </SelectContent>
+   925→              </Select>
+   926→            </FormField>
+   927→          </div>
+   928→          <DlgFooter onCancel={() => setAddOpen(false)} onConfirm={handleCreateInvoice} confirmLabel={isRTL ? 'إنشاء' : 'Create'} />
+   929→        </DialogContent>
+   930→      </Dialog>
+   931→
+   932→      {/* Invoice Preview Dialog */}
+   933→      {previewInv && <InvoicePreviewDialog invoice={previewInv} open={!!previewInv} onClose={() => setPreviewInv(null)} onStatusChange={handleStatusChange} />}
+   934→    </div>
+   935→  )
+   936→}
+   937→
+   938→// ════════════════════════════════════════════════════════════════
+   939→// PAGE 6: ROLES & PERMISSIONS (Enterprise RBAC — Enhanced)
+   940→// ════════════════════════════════════════════════════════════════
+   941→function RolesPage() {
+   942→  const { t, lang, isRTL } = useSA()
+   943→  const [roles, setRoles] = useState<RbacRole[]>(INIT_RBAC_ROLES)
+   944→  const [templates] = useState<PermissionTemplate[]>(INIT_RBAC_TEMPLATES)
+   945→  const [dlg, setDlg] = useState<{ type: 'add' | 'edit' | 'delete' | 'matrix' | 'clone_src' | 'details'; role?: RbacRole } | null>(null)
+   946→  const [form, setForm] = useState({ name: '', nameEn: '', desc: '', descEn: '', parentId: null as string | null, permissions: {} as Record<string, string[]> })
+   947→  const [tplDlg, setTplDlg] = useState(false)
+   948→  const [viewTab, setViewTab] = useState<'roles' | 'matrix' | 'templates' | 'api' | 'buttons' | 'jwt' | 'visibility' | 'policies'>('roles')
+   949→  const [detailRole, setDetailRole] = useState<RbacRole | null>(null)
+   950→
+   951→  const rName = (r: RbacRole) => lang === 'en' ? r.nameEn : r.name
+   952→  const rDesc = (r: RbacRole) => lang === 'en' ? r.descriptionEn : r.description
+   953→
+   954→  const openAdd = () => {
+   955→    setForm({ name: '', nameEn: '', desc: '', descEn: '', parentId: null, permissions: {} })
+   956→    SYSTEM_MODULES.forEach(m => { form.permissions[m.key] = ['view'] })
+   957→    setForm(p => ({ ...p, permissions: { ...p.permissions } }))
+   958→    setDlg({ type: 'add' })
+   959→  }
+   960→
+   961→  const openEdit = (r: RbacRole) => {
+   962→    setForm({ name: r.name, nameEn: r.nameEn, desc: r.description, descEn: r.descriptionEn, parentId: r.parentId, permissions: cloneRolePermissions(r) })
+   963→    setDlg({ type: 'edit', role: r })
+   964→  }
+   965→
+   966→  const openMatrix = (r: RbacRole) => { setForm({ name: r.name, nameEn: r.nameEn, desc: r.description, descEn: r.descriptionEn, parentId: r.parentId, permissions: cloneRolePermissions(r) }); setDlg({ type: 'matrix', role: r }) }
+   967→
+   968→  const openDetails = (r: RbacRole) => { setDetailRole(r) }
+   969→
+   970→  const handleClone = (r: RbacRole) => {
+   971→    const clone: RbacRole = { ...r, id: Date.now().toString(), name: `${r.name} ${t.rbacCloneSuffix}`, nameEn: `${r.nameEn} (Copy)`, userCount: 0, isSystem: false, parentId: r.parentId, permissions: cloneRolePermissions(r), createdAt: new Date().toISOString().split('T')[0], claims: r.claims ? r.claims.map(c => ({ ...c })) : [], policies: r.policies ? r.policies.map(p => ({ ...p })) : [], hiddenPages: r.hiddenPages ? [...r.hiddenPages] : [] }
+   972→    setRoles(p => [clone, ...p]); toast.success(t.rbacRoleCloned)
+   973→  }
+   974→
+   975→  const handleSave = () => {
+   976→    if (!form.name.trim()) { toast.error(lang === 'ar' ? 'يرجى إدخال اسم الدور' : 'Please enter role name'); return }
+   977→    if (dlg?.type === 'add') {
+   978→      const r: RbacRole = { id: Date.now().toString(), name: form.name, nameEn: form.nameEn, description: form.desc, descriptionEn: form.descEn, userCount: 0, isSystem: false, parentId: form.parentId, permissions: { ...form.permissions }, createdAt: new Date().toISOString().split('T')[0], claims: [], policies: [], hiddenPages: [] }
+   979→      setRoles(p => [r, ...p]); toast.success(t.roleCreated)
+   980→    } else if (dlg?.role) {
+   981→      setRoles(p => p.map(r => r.id === dlg.role!.id ? { ...r, name: form.name, nameEn: form.nameEn, description: form.desc, descriptionEn: form.descEn, parentId: form.parentId, permissions: { ...form.permissions } } : r))
+   982→      toast.success(t.roleUpdated)
+   983→    }
+   984→    setDlg(null)
+   985→  }
+   986→
+   987→  const handleDelete = () => {
+   988→    if (!dlg?.role) return
+   989→    setRoles(p => p.filter(x => x.id !== dlg.role!.id)); toast.success(t.roleDeleted); setDlg(null)
+   990→  }
+   991→
+   992→  const handleTogglePerm = (mod: string, action: string) => {
+   993→    setForm(p => ({ ...p, permissions: togglePermission({ ...p, permissions: p.permissions }, mod, action) }))
+   994→  }
+   995→
+   996→  const handleApplyTemplate = (tpl: PermissionTemplate) => {
+   997→    const perms = applyTemplate(tpl)
+   998→    setForm(p => ({ ...p, permissions: perms }))
+   999→    setTplDlg(false); toast.success(t.rbacTemplateApplied)
+  1000→  }
+  1001→
+  1002→  const permCount = (r: RbacRole) => countPermissions(r.permissions)
+  1003→  const effectivePerms = dlg?.role ? getEffectivePermissions(dlg.role, roles) : null
+  1004→  const inheritedInfo = dlg?.role ? getInheritedVsOwn(dlg.role, roles) : null
+  1005→
+  1006→  const TABS = [
+  1007→    { key: 'roles' as const, label: t.rolesTitle },
+  1008→    { key: 'matrix' as const, label: t.rbacMatrix },
+  1009→    { key: 'templates' as const, label: t.rbacTemplates },
+  1010→    { key: 'api' as const, label: lang === 'ar' ? 'API' : 'API' },
+  1011→    { key: 'buttons' as const, label: lang === 'ar' ? 'الأزرار' : 'Buttons' },
+  1012→    { key: 'jwt' as const, label: t.rbacJwtClaims },
+  1013→    { key: 'visibility' as const, label: t.rbacMenuVisibility },
+  1014→    { key: 'policies' as const, label: lang === 'ar' ? 'السياسات' : 'Policies' },
+  1015→  ]
+  1016→
+  1017→  // Method colors
+  1018→  const methodColor = (m: string) => m === 'GET' ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30' : m === 'POST' ? 'text-sky-600 bg-sky-50 dark:bg-sky-950/30' : m === 'PUT' || m === 'PATCH' ? 'text-amber-600 bg-amber-50 dark:bg-amber-950/30' : 'text-red-600 bg-red-50 dark:bg-red-950/30'
+  1019→
+  1020→  return (
+  1021→    <div className="space-y-6">
+  1022→      <PageTitle title={t.rbacTitle} action={<PrimaryBtn icon={Plus} label={t.addRole} onClick={openAdd} />} />
+  1023→
+  1024→      {/* View Tabs — scrollable */}
+  1025→      <div className="flex gap-2 overflow-x-auto pb-1">
+  1026→        {TABS.map(tab => (
+  1027→          <Button key={tab.key} size="sm" variant={viewTab === tab.key ? 'default' : 'outline'} className="text-xs rounded-full px-4 whitespace-nowrap shrink-0" onClick={() => setViewTab(tab.key)}>
+  1028→            {tab.label}
+  1029→          </Button>
+  1030→        ))}
+  1031→      </div>
+  1032→
+  1033→      {/* Roles View */}
+  1034→      {viewTab === 'roles' && (
+  1035→        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+  1036→          {roles.map((r, i) => (
+  1037→            <motion.div key={r.id} variants={fade} initial="hidden" animate="visible" transition={{ delay: i * 0.04 }}>
+  1038→              <Card className="group transition-all hover:shadow-lg border-0 shadow-sm h-full">
+  1039→                <CardContent className="p-5 sm:p-6">
+  1040→                  <div className="flex items-start justify-between mb-4">
+  1041→                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-100 dark:bg-violet-900/30"><Shield className="h-5 w-5 text-violet-600" /></div>
+  1042→                    <div className="flex items-center gap-1.5">
+  1043→                      {r.isSystem && <Badge variant="secondary" className="text-[10px] bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400">{t.rbacSystemRole}</Badge>}
+  1044→                      {r.claims && r.claims.length > 0 && <Badge variant="secondary" className="text-[10px] bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400">{r.claims.length} Claims</Badge>}
+  1045→                    </div>
+  1046→                  </div>
+  1047→                  <h3 className="font-bold text-base">{rName(r)}</h3>
+  1048→                  <p className="text-xs text-muted-foreground mb-1">{lang === 'ar' ? r.nameEn : r.name}</p>
+  1049→                  <p className="text-sm text-muted-foreground mb-4 leading-relaxed">{rDesc(r)}</p>
+  1050→                  <div className="flex items-center gap-3 mb-4 text-xs text-muted-foreground">
+  1051→                    <span>{permCount(r)} {t.rbacPermissions}</span>
+  1052→                    <span>·</span>
+  1053→                    <span>{r.userCount} {t.rbacUserCount}</span>
+  1054→                    {r.parentId && <><span>·</span><span className="text-sky-600">{t.rbacInherited}</span></>}
+  1055→                    {(r.policies || []).length > 0 && <><span>·</span><span className="text-red-500">{r.policies.length} {lang === 'ar' ? 'سياسات' : 'policies'}</span></>}
+  1056→                  </div>
+  1057→                  <div className="flex items-center justify-between pt-3 border-t">
+  1058→                    <div className="flex gap-1">
+  1059→                      <ActionBtn icon={Eye} label={t.rbacViewDetails} onClick={() => openDetails(r)} />
+  1060→                      <ActionBtn icon={Edit} label={t.edit} onClick={() => openEdit(r)} />
+  1061→                      <ActionBtn icon={Copy} label={t.rbacCloneRole} onClick={() => handleClone(r)} />
+  1062→                    </div>
+  1063→                    {!r.isSystem && <ActionBtn icon={Trash2} onClick={() => setDlg({ type: 'delete', role: r })} danger />}
+  1064→                  </div>
+  1065→                </CardContent>
+  1066→              </Card>
+  1067→            </motion.div>
+  1068→          ))}
+  1069→        </div>
+  1070→      )}
+  1071→
+  1072→      {/* Matrix Overview */}
+  1073→      {viewTab === 'matrix' && (
+  1074→        <Card className="border-0 shadow-sm overflow-hidden">
+  1075→          <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">{t.rbacMatrix} — {roles.length} {lang === 'ar' ? 'أدوار' : 'roles'} × {SYSTEM_MODULES.length} {t.rbacModule}</CardTitle></CardHeader>
+  1076→          <CardContent className="overflow-x-auto">
+  1077→            <table className="w-full text-xs">
+  1078→              <thead>
+  1079→                <tr className="border-b">
+  1080→                  <th className="p-2 text-start font-semibold sticky start-0 bg-background min-w-[120px]">{t.rbacModule}</th>
+  1081→                  {roles.map(r => <th key={r.id} className="p-2 text-center font-semibold min-w-[80px]">{rName(r)}</th>)}
+  1082→                </tr>
+  1083→              </thead>
+  1084→              <tbody>
+  1085→                {SYSTEM_MODULES.map(mod => (
+  1086→                  <tr key={mod.key} className="border-b border-border/50 hover:bg-muted/30">
+  1087→                    <td className="p-2 font-medium sticky start-0 bg-background">{lang === 'ar' ? mod.labelAr : mod.labelEn}</td>
+  1088→                    {roles.map(r => {
+  1089→                      const count = (r.permissions[mod.key] || []).length
+  1090→                      const total = PERMISSION_ACTIONS.length
+  1091→                      const pct = Math.round(count / total * 100)
+  1092→                      return (
+  1093→                        <td key={r.id} className="p-2 text-center">
+  1094→                          <div className="flex items-center justify-center gap-1">
+  1095→                            <div className="w-12 h-1.5 rounded-full bg-muted overflow-hidden"><div className={`h-full rounded-full ${pct === 100 ? 'bg-emerald-500' : pct > 50 ? 'bg-sky-500' : pct > 0 ? 'bg-amber-500' : 'bg-gray-300'}`} style={{ width: `${pct}%` }} /></div>
+  1096→                            <span className="tabular-nums text-muted-foreground w-6">{count}</span>
+  1097→                          </div>
+  1098→                        </td>
+  1099→                      )
+  1100→                    })}
+  1101→                  </tr>
+  1102→                ))}
+  1103→              </tbody>
+  1104→            </table>
+  1105→          </CardContent>
+  1106→        </Card>
+  1107→      )}
+  1108→
+  1109→      {/* Templates View */}
+  1110→      {viewTab === 'templates' && (
+  1111→        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+  1112→          {templates.map((tpl, i) => (
+  1113→            <motion.div key={tpl.id} variants={fade} initial="hidden" animate="visible" transition={{ delay: i * 0.04 }}>
+  1114→              <Card className="group transition-all hover:shadow-lg border-0 shadow-sm cursor-pointer" onClick={() => handleApplyTemplate(tpl)}>
+  1115→                <CardContent className="p-5 text-center">
+  1116→                  <div className="h-12 w-12 rounded-2xl bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center mx-auto mb-3"><Shield className="h-6 w-6 text-violet-600" /></div>
+  1117→                  <h3 className="font-bold text-sm">{lang === 'ar' ? tpl.name : tpl.nameEn}</h3>
+  1118→                  <p className="text-xs text-muted-foreground mt-1 mb-3">{lang === 'ar' ? tpl.description : tpl.descriptionEn}</p>
+  1119→                  <Badge variant="secondary" className="text-[10px]">{countPermissions(tpl.permissions)} {t.rbacPermissions}</Badge>
+  1120→                  <p className="text-[10px] text-violet-600 mt-3 group-hover:underline">{t.rbacApplyTemplate}</p>
+  1121→                </CardContent>
+  1122→              </Card>
+  1123→            </motion.div>
+  1124→          ))}
+  1125→        </div>
+  1126→      )}
+  1127→
+  1128→      {/* API Endpoints Authorization View */}
+  1129→      {viewTab === 'api' && (
+  1130→        <Card className="border-0 shadow-sm overflow-hidden">
+  1131→          <CardHeader className="pb-2">
+  1132→            <CardTitle className="text-sm font-semibold">{lang === 'ar' ? 'تفويض نقاط API' : 'API Endpoint Authorization'} — {lang === 'ar' ? 'اختر دوراً لمحاكاة التفويض' : 'Select a role to simulate authorization'}</CardTitle>
+  1133→          </CardHeader>
+  1134→          <CardContent>
+  1135→            <div className="flex gap-2 mb-4 flex-wrap">
+  1136→              {roles.map(r => (
+  1137→                <Button key={r.id} size="sm" variant={detailRole?.id === r.id ? 'default' : 'outline'} className="text-xs rounded-full px-3" onClick={() => setDetailRole(r)}>
+  1138→                  {rName(r)}
+  1139→                </Button>
+  1140→              ))}
+  1141→            </div>
+  1142→            {detailRole && (
+  1143→              <div className="overflow-x-auto border rounded-lg">
+  1144→                <table className="w-full text-xs">
+  1145→                  <thead>
+  1146→                    <tr className="bg-muted/50">
+  1147→                      <th className="p-2 text-start font-semibold sticky start-0 bg-muted/50 min-w-[60px]">Method</th>
+  1148→                      <th className="p-2 text-start font-semibold min-w-[220px]" dir="ltr">{lang === 'ar' ? 'المسار' : 'Endpoint'}</th>
+  1149→                      <th className="p-2 text-start font-semibold min-w-[120px]">{lang === 'ar' ? 'الوصف' : 'Description'}</th>
+  1150→                      <th className="p-2 text-center font-semibold min-w-[80px]">{lang === 'ar' ? 'الحالة' : 'Status'}</th>
+  1151→                      <th className="p-2 text-start font-semibold min-w-[150px]">{lang === 'ar' ? 'ملاحظات' : 'Notes'}</th>
+  1152→                    </tr>
+  1153→                  </thead>
+  1154→                  <tbody>
+  1155→                    {Object.entries(API_ENDPOINTS).map(([mod, endpoints]) =>
+  1156→                      endpoints.map((ep, i) => {
+  1157→                        const auth = isApiAuthorized(detailRole, ep.method, ep.path)
+  1158→                        const forbidden = simulate403(ep.path, ep.method, detailRole)
+  1159→                        return (
+  1160→                          <tr key={`${mod}-${i}`} className="border-b border-border/50 hover:bg-muted/30">
+  1161→                            <td className="p-2 sticky start-0 bg-background">
+  1162→                              <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-bold ${methodColor(ep.method)}`}>{ep.method}</span>
+  1163→                            </td>
+  1164→                            <td className="p-2 font-mono text-[11px]" dir="ltr">{ep.path}</td>
+  1165→                            <td className="p-2 text-xs">{lang === 'ar' ? ep.labelAr : ep.labelEn}</td>
+  1166→                            <td className="p-2 text-center">
+  1167→                              {auth.authorized
+  1168→                                ? <Badge className="bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 text-[10px] border-emerald-200">200 OK</Badge>
+  1169→                                : <Badge className="bg-red-50 text-red-700 dark:bg-red-950/30 text-[10px] border-red-200">403</Badge>
+  1170→                              }
+  1171→                            </td>
+  1172→                            <td className="p-2 text-xs text-muted-foreground">
+  1173→                              {!auth.authorized && forbidden ? forbidden.body.message : (lang === 'ar' ? 'مصرح' : 'Authorized')}
+  1174→                            </td>
+  1175→                          </tr>
+  1176→                        )
+  1177→                      })
+  1178→                    )}
+  1179→                  </tbody>
+  1180→                </table>
+  1181→              </div>
+  1182→            )}
+  1183→          </CardContent>
+  1184→        </Card>
+  1185→      )}
+  1186→
+  1187→      {/* Buttons Visibility View */}
+  1188→      {viewTab === 'buttons' && (
+  1189→        <Card className="border-0 shadow-sm overflow-hidden">
+  1190→          <CardHeader className="pb-2">
+  1191→            <CardTitle className="text-sm font-semibold">{lang === 'ar' ? 'صلاحيات الأزرار (UI Buttons)' : 'Button Permissions'}</CardTitle>
+  1192→          </CardHeader>
+  1193→          <CardContent>
+  1194→            <div className="flex gap-2 mb-4 flex-wrap">
+  1195→              {roles.map(r => (
+  1196→                <Button key={r.id} size="sm" variant={detailRole?.id === r.id ? 'default' : 'outline'} className="text-xs rounded-full px-3" onClick={() => setDetailRole(r)}>
+  1197→                  {rName(r)}
+  1198→                </Button>
+  1199→              ))}
+  1200→            </div>
+  1201→            {detailRole && (
+  1202→              <div className="space-y-4">
+  1203→                {Object.entries(UI_BUTTONS).map(([mod, buttons]) => {
+  1204→                  const modLabel = SYSTEM_MODULES.find(m => m.key === mod)
+  1205→                  if (!modLabel || buttons.length === 0) return null
+  1206→                  return (
+  1207→                    <div key={mod} className="border rounded-lg p-3">
+  1208→                      <p className="text-xs font-semibold mb-2">{lang === 'ar' ? modLabel.labelAr : modLabel.labelEn}</p>
+  1209→                      <div className="flex flex-wrap gap-2">
+  1210→                        {buttons.map(btn => {
+  1211→                          const visible = isButtonVisible(detailRole, mod, btn.key)
+  1212→                          return (
+  1213→                            <div key={btn.key} className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] ${visible ? 'bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-emerald-950/30 dark:border-emerald-800' : 'bg-red-50 border-red-200 text-red-500 dark:bg-red-950/30 dark:border-red-800 line-through opacity-60'}`}>
+  1214→                              {visible ? <CheckCircle2 className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
+  1215→                              {lang === 'ar' ? btn.labelAr : btn.labelEn}
+  1216→                              <span className="text-[9px] opacity-60">({btn.requiredAction})</span>
+  1217→                            </div>
+  1218→                          )
+  1219→                        })}
+  1220→                      </div>
+  1221→                    </div>
+  1222→                  )
+  1223→                })}
+  1224→              </div>
+  1225→            )}
+  1226→          </CardContent>
+  1227→        </Card>
+  1228→      )}
+  1229→
+  1230→      {/* JWT Claims View */}
+  1231→      {viewTab === 'jwt' && (
+  1232→        <Card className="border-0 shadow-sm overflow-hidden">
+  1233→          <CardHeader className="pb-2">
+  1234→            <CardTitle className="text-sm font-semibold">{t.rbacJwtClaims} — {lang === 'ar' ? 'حمولات الرمز المميز' : 'Token Payloads'}</CardTitle>
+  1235→          </CardHeader>
+  1236→          <CardContent>
+  1237→            <div className="flex gap-2 mb-4 flex-wrap">
+  1238→              {roles.map(r => (
+  1239→                <Button key={r.id} size="sm" variant={detailRole?.id === r.id ? 'default' : 'outline'} className="text-xs rounded-full px-3" onClick={() => setDetailRole(r)}>
+  1240→                  {rName(r)}
+  1241→                </Button>
+  1242→              ))}
+  1243→            </div>
+  1244→            {detailRole && (
+  1245→              <div className="space-y-4">
+  1246→                {/* Role Claims Table */}
+  1247→                <div className="border rounded-lg p-4">
+  1248→                  <p className="text-xs font-semibold mb-3">{lang === 'ar' ? 'الادعاءات المخصصة' : 'Custom Claims'}</p>
+  1249→                  {(detailRole.claims || []).length === 0 ? (
+  1250→                    <p className="text-xs text-muted-foreground">{lang === 'ar' ? 'لا توجد ادعاءات مخصصة' : 'No custom claims'}</p>
+  1251→                  ) : (
+  1252→                    <div className="overflow-x-auto">
+  1253→                      <table className="w-full text-xs">
+  1254→                        <thead><tr className="border-b"><th className="p-2 text-start font-semibold">Key</th><th className="p-2 text-start font-semibold">Value</th><th className="p-2 text-start font-semibold">{lang === 'ar' ? 'النوع' : 'Type'}</th><th className="p-2 text-start font-semibold">{lang === 'ar' ? 'التسمية' : 'Label'}</th></tr></thead>
+  1255→                        <tbody>
+  1256→                          {(detailRole.claims || []).map((c, i) => (
+  1257→                            <tr key={i} className="border-b border-border/50">
+  1258→                              <td className="p-2 font-mono text-violet-600" dir="ltr">{c.key}</td>
+  1259→                              <td className="p-2 font-mono" dir="ltr">{c.value}</td>
+  1260→                              <td className="p-2"><Badge variant="secondary" className="text-[10px]">{c.type}</Badge></td>
+  1261→                              <td className="p-2">{lang === 'ar' ? c.labelAr : c.labelEn}</td>
+  1262→                            </tr>
+  1263→                          ))}
+  1264→                        </tbody>
+  1265→                      </table>
+  1266→                    </div>
+  1267→                  )}
+  1268→                </div>
+  1269→                {/* JWT Payload */}
+  1270→                <div className="border rounded-lg p-4">
+  1271→                  <div className="flex items-center justify-between mb-3">
+  1272→                    <p className="text-xs font-semibold">{lang === 'ar' ? 'حمولة JWT المُنشأة' : 'Generated JWT Payload'}</p>
+  1273→                    <Button size="sm" variant="ghost" className="h-7 text-xs gap-1" onClick={() => { navigator.clipboard.writeText(JSON.stringify(generateJwtClaims(detailRole), null, 2)); toast.success(lang === 'ar' ? 'تم النسخ' : 'Copied') }}>
+  1274→                      <Copy className="h-3 w-3" />{lang === 'ar' ? 'نسخ' : 'Copy'}
+  1275→                    </Button>
+  1276→                  </div>
+  1277→                  <pre className="bg-muted rounded-lg p-4 text-xs font-mono overflow-x-auto leading-relaxed" dir="ltr">
+  1278→                    {JSON.stringify(generateJwtClaims(detailRole), null, 2)}
+  1279→                  </pre>
+  1280→                </div>
+  1281→              </div>
+  1282→            )}
+  1283→          </CardContent>
+  1284→        </Card>
+  1285→      )}
+  1286→
+  1287→      {/* Menu Visibility View */}
+  1288→      {viewTab === 'visibility' && (
+  1289→        <Card className="border-0 shadow-sm overflow-hidden">
+  1290→          <CardHeader className="pb-2">
+  1291→            <CardTitle className="text-sm font-semibold">{t.rbacMenuVisibility} — {lang === 'ar' ? 'إخفاء الصفحات حسب الصلاحيات' : 'Hide pages based on permissions'}</CardTitle>
+  1292→          </CardHeader>
+  1293→          <CardContent>
+  1294→            <div className="flex gap-2 mb-4 flex-wrap">
+  1295→              {roles.map(r => (
+  1296→                <Button key={r.id} size="sm" variant={detailRole?.id === r.id ? 'default' : 'outline'} className="text-xs rounded-full px-3" onClick={() => setDetailRole(r)}>
+  1297→                  {rName(r)}
+  1298→                </Button>
+  1299→              ))}
+  1300→            </div>
+  1301→            {detailRole && (
+  1302→              <div className="overflow-x-auto border rounded-lg">
+  1303→                <table className="w-full text-xs">
+  1304→                  <thead>
+  1305→                    <tr className="bg-muted/50">
+  1306→                      <th className="p-2 text-start font-semibold">{lang === 'ar' ? 'الصفحة' : 'Page'}</th>
+  1307→                      <th className="p-2 text-start font-semibold">{lang === 'ar' ? 'الوحدة' : 'Module'}</th>
+  1308→                      <th className="p-2 text-center font-semibold">{lang === 'ar' ? 'عرض' : 'View'}</th>
+  1309→                      <th className="p-2 text-center font-semibold">{lang === 'ar' ? 'مرئي في القائمة' : 'Menu Visible'}</th>
+  1310→                      <th className="p-2 text-center font-semibold">{lang === 'ar' ? 'الحالة' : 'Status'}</th>
+  1311→                    </tr>
+  1312→                  </thead>
+  1313→                  <tbody>
+  1314→                    {SYSTEM_MODULES.map(mod => {
+  1315→                      const pages = PAGE_VISIBILITY_MAP[mod.key] || []
+  1316→                      const hasView = (detailRole.permissions[mod.key] || []).includes('view')
+  1317→                      const hiddenExplicit = (detailRole.hiddenPages || []).some(p => pages.includes(p))
+  1318→                      const isHidden = !hasView || hiddenExplicit
+  1319→                      return (
+  1320→                        <tr key={mod.key} className={`border-b border-border/50 ${isHidden ? 'bg-red-50/50 dark:bg-red-950/10' : ''}`}>
+  1321→                          <td className="p-2 font-medium">{pages.map(p => p).join(', ')}</td>
+  1322→                          <td className="p-2">{lang === 'ar' ? mod.labelAr : mod.labelEn}</td>
+  1323→                          <td className="p-2 text-center">
+
+[showing lines 724-1323 of 2467; use offset=1324 with limit to continue reading]
