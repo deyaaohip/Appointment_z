@@ -349,22 +349,35 @@ function TenantsPage() {
                     </div>
                   </TableCell>
                   <TableCell className="px-3">
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex flex-col gap-1.5">
+                      <div className="flex items-center gap-1.5">
+                        <a
+                          href={`https://bookflow.app/preview/${tn.workspaceSlug}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-xs font-mono text-violet-600 dark:text-violet-400 hover:underline truncate max-w-[160px]"
+                          dir="ltr"
+                          title={`https://bookflow.app/preview/${tn.workspaceSlug}`}
+                        >
+                          <ExternalLink className="h-3 w-3 shrink-0" />
+                          {tn.workspaceSlug}.preview
+                        </a>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 shrink-0"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            navigator.clipboard.writeText(`https://bookflow.app/preview/${tn.workspaceSlug}`)
+                            toast.success(t2.workspacePreviewCopied)
+                          }}
+                        >
+                          <Copy className="h-3 w-3" />
+                        </Button>
+                      </div>
                       <Button
-                        variant="outline"
                         size="sm"
-                        className="h-7 gap-1 text-[10px] font-medium"
-                        onClick={() => {
-                          navigator.clipboard.writeText(`https://bookflow.app/preview/${tn.workspaceSlug}`)
-                          toast.success(t2.workspacePreviewCopied)
-                        }}
-                      >
-                        <Eye className="h-3 w-3" />
-                        {t2.workspacePreview}
-                      </Button>
-                      <Button
-                        size="sm"
-                        className={`h-7 gap-1 text-[10px] font-semibold ${
+                        className={`h-7 gap-1 text-[10px] font-semibold w-full ${
                           tn.workspacePublished
                             ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/50 border-0'
                             : 'bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white shadow-sm shadow-violet-600/20'
@@ -419,22 +432,35 @@ function TenantsPage() {
               {tn.subscriptionEndDate && <span className="text-[10px] text-muted-foreground">{t.subscriptionEnd}: {tn.subscriptionEndDate}</span>}
             </div>
             {/* Workspace Preview & Publish — always visible on mobile */}
-            <div className="flex items-center gap-2 mb-3">
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 gap-1.5 text-[11px] font-medium flex-1"
-                onClick={() => {
-                  navigator.clipboard.writeText(`https://bookflow.app/preview/${tn.workspaceSlug}`)
-                  toast.success(t2.workspacePreviewCopied)
-                }}
+            <div className="space-y-2 mb-3">
+              <a
+                href={`https://bookflow.app/preview/${tn.workspaceSlug}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 px-3 py-2 rounded-lg border text-xs hover:bg-muted/50 transition-colors"
+                dir="ltr"
               >
-                <Eye className="h-3.5 w-3.5" />
-                {t2.workspacePreview}
-              </Button>
+                <ExternalLink className="h-3.5 w-3.5 text-violet-600 shrink-0" />
+                <span className="font-mono truncate text-violet-600 dark:text-violet-400">
+                  bookflow.app/preview/{tn.workspaceSlug}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 shrink-0 ms-auto"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    navigator.clipboard.writeText(`https://bookflow.app/preview/${tn.workspaceSlug}`)
+                    toast.success(t2.workspacePreviewCopied)
+                  }}
+                >
+                  <Copy className="h-3 w-3" />
+                </Button>
+              </a>
               <Button
                 size="sm"
-                className={`h-8 gap-1.5 text-[11px] font-semibold flex-1 ${
+                className={`h-8 gap-1.5 text-[11px] font-semibold w-full ${
                   tn.workspacePublished
                     ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/50 border-0'
                     : 'bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white shadow-sm shadow-violet-600/20'
