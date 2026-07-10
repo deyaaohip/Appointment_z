@@ -316,10 +316,11 @@ function TenantsPage() {
               <SortableTH label={t.tenantRevenue} sortKey="revenue" currentSort={sort} onSort={handleSort} align="end" />
               <SortableTH label={t.status} sortKey="status" currentSort={sort} onSort={handleSort} />
               <TableHead className="px-3 font-semibold text-xs uppercase tracking-wider">{t.subscriptionStatus}</TableHead>
+              <TableHead className="px-3 font-semibold text-xs uppercase tracking-wider text-center">{t2.workspaceSection}</TableHead>
               <TableHead className="pe-5 font-semibold text-xs uppercase tracking-wider text-end">{t.actions}</TableHead>
             </TableRow></TableHeader>
             <TableBody>
-              {items.length === 0 ? <EmptyRow colSpan={7} /> : items.map(tn => (
+              {items.length === 0 ? <EmptyRow colSpan={8} /> : items.map(tn => (
                 <TableRow key={tn.id} className="group hover:bg-muted/20 transition-colors">
                   <TableCell className="ps-5">
                     <div className="flex items-center gap-3">
@@ -347,22 +348,42 @@ function TenantsPage() {
                       {tn.subscriptionEndDate && <p className="text-[10px] text-muted-foreground">{t.subscriptionEnd}: {tn.subscriptionEndDate}</p>}
                     </div>
                   </TableCell>
-                  <TableCell className="pe-5">
-                    <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <ActionBtn icon={Eye} label={t.view} onClick={() => setDetailTenant(tn)} />
-                      <ActionBtn icon={Globe} label={t2.workspacePreview} onClick={() => {
-                        navigator.clipboard.writeText(`https://bookflow.app/preview/${tn.workspaceSlug}`)
-                        toast.success(t2.workspacePreviewCopied)
-                      }} />
-                      <ActionBtn
-                        icon={tn.workspacePublished ? PowerOff : Rocket}
-                        label={tn.workspacePublished ? t2.workspaceTakeOffline : t2.workspaceGoLive}
+                  <TableCell className="px-3">
+                    <div className="flex items-center gap-1.5">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 gap-1 text-[10px] font-medium"
+                        onClick={() => {
+                          navigator.clipboard.writeText(`https://bookflow.app/preview/${tn.workspaceSlug}`)
+                          toast.success(t2.workspacePreviewCopied)
+                        }}
+                      >
+                        <Eye className="h-3 w-3" />
+                        {t2.workspacePreview}
+                      </Button>
+                      <Button
+                        size="sm"
+                        className={`h-7 gap-1 text-[10px] font-semibold ${
+                          tn.workspacePublished
+                            ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/50 border-0'
+                            : 'bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white shadow-sm shadow-violet-600/20'
+                        }`}
                         onClick={() => {
                           setTenants(p => p.map(x => x.id === tn.id ? { ...x, workspacePublished: !x.workspacePublished } : x))
                           toast.success(tn.workspacePublished ? t2.workspaceUnpublishSuccess : t2.workspacePublishSuccess)
                         }}
-                        variant={tn.workspacePublished ? 'danger' : undefined}
-                      />
+                      >
+                        {tn.workspacePublished
+                          ? <><CheckCircle2 className="h-3 w-3" />{t2.workspacePublishedBadge}</>
+                          : <><Rocket className="h-3 w-3" />{t2.workspacePublish}</>
+                        }
+                      </Button>
+                    </div>
+                  </TableCell>
+                  <TableCell className="pe-5">
+                    <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <ActionBtn icon={Eye} label={t.view} onClick={() => setDetailTenant(tn)} />
                       <ActionBtn icon={Edit} label={t.edit} onClick={() => openEdit(tn)} />
                       <ActionBtn icon={CalendarDays} label={t.extendSubscription} onClick={() => openExtend(tn)} />
                       <ActionBtn icon={tn.status === 'suspended' ? Power : PowerOff} label={tn.status === 'suspended' ? t.active : t.suspended} onClick={() => handleToggleStatus(tn)} />
@@ -397,21 +418,40 @@ function TenantsPage() {
               <StatusBadge status={tn.subscriptionStatus} locale={lang} />
               {tn.subscriptionEndDate && <span className="text-[10px] text-muted-foreground">{t.subscriptionEnd}: {tn.subscriptionEndDate}</span>}
             </div>
-            <div className="flex items-center justify-end gap-1 pt-2 border-t">
-              <ActionBtn icon={Eye} onClick={() => setDetailTenant(tn)} />
-              <ActionBtn icon={Globe} label={t2.workspacePreview} onClick={() => {
-                navigator.clipboard.writeText(`https://bookflow.app/preview/${tn.workspaceSlug}`)
-                toast.success(t2.workspacePreviewCopied)
-              }} />
-              <ActionBtn
-                icon={tn.workspacePublished ? PowerOff : Rocket}
-                label={tn.workspacePublished ? t2.workspaceTakeOffline : t2.workspaceGoLive}
+            {/* Workspace Preview & Publish — always visible on mobile */}
+            <div className="flex items-center gap-2 mb-3">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 gap-1.5 text-[11px] font-medium flex-1"
+                onClick={() => {
+                  navigator.clipboard.writeText(`https://bookflow.app/preview/${tn.workspaceSlug}`)
+                  toast.success(t2.workspacePreviewCopied)
+                }}
+              >
+                <Eye className="h-3.5 w-3.5" />
+                {t2.workspacePreview}
+              </Button>
+              <Button
+                size="sm"
+                className={`h-8 gap-1.5 text-[11px] font-semibold flex-1 ${
+                  tn.workspacePublished
+                    ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/50 border-0'
+                    : 'bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white shadow-sm shadow-violet-600/20'
+                }`}
                 onClick={() => {
                   setTenants(p => p.map(x => x.id === tn.id ? { ...x, workspacePublished: !x.workspacePublished } : x))
                   toast.success(tn.workspacePublished ? t2.workspaceUnpublishSuccess : t2.workspacePublishSuccess)
                 }}
-                variant={tn.workspacePublished ? 'danger' : undefined}
-              />
+              >
+                {tn.workspacePublished
+                  ? <><CheckCircle2 className="h-3.5 w-3.5" />{t2.workspacePublishedBadge}</>
+                  : <><Rocket className="h-3.5 w-3.5" />{t2.workspacePublish}</>
+                }
+              </Button>
+            </div>
+            <div className="flex items-center justify-end gap-1 pt-2 border-t">
+              <ActionBtn icon={Eye} onClick={() => setDetailTenant(tn)} />
               <ActionBtn icon={CalendarDays} label={t.extendSubscription} onClick={() => openExtend(tn)} />
               <ActionBtn icon={Edit} label={t.edit} onClick={() => openEdit(tn)} />
               <ActionBtn icon={tn.status === 'suspended' ? Power : PowerOff} label={tn.status === 'suspended' ? t.active : t.suspended} onClick={() => handleToggleStatus(tn)} />
