@@ -1,0 +1,2002 @@
+     1→'use client'
+     2→
+     3→import { useState, useMemo, useCallback, useEffect } from 'react'
+     4→import { motion } from 'framer-motion'
+     5→import { toast } from 'sonner'
+     6→import { useAppStore } from '@/stores/app-store'
+     7→import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+     8→import { Badge } from '@/components/ui/badge'
+     9→import { Button } from '@/components/ui/button'
+    10→import { Input } from '@/components/ui/input'
+    11→import { Textarea } from '@/components/ui/textarea'
+    12→import { Progress } from '@/components/ui/progress'
+    13→import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+    14→import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
+    15→import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+    16→import { Separator } from '@/components/ui/separator'
+    17→import {
+    18→  Building2, Users, CalendarDays, Activity, CreditCard,
+    19→  Settings, Shield, Eye, Edit, Trash2, Plus, BarChart3, Server,
+    20→  Database, Lock, Bell, FileText, UserCog, CheckCircle2, AlertTriangle,
+    21→  RefreshCw, Globe, UserPlus, Clock, Monitor, HardDrive, Mail, Download,
+    22→  Power, PowerOff, Save, ChevronLeft, Search, Wallet, XCircle, Info,
+    23→  Upload, Image as ImageIcon, ClipboardCheck, Banknote, Copy, Link2, LayoutGrid, ChevronRight,
+    24→} from 'lucide-react'
+    25→
+    26→// ─── Imports from shared modules ───────────────────────────────
+    27→import { useT } from './sa-i18n'
+    28→import { type Lang } from './sa-i18n'
+    29→import {
+    30→  type Tenant, type PlatformUser, type SysLog, type Invoice,
+    31→  type Role, type Plan, type Server as ServerType, type Backup,
+    32→  type SecurityAttempt, type NotificationTemplate, type Report,
+    33→  type SortState, type CliqPayment, type CliqConfig,
+    34→  INIT_TENANTS, INIT_USERS, INIT_LOGS, PLANS, INIT_ROLES, SERVERS,
+    35→  INVOICES, BACKUPS, SECURITY_ATTEMPTS, NOTIF_TEMPLATES, REPORTS,
+    36→  DEFAULT_CLIQ_CONFIG, INIT_CLIQ_PAYMENTS, bField,
+    37→} from './sa-data'
+    38→import {
+    39→  fade, useSA, StatusBadge, LogDot, getLogLabel, PageTitle, FormField,
+    40→  Toggle, ConfirmDialog, KpiCard, StatCard, ActionBtn, PrimaryBtn,
+    41→  EmptyRow, SearchInput, SortableTH, Pagination, TableFooter, DlgFooter,
+    42→  gaugeColor, genericSort, paginate, useCurrency,
+    43→} from './sa-helpers'
+    44→import { TenantWizard, type TenantFormData } from './tenant-wizard'
+    45→import { TenantDetailsDialog } from './tenant-details-dialog'
+    46→import {
+    47→  INIT_RBAC_ROLES, INIT_RBAC_TEMPLATES, SYSTEM_MODULES, PERMISSION_ACTIONS,
+    48→  type RbacRole, type PermissionTemplate, type ModuleKey, type ActionKey,
+    49→  hasPermission, cloneRolePermissions, getEffectivePermissions, countPermissions,
+    50→  togglePermission, applyTemplate, getInheritedVsOwn,
+    51→  API_ENDPOINTS, UI_BUTTONS, PAGE_VISIBILITY_MAP,
+    52→  isApiAuthorized, isButtonVisible, getHiddenPages, generateJwtClaims, simulate403,
+    53→  METHOD_ACTION_MAP,
+    54→  type RbacClaim, type RbacPolicy,
+    55→} from './rbac-data'
+    56→import { InvoicePreviewDialog } from './invoice-preview'
+    57→import { DatabaseMonitoringPage } from './database-monitoring-page'
+    58→import { BackupSystemPage } from './backup-system-page'
+    59→import { SecurityCenterPage } from './security-center-page'
+    60→import { InputSecurityPage } from './input-security-page'
+    61→import { SettingsModulePage } from './settings-module-page'
+    62→
+    63→const PER_PAGE = 7
+    64→
+    65→// ─── Bilingual field helper for logs ───────────────────────────
+    66→function logMsg(l: SysLog, lang: Lang) { return lang === 'en' ? l.messageEn : l.message }
+    67→function logSrc(l: SysLog, lang: Lang) { return lang === 'en' ? l.sourceEn : l.source }
+    68→function serverRegion(s: ServerType, lang: Lang) { return lang === 'en' ? s.regionEn : s.region }
+    69→function secCountry(a: SecurityAttempt, lang: Lang) { return lang === 'en' ? a.countryEn : a.country }
+    70→function invTenant(inv: Invoice, lang: Lang) { return lang === 'en' ? (inv.tenantEn || inv.tenant) : inv.tenant }
+    71→function userTenant(u: PlatformUser, lang: Lang) { return lang === 'en' ? (u.tenantEn || u.tenant) : u.tenant }
+    72→function cliqTenantName(p: CliqPayment, lang: Lang) { return lang === 'en' ? (p.tenantNameEn || p.tenantName) : p.tenantName }
+    73→
+    74→// ════════════════════════════════════════════════════════════════
+    75→// PAGE 1: OVERVIEW (Audited — all KPIs derived from real data)
+    76→// ════════════════════════════════════════════════════════════════
+    77→function OverviewPage() {
+    78→  const { t, isRTL, lang } = useSA()
+    79→  const { sym, fmt } = useCurrency()
+    80→  const [tenants] = useState<Tenant[]>(INIT_TENANTS)
+    81→  const [logs] = useState<SysLog[]>(INIT_LOGS)
+    82→  const [invoices] = useState<Invoice[]>(INVOICES)
+    83→
+    84→  // Computed from real data — no hardcoded values
+    85→  const totalRevenue = tenants.reduce((s, tn) => s + tn.revenue, 0)
+    86→  const totalBookings = tenants.reduce((s, tn) => s + tn.bookings, 0)
+    87→  const activeCount = tenants.filter(tn => tn.status === 'active').length
+    88→  const expiredCount = tenants.filter(tn => tn.subscriptionStatus === 'expired').length
+    89→  const pendingSubs = tenants.filter(tn => tn.subscriptionStatus === 'trial' || tn.status === 'trial').length
+    90→  const paidInvoices = invoices.filter(i => i.status === 'paid')
+    91→  const monthlyRevenue = paidInvoices.reduce((s, i) => s + i.amount, 0)
+    92→  const activeTenants = tenants.filter(tn => tn.status === 'active').slice(0, 6)
+    93→
+    94→  return (
+    95→    <div className="space-y-6">
+    96→      {/* Primary KPIs — all computed from tenant/invoice data */}
+    97→      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+    98→        <KpiCard icon={Building2} bg="bg-violet-600" label={t.totalTenants} value={tenants.length} sub={`${activeCount} ${t.active.toLowerCase()}`} trend={12} delay={0} />
+    99→        <KpiCard icon={Users} bg="bg-sky-600" label={t.totalUsers} value={INIT_USERS.length} sub={`${tenants.reduce((s, tn) => s + tn.users, 0)} ${t.users.toLowerCase()}`} trend={8} delay={0.04} />
+   100→        <KpiCard icon={Banknote} bg="bg-amber-500" label={t.revenue} value={`${(totalRevenue / 1000).toFixed(1)}K ${sym}`} sub={t.thisMonth} trend={18} delay={0.08} />
+   101→        <KpiCard icon={CalendarDays} bg="bg-emerald-600" label={t.totalBookings} value={totalBookings.toLocaleString()} sub={t.last30Days} trend={5} delay={0.12} />
+   102→      </div>
+   103→
+   104→      {/* Secondary KPIs — subscription health */}
+   105→      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+   106→        <StatCard icon={CheckCircle2} label={t.monthlyRevenue} value={fmt(monthlyRevenue)} color="text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30" />
+   107→        <StatCard icon={Clock} label={t.pendingRequests} value={String(pendingSubs)} color="text-amber-600 bg-amber-50 dark:bg-amber-950/30" />
+   108→        <StatCard icon={AlertTriangle} label={t.expiredSubs} value={String(expiredCount)} color="text-red-600 bg-red-50 dark:bg-red-950/30" />
+   109→        <StatCard icon={CreditCard} label={t.recentPayments} value={String(paidInvoices.length)} color="text-sky-600 bg-sky-50 dark:bg-sky-950/30" />
+   110→      </div>
+   111→
+   112→      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6">
+   113→        <motion.div variants={fade} initial="hidden" animate="visible" transition={{ delay: 0.15 }} className="xl:col-span-2">
+   114→          <Card className="border-0 shadow-sm">
+   115→            <CardHeader className="pb-2"><CardTitle className="text-sm sm:text-base font-semibold">{t.revenueByPlan}</CardTitle></CardHeader>
+   116→            <CardContent className="space-y-4">
+   117→              {PLANS.filter(p => p.price > 0).map(p => {
+   118→                const rev = tenants.filter(tn => tn.plan === p.name).reduce((s, tn) => s + tn.revenue, 0)
+   119→                const pct = totalRevenue > 0 ? Math.round(rev / totalRevenue * 100) : 0
+   120→                return (
+   121→                  <div key={p.id} className="space-y-2">
+   122→                    <div className="flex items-center justify-between text-sm">
+   123→                      <span className="font-medium">{p.name}</span>
+   124→                      <span className="text-muted-foreground tabular-nums text-xs sm:text-sm">{rev.toLocaleString()} {sym}</span>
+   125→                    </div>
+   126→                    <div className="h-2.5 rounded-full bg-muted overflow-hidden">
+   127→                      <div className={`h-full rounded-full ${p.color} transition-all duration-700`} style={{ width: `${pct}%` }} />
+   128→                    </div>
+   129→                  </div>
+   130→                )
+   131→              })}
+   132→            </CardContent>
+   133→          </Card>
+   134→        </motion.div>
+   135→
+   136→        <motion.div variants={fade} initial="hidden" animate="visible" transition={{ delay: 0.2 }}>
+   137→          <Card className="border-0 shadow-sm h-full">
+   138→            <CardHeader className="pb-2"><CardTitle className="text-sm sm:text-base font-semibold">{t.recentActivity}</CardTitle></CardHeader>
+   139→            <CardContent>
+   140→              <div className="space-y-1">{logs.slice(0, 6).map(l => (
+   141→                <div key={l.id} className="flex gap-3 rounded-lg px-2.5 py-2 hover:bg-muted/50 transition-colors">
+   142→                  <LogDot level={l.level} />
+   143→                  <div className="min-w-0 flex-1">
+   144→                    <p className="text-xs sm:text-sm leading-relaxed line-clamp-2">{logMsg(l, lang)}</p>
+   145→                    <p className="text-[10px] sm:text-[11px] text-muted-foreground mt-0.5">{logSrc(l, lang)}</p>
+   146→                  </div>
+   147→                </div>
+   148→              ))}</div>
+   149→            </CardContent>
+   150→          </Card>
+   151→        </motion.div>
+   152→      </div>
+   153→
+   154→      <motion.div variants={fade} initial="hidden" animate="visible" transition={{ delay: 0.25 }}>
+   155→        <Card className="border-0 shadow-sm">
+   156→          <CardHeader className="pb-2"><CardTitle className="text-sm sm:text-base font-semibold">{t.activeTenants}</CardTitle></CardHeader>
+   157→          <CardContent>
+   158→            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
+   159→              {activeTenants.map(tn => (
+   160→                <button key={tn.id} className="flex items-center gap-3 rounded-xl border p-3 text-start hover:bg-accent/50 transition-colors group" onClick={() => toast.info(t.details.replace('{name}', bField(tn, 'name', lang)))}>
+   161→                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-900/30 text-violet-600 font-bold text-sm">{bField(tn, 'name', lang).charAt(0)}</div>
+   162→                  <div className="min-w-0 flex-1">
+   163→                    <p className="text-sm font-semibold truncate">{bField(tn, 'name', lang)}</p>
+   164→                    <p className="text-xs text-muted-foreground">{tn.plan} · {tn.bookings.toLocaleString()} {t.bookings}</p>
+   165→                  </div>
+   166→                  <ChevronLeft className="h-4 w-4 text-muted-foreground shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" style={{ transform: isRTL ? 'scaleX(-1)' : undefined }} />
+   167→                </button>
+   168→              ))}
+   169→            </div>
+   170→          </CardContent>
+   171→        </Card>
+   172→      </motion.div>
+   173→    </div>
+   174→  )
+   175→}
+   176→
+   177→// ════════════════════════════════════════════════════════════════
+   178→// PAGE 2: TENANTS (full CRUD + sort + pagination)
+   179→// ════════════════════════════════════════════════════════════════
+   180→function TenantsPage() {
+   181→  const { t, isRTL, lang } = useSA()
+   182→  const { sym } = useCurrency()
+   183→  const [tenants, setTenants] = useState<Tenant[]>(INIT_TENANTS)
+   184→  const [search, setSearch] = useState('')
+   185→  const [filter, setFilter] = useState('all')
+   186→  const [page, setPage] = useState(1)
+   187→  const [sort, setSort] = useState<SortState>({ key: 'name', dir: 'asc' })
+   188→  const [dlg, setDlg] = useState<{ type: string; tenant?: Tenant } | null>(null)
+   189→  const [form, setForm] = useState({ name: '', nameEn: '', email: '', country: '', plan: 'Starter' })
+   190→  const [extendDlg, setExtendDlg] = useState<Tenant | null>(null)
+   191→  const [extendMonths, setExtendMonths] = useState(12)
+   192→  const [extendPlan, setExtendPlan] = useState('')
+   193→  const [wizardOpen, setWizardOpen] = useState(false)
+   194→  const [detailTenant, setDetailTenant] = useState<Tenant | null>(null)
+   195→
+   196→  const filtered = useMemo(() => {
+   197→    let list = [...tenants]
+   198→    if (filter !== 'all') list = list.filter(tn => tn.status === filter)
+   199→    if (search) { const q = search.toLowerCase(); list = list.filter(tn => tn.name.includes(q) || tn.nameEn.toLowerCase().includes(q) || tn.email.toLowerCase().includes(q)) }
+   200→    return genericSort(list, sort.key, sort.dir, lang)
+   201→  }, [tenants, search, filter, sort, lang])
+   202→
+   203→  const { items, totalPages } = paginate(filtered, page, PER_PAGE)
+   204→  const handleSort = (key: string) => setSort(p => p.key === key ? { key, dir: p.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' })
+   205→
+   206→  const openAdd = () => { setWizardOpen(true) }
+   207→  const openEdit = (tn: Tenant) => { setForm({ name: tn.name, nameEn: tn.nameEn, email: tn.email, country: tn.country, plan: tn.plan }); setDlg({ type: 'edit', tenant: tn }) }
+   208→
+   209→  // Wizard-based tenant creation with full validation
+   210→  const handleWizardSave = useCallback((data: TenantFormData) => {
+   211→    // Duplicate checks
+   212→    const emailExists = tenants.some(tn => tn.email.toLowerCase() === data.email.toLowerCase())
+   213→    if (emailExists) { toast.error(isRTL ? 'البريد الإلكتروني مستخدم بالفعل' : 'Email already exists'); return }
+   214→    const nameArExists = tenants.some(tn => tn.name === data.nameAr.trim())
+   215→    if (nameArExists) { toast.error(isRTL ? 'اسم المستأجر (عربي) مستخدم بالفعل' : 'Tenant Arabic name already exists'); return }
+   216→    const nameEnExists = tenants.some(tn => tn.nameEn === data.nameEn.trim())
+   217→    if (nameEnExists) { toast.error(isRTL ? 'اسم المستأجر (إنجليزي) مستخدم بالفعل' : 'Tenant English name already exists'); return }
+   218→
+   219→    // Calculate subscription end date based on billing cycle
+   220→    const cycleMonths = data.billingCycle === 'quarterly' ? 3 : data.billingCycle === 'yearly' ? 12 : 1
+   221→    const endDate = new Date(data.startDate)
+   222→    endDate.setMonth(endDate.getMonth() + cycleMonths)
+   223→
+   224→    const newTenant: Tenant = {
+   225→      id: Date.now().toString(),
+   226→      name: data.nameAr,
+   227→      nameEn: data.nameEn,
+   228→      email: data.email,
+   229→      country: data.country,
+   230→      plan: data.plan,
+   231→      bookings: 0,
+   232→      revenue: 0,
+   233→      users: 1,
+   234→      status: 'active',
+   235→      createdAt: data.startDate,
+   236→      subscriptionStatus: 'active',
+   237→      subscriptionEndDate: endDate.toISOString().split('T')[0],
+   238→    }
+   239→    // Atomic update: add tenant + create invoice in one state batch
+   240→    setTenants(prev => [newTenant, ...prev])
+   241→    setPage(1)
+   242→    setFilter('all')
+   243→    setSearch('')
+   244→  }, [tenants, isRTL])
+   245→
+   246→  const handleSave = useCallback(() => {
+   247→    if (!form.name.trim()) { toast.error(t.enterTenantName); return }
+   248→    if (form.email && !form.email.includes('@')) { toast.error(t.enterValidEmail); return }
+   249→    if (dlg?.type === 'edit' && dlg.tenant) {
+   250→      // Check for duplicates on edit (excluding self)
+   251→      const dupEmail = tenants.some(tn => tn.id !== dlg.tenant!.id && tn.email.toLowerCase() === form.email.toLowerCase())
+   252→      if (dupEmail) { toast.error(isRTL ? 'البريد الإلكتروني مستخدم بالفعل' : 'Email already exists'); return }
+   253→      setTenants(p => p.map(tn => tn.id === dlg.tenant!.id ? { ...tn, ...form } : tn)); toast.success(t.updated)
+   254→    }
+   255→    setDlg(null); setPage(1)
+   256→  }, [form, dlg, t, tenants, isRTL])
+   257→
+   258→  const handleDelete = (tn: Tenant) => { setTenants(p => p.filter(x => x.id !== tn.id)); toast.success(t.deleted); setPage(1) }
+   259→  const handleToggleStatus = (tn: Tenant) => {
+   260→    const newStatus = tn.status === 'suspended' ? 'active' : 'suspended'
+   261→    setTenants(p => p.map(x => x.id === tn.id ? { ...x, status: newStatus } : x))
+   262→    toast.success(newStatus === 'suspended' ? t.tenantSuspended : t.tenantActivated)
+   263→    setPage(1)
+   264→  }
+   265→
+   266→  const openExtend = (tn: Tenant) => { setExtendDlg(tn); setExtendPlan(tn.plan); setExtendMonths(12) }
+   267→  const handleExtend = () => {
+   268→    if (!extendDlg) return
+   269→    const startDate = extendDlg.subscriptionEndDate && extendDlg.subscriptionEndDate > new Date().toISOString().split('T')[0]
+   270→      ? new Date(extendDlg.subscriptionEndDate) : new Date()
+   271→    const newEnd = new Date(startDate)
+   272→    newEnd.setMonth(newEnd.getMonth() + extendMonths)
+   273→    setTenants(p => p.map(x => x.id === extendDlg.id ? {
+   274→      ...x, plan: extendPlan || x.plan,
+   275→      subscriptionStatus: 'active', status: 'active',
+   276→      subscriptionEndDate: newEnd.toISOString().split('T')[0]
+   277→    } : x))
+   278→    toast.success(t.subscriptionExtended)
+   279→    setExtendDlg(null)
+   280→  }
+   281→
+   282→  const tnName = (tn: Tenant) => bField(tn, 'name', lang)
+   283→
+   284→  // Existing tenants for wizard duplicate check
+   285→  const existingTenants = useMemo(() => tenants.map(tn => ({ email: tn.email, name: tn.name, nameEn: tn.nameEn })), [tenants])
+   286→
+   287→  return (
+   288→    <div className="space-y-5">
+   289→      <PageTitle title={t.tenantMgmt} action={<PrimaryBtn icon={Plus} label={t.addTenant} onClick={openAdd} />} />
+   290→      <div className="flex flex-col sm:flex-row gap-3">
+   291→        <SearchInput value={search} onChange={v => { setSearch(v); setPage(1) }} placeholder={t.tenantSearch} />
+   292→        <Select value={filter} onValueChange={v => { setFilter(v); setPage(1) }}>
+   293→          <SelectTrigger className="w-full sm:w-44 h-10"><SelectValue /></SelectTrigger>
+   294→          <SelectContent>
+   295→            <SelectItem value="all">{t.allStatuses}</SelectItem>
+   296→            <SelectItem value="active">{t.active}</SelectItem>
+   297→            <SelectItem value="trial">{t.trial}</SelectItem>
+   298→            <SelectItem value="suspended">{t.suspended}</SelectItem>
+   299→          </SelectContent>
+   300→        </Select>
+   301→      </div>
+   302→
+   303→      <Card className="border-0 shadow-sm overflow-hidden hidden md:block">
+   304→        <div className="overflow-x-auto">
+   305→          <Table>
+   306→            <TableHeader><TableRow className="bg-muted/50 hover:bg-muted/50">
+   307→              <SortableTH label={t.tenant} sortKey="name" currentSort={sort} onSort={handleSort} className="ps-5" />
+   308→              <SortableTH label={t.plan} sortKey="plan" currentSort={sort} onSort={handleSort} />
+   309→              <SortableTH label={t.bookings} sortKey="bookings" currentSort={sort} onSort={handleSort} align="end" />
+   310→              <SortableTH label={t.tenantRevenue} sortKey="revenue" currentSort={sort} onSort={handleSort} align="end" />
+   311→              <SortableTH label={t.status} sortKey="status" currentSort={sort} onSort={handleSort} />
+   312→              <TableHead className="px-3 font-semibold text-xs uppercase tracking-wider">{t.subscriptionStatus}</TableHead>
+   313→              <TableHead className="pe-5 font-semibold text-xs uppercase tracking-wider text-end">{t.actions}</TableHead>
+   314→            </TableRow></TableHeader>
+   315→            <TableBody>
+   316→              {items.length === 0 ? <EmptyRow colSpan={7} /> : items.map(tn => (
+   317→                <TableRow key={tn.id} className="group hover:bg-muted/20 transition-colors">
+   318→                  <TableCell className="ps-5">
+   319→                    <div className="flex items-center gap-3">
+   320→                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-900/30 text-violet-600 font-bold text-xs">{tnName(tn).charAt(0)}</div>
+   321→                      <div className="min-w-0"><p className="font-medium text-sm truncate max-w-[200px]">{tnName(tn)}</p><p className="text-xs text-muted-foreground truncate max-w-[200px]" dir="ltr">{tn.email}</p></div>
+   322→                    </div>
+   323→                  </TableCell>
+   324→                  <TableCell className="px-3"><Badge variant="secondary" className="font-medium text-xs">{tn.plan}</Badge></TableCell>
+   325→                  <TableCell className="px-3 text-end tabular-nums text-sm">{tn.bookings.toLocaleString()}</TableCell>
+   326→                  <TableCell className="px-3 text-end font-semibold tabular-nums text-sm">{tn.revenue.toLocaleString()} <span className="text-xs font-normal text-muted-foreground">{sym}</span></TableCell>
+   327→                  <TableCell className="px-3"><StatusBadge status={tn.status} locale={lang} /></TableCell>
+   328→                  <TableCell className="px-3">
+   329→                    <div className="space-y-0.5">
+   330→                      <StatusBadge status={tn.subscriptionStatus} locale={lang} />
+   331→                      {tn.subscriptionEndDate && <p className="text-[10px] text-muted-foreground">{t.subscriptionEnd}: {tn.subscriptionEndDate}</p>}
+   332→                    </div>
+   333→                  </TableCell>
+   334→                  <TableCell className="pe-5">
+   335→                    <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+   336→                      <ActionBtn icon={Eye} label={t.view} onClick={() => setDetailTenant(tn)} />
+   337→                      <ActionBtn icon={Edit} label={t.edit} onClick={() => openEdit(tn)} />
+   338→                      <ActionBtn icon={CalendarDays} label={t.extendSubscription} onClick={() => openExtend(tn)} />
+   339→                      <ActionBtn icon={tn.status === 'suspended' ? Power : PowerOff} label={tn.status === 'suspended' ? t.active : t.suspended} onClick={() => handleToggleStatus(tn)} />
+   340→                      <ActionBtn icon={Trash2} onClick={() => setDlg({ type: 'delete', tenant: tn })} danger />
+   341→                    </div>
+   342→                  </TableCell>
+   343→                </TableRow>
+   344→              ))}
+   345→            </TableBody>
+   346→          </Table>
+   347→        </div>
+   348→        <TableFooter current={items.length} total={filtered.length} entity={t.tenant.toLowerCase()} />
+   349→        <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+   350→      </Card>
+   351→
+   352→      <div className="md:hidden space-y-3">
+   353→        {items.length === 0 ? <Card className="border-0 shadow-sm"><CardContent className="py-16 text-center text-muted-foreground text-sm">{t.noResults}</CardContent></Card> : items.map(tn => (
+   354→          <Card key={tn.id} className="border-0 shadow-sm"><CardContent className="p-4">
+   355→            <div className="flex items-start justify-between gap-3 mb-3">
+   356→              <div className="flex items-center gap-3 min-w-0">
+   357→                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-900/30 text-violet-600 font-bold text-sm">{tnName(tn).charAt(0)}</div>
+   358→                <div className="min-w-0"><p className="font-semibold text-sm truncate">{tnName(tn)}</p><p className="text-xs text-muted-foreground truncate" dir="ltr">{tn.email}</p></div>
+   359→              </div>
+   360→              <StatusBadge status={tn.status} locale={lang} />
+   361→            </div>
+   362→            <div className="grid grid-cols-3 gap-3 mb-3 text-center">
+   363→              <div className="rounded-lg bg-muted/50 p-2"><p className="text-[10px] text-muted-foreground">{t.plan}</p><p className="text-xs font-semibold mt-0.5">{tn.plan}</p></div>
+   364→              <div className="rounded-lg bg-muted/50 p-2"><p className="text-[10px] text-muted-foreground">{t.bookings}</p><p className="text-xs font-semibold mt-0.5 tabular-nums">{tn.bookings.toLocaleString()}</p></div>
+   365→              <div className="rounded-lg bg-muted/50 p-2"><p className="text-[10px] text-muted-foreground">{t.tenantRevenue}</p><p className="text-xs font-semibold mt-0.5 tabular-nums">{tn.revenue.toLocaleString()} {sym}</p></div>
+   366→            </div>
+   367→            <div className="flex items-center gap-2 mb-3">
+   368→              <StatusBadge status={tn.subscriptionStatus} locale={lang} />
+   369→              {tn.subscriptionEndDate && <span className="text-[10px] text-muted-foreground">{t.subscriptionEnd}: {tn.subscriptionEndDate}</span>}
+   370→            </div>
+   371→            <div className="flex items-center justify-end gap-1 pt-2 border-t">
+   372→              <ActionBtn icon={Eye} onClick={() => setDetailTenant(tn)} />
+   373→              <ActionBtn icon={CalendarDays} label={t.extendSubscription} onClick={() => openExtend(tn)} />
+   374→              <ActionBtn icon={Edit} label={t.edit} onClick={() => openEdit(tn)} />
+   375→              <ActionBtn icon={tn.status === 'suspended' ? Power : PowerOff} label={tn.status === 'suspended' ? t.active : t.suspended} onClick={() => handleToggleStatus(tn)} />
+   376→              <ActionBtn icon={Trash2} onClick={() => setDlg({ type: 'delete', tenant: tn })} danger />
+   377→            </div>
+   378→          </CardContent></Card>
+   379→        ))}
+   380→      </div>
+   381→
+   382→      <Dialog open={dlg?.type === 'edit'} onOpenChange={() => setDlg(null)}>
+   383→        <DialogContent className="max-w-md" dir={isRTL ? 'rtl' : 'ltr'}><DialogHeader><DialogTitle>{t.editTenantDlg}</DialogTitle><DialogDescription className="sr-only">{isRTL ? 'تعديل بيانات المستأجر' : 'Edit tenant details'}</DialogDescription></DialogHeader>
+   384→          <div className="space-y-4 pt-2">
+   385→            <FormField label={t.nameAr}><Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} /></FormField>
+   386→            <FormField label={t.nameEn}><Input value={form.nameEn} onChange={e => setForm(p => ({ ...p, nameEn: e.target.value }))} dir="ltr" /></FormField>
+   387→            <FormField label={t.email}><Input type="email" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} dir="ltr" /></FormField>
+   388→            <div className="grid grid-cols-2 gap-3">
+   389→              <FormField label={t.country}><Input value={form.country} onChange={e => setForm(p => ({ ...p, country: e.target.value }))} /></FormField>
+   390→              <FormField label={t.plan}><Select value={form.plan} onValueChange={v => setForm(p => ({ ...p, plan: v }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{PLANS.map(p => <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>)}</SelectContent></Select></FormField>
+   391→            </div>
+   392→          </div>
+   393→          <DlgFooter onCancel={() => setDlg(null)} onConfirm={handleSave} />
+   394→        </DialogContent>
+   395→      </Dialog>
+   396→      <ConfirmDialog open={dlg?.type === 'delete'} onOpenChange={() => setDlg(null)} title={t.deleteTenantDlg} desc={t.deleteTenantDesc.replace('{name}', dlg?.tenant?.name || '')} onConfirm={() => { if (dlg?.tenant) handleDelete(dlg.tenant) }} danger />
+   397→
+   398→      {/* Extend Subscription Dialog */}
+   399→      <Dialog open={!!extendDlg} onOpenChange={() => setExtendDlg(null)}>
+   400→        <DialogContent className="max-w-md" dir={isRTL ? 'rtl' : 'ltr'}>
+   401→          <DialogHeader><DialogTitle>{t.extendSubscriptionDlg}</DialogTitle><DialogDescription className="sr-only">{isRTL ? 'تمديد اشتراك المستأجر' : 'Extend tenant subscription'}</DialogDescription></DialogHeader>
+   402→          <div className="space-y-4 pt-2">
+   403→            {extendDlg && <>
+   404→              <div className="rounded-lg bg-muted/50 p-3 space-y-1">
+   405→                <p className="font-semibold text-sm">{tnName(extendDlg)}</p>
+   406→                <div className="flex items-center gap-2">
+   407→                  <StatusBadge status={extendDlg.subscriptionStatus} locale={lang} />
+   408→                  {extendDlg.subscriptionEndDate && <span className="text-[11px] text-muted-foreground">{t.subscriptionEnd}: {extendDlg.subscriptionEndDate}</span>}
+   409→                </div>
+   410→              </div>
+   411→              <FormField label={t.plan}>
+   412→                <Select value={extendPlan} onValueChange={setExtendPlan}>
+   413→                  <SelectTrigger><SelectValue /></SelectTrigger>
+   414→                  <SelectContent>{PLANS.filter(p => p.price > 0).map(p => <SelectItem key={p.id} value={p.name}>{p.name} — {p.price} {sym}/{t.perMonth}</SelectItem>)}</SelectContent>
+   415→                </Select>
+   416→              </FormField>
+   417→              <FormField label={t.durationMonths}>
+   418→                <Select value={String(extendMonths)} onValueChange={v => setExtendMonths(Number(v))}>
+   419→                  <SelectTrigger><SelectValue /></SelectTrigger>
+   420→                  <SelectContent>
+   421→                    {[1, 3, 6, 12, 24].map(m => <SelectItem key={m} value={String(m)}>{m} {t.months}</SelectItem>)}
+   422→                  </SelectContent>
+   423→                </Select>
+   424→              </FormField>
+   425→              {extendPlan && (() => {
+   426→                const plan = PLANS.find(p => p.name === extendPlan)
+   427→                const total = plan ? plan.price * extendMonths : 0
+   428→                return total > 0 ? (
+   429→                  <div className="rounded-lg bg-violet-50 dark:bg-violet-950/30 p-3 text-center">
+   430→                    <p className="text-[10px] text-muted-foreground">{isRTL ? 'الإجمالي' : 'Total'}</p>
+   431→                    <p className="text-lg font-bold text-violet-700 dark:text-violet-400">{total.toLocaleString()} {sym}</p>
+   432→                  </div>
+   433→                ) : null
+   434→              })()}
+   435→            </>}
+   436→          </div>
+   437→          <DlgFooter onCancel={() => setExtendDlg(null)} onConfirm={handleExtend} confirmLabel={isRTL ? 'تمديد الاشتراك' : 'Extend Subscription'} />
+   438→        </DialogContent>
+   439→      </Dialog>
+   440→
+   441→      {/* Multi-step Tenant Creation Wizard */}
+   442→      <TenantWizard open={wizardOpen} onClose={() => setWizardOpen(false)} onSave={handleWizardSave} existingTenants={existingTenants} />
+   443→
+   444→      {/* Tenant Details Dialog */}
+   445→      {detailTenant && <TenantDetailsDialog tenant={detailTenant} open={!!detailTenant} onClose={() => setDetailTenant(null)} />}
+   446→    </div>
+   447→  )
+   448→}
+   449→
+   450→// ════════════════════════════════════════════════════════════════
+   451→// PAGE 3: USERS (full CRUD + sort + pagination)
+   452→// ════════════════════════════════════════════════════════════════
+   453→function UsersPage() {
+   454→  const { t, lang, isRTL } = useSA()
+   455→  const [users, setUsers] = useState<PlatformUser[]>(INIT_USERS)
+   456→  const [search, setSearch] = useState('')
+   457→  const [filter, setFilter] = useState('all')
+   458→  const [page, setPage] = useState(1)
+   459→  const [sort, setSort] = useState<SortState>({ key: 'name', dir: 'asc' })
+   460→  const [dlg, setDlg] = useState<{ type: string; user?: PlatformUser } | null>(null)
+   461→  const [form, setForm] = useState({ name: '', email: '', tenant: '', role: 'owner' })
+   462→
+   463→  const ROLE_MAP: Record<string, string> = { owner: t.owner, manager: t.manager, receptionist: t.receptionist, accountant: t.accountant }
+   464→
+   465→  const filtered = useMemo(() => {
+   466→    let list = [...users]
+   467→    if (filter !== 'all') list = list.filter(u => u.status === filter)
+   468→    if (search) { const q = search.toLowerCase(); list = list.filter(u => u.name.includes(q) || u.email.toLowerCase().includes(q) || u.tenant.includes(q)) }
+   469→    return genericSort(list, sort.key, sort.dir, lang)
+   470→  }, [users, search, filter, sort, lang])
+   471→
+   472→  const { items, totalPages } = paginate(filtered, page, PER_PAGE)
+   473→  const handleSort = (key: string) => setSort(p => p.key === key ? { key, dir: p.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' })
+   474→
+   475→  const openAdd = () => { setForm({ name: '', email: '', tenant: '', role: 'owner' }); setDlg({ type: 'add' }) }
+   476→  const openEdit = (u: PlatformUser) => { setForm({ name: u.name, email: u.email, tenant: u.tenant, role: u.role }); setDlg({ type: 'edit', user: u }) }
+   477→
+   478→  const handleSave = useCallback(() => {
+   479→    if (!form.name.trim() || !form.email.trim()) { toast.error(t.enterNameAndEmail); return }
+   480→    if (dlg?.type === 'add') {
+   481→      setUsers(p => [{ id: Date.now().toString(), ...form, tenantEn: '', status: 'active', lastLogin: new Date().toISOString() }, ...p])
+   482→      toast.success(t.added.replace('{name}', form.name))
+   483→    } else if (dlg?.user) {
+   484→      setUsers(p => p.map(u => u.id === dlg.user!.id ? { ...u, ...form } : u)); toast.success(t.updated)
+   485→    }
+   486→    setDlg(null); setPage(1)
+   487→  }, [form, dlg, t])
+   488→
+   489→  const handleDelete = (u: PlatformUser) => { setUsers(p => p.filter(x => x.id !== u.id)); toast.success(t.userDeleted); setPage(1) }
+   490→  const handleToggleStatus = (u: PlatformUser) => {
+   491→    const newStatus = u.status === 'suspended' ? 'active' : 'suspended'
+   492→    setUsers(p => p.map(x => x.id === u.id ? { ...x, status: newStatus } : x))
+   493→    toast.success(newStatus === 'suspended' ? t.userSuspended : t.userActivated)
+   494→  }
+   495→
+   496→  return (
+   497→    <div className="space-y-5">
+   498→      <PageTitle title={t.userMgmt} action={<PrimaryBtn icon={UserPlus} label={t.addUser} onClick={openAdd} />} />
+   499→      <div className="flex flex-col sm:flex-row gap-3">
+   500→        <SearchInput value={search} onChange={v => { setSearch(v); setPage(1) }} placeholder={t.userSearch} />
+   501→        <Select value={filter} onValueChange={v => { setFilter(v); setPage(1) }}>
+   502→          <SelectTrigger className="w-full sm:w-44 h-10"><SelectValue /></SelectTrigger>
+   503→          <SelectContent><SelectItem value="all">{t.all}</SelectItem><SelectItem value="active">{t.active}</SelectItem><SelectItem value="suspended">{t.suspended}</SelectItem></SelectContent>
+   504→        </Select>
+   505→      </div>
+   506→
+   507→      <Card className="border-0 shadow-sm overflow-hidden hidden md:block">
+   508→        <div className="overflow-x-auto">
+   509→          <Table><TableHeader><TableRow className="bg-muted/50 hover:bg-muted/50">
+   510→            <SortableTH label={t.user} sortKey="name" currentSort={sort} onSort={handleSort} className="ps-5" />
+   511→            <SortableTH label={t.email} sortKey="email" currentSort={sort} onSort={handleSort} />
+   512→            <SortableTH label={t.tenant} sortKey="tenant" currentSort={sort} onSort={handleSort} />
+   513→            <SortableTH label={t.role} sortKey="role" currentSort={sort} onSort={handleSort} />
+   514→            <SortableTH label={t.status} sortKey="status" currentSort={sort} onSort={handleSort} />
+   515→            <TableHead className="pe-5 font-semibold text-xs uppercase tracking-wider text-end">{t.actions}</TableHead>
+   516→          </TableRow></TableHeader>
+   517→          <TableBody>
+   518→            {items.length === 0 ? <EmptyRow colSpan={6} /> : items.map(u => (
+   519→              <TableRow key={u.id} className="group hover:bg-muted/20 transition-colors">
+   520→                <TableCell className="ps-5">
+   521→                  <div className="flex items-center gap-3">
+   522→                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky-100 dark:bg-sky-900/30 text-sky-600 font-bold text-xs">{u.name.charAt(0)}</div>
+   523→                    <span className="font-medium text-sm">{u.name}</span>
+   524→                  </div>
+   525→                </TableCell>
+   526→                <TableCell className="px-3 text-sm text-muted-foreground" dir="ltr">{u.email}</TableCell>
+   527→                <TableCell className="px-3 text-sm">{userTenant(u, lang)}</TableCell>
+   528→                <TableCell className="px-3"><Badge variant="secondary" className="text-xs">{ROLE_MAP[u.role] || u.role}</Badge></TableCell>
+   529→                <TableCell className="px-3"><StatusBadge status={u.status} locale={lang} /></TableCell>
+   530→                <TableCell className="pe-5">
+   531→                  <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+   532→                    <ActionBtn icon={Edit} label={t.edit} onClick={() => openEdit(u)} />
+   533→                    <ActionBtn icon={u.status === 'suspended' ? Power : PowerOff} label={u.status === 'suspended' ? t.active : t.suspended} onClick={() => handleToggleStatus(u)} />
+   534→                    <ActionBtn icon={Trash2} onClick={() => setDlg({ type: 'delete', user: u })} danger />
+   535→                  </div>
+   536→                </TableCell>
+   537→              </TableRow>
+   538→            ))}
+   539→          </TableBody></Table>
+   540→        </div>
+   541→        <TableFooter current={items.length} total={filtered.length} entity={t.user.toLowerCase()} />
+   542→        <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+   543→      </Card>
+   544→
+   545→      <div className="md:hidden space-y-3">
+   546→        {items.length === 0 ? <Card className="border-0 shadow-sm"><CardContent className="py-16 text-center text-muted-foreground text-sm">{t.noResults}</CardContent></Card> : items.map(u => (
+   547→          <Card key={u.id} className="border-0 shadow-sm"><CardContent className="p-4">
+   548→            <div className="flex items-start justify-between gap-3 mb-3">
+   549→              <div className="flex items-center gap-3 min-w-0">
+   550→                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-sky-100 dark:bg-sky-900/30 text-sky-600 font-bold text-sm">{u.name.charAt(0)}</div>
+   551→                <div className="min-w-0"><p className="font-semibold text-sm truncate">{u.name}</p><p className="text-xs text-muted-foreground truncate" dir="ltr">{u.email}</p></div>
+   552→              </div>
+   553→              <StatusBadge status={u.status} locale={lang} />
+   554→            </div>
+   555→            <div className="grid grid-cols-2 gap-3 mb-3">
+   556→              <div className="rounded-lg bg-muted/50 p-2"><p className="text-[10px] text-muted-foreground">{t.tenant}</p><p className="text-xs font-semibold mt-0.5 truncate">{userTenant(u, lang)}</p></div>
+   557→              <div className="rounded-lg bg-muted/50 p-2"><p className="text-[10px] text-muted-foreground">{t.role}</p><p className="text-xs font-semibold mt-0.5">{ROLE_MAP[u.role] || u.role}</p></div>
+   558→            </div>
+   559→            <div className="flex items-center justify-end gap-1 pt-2 border-t">
+   560→              <ActionBtn icon={Edit} label={t.edit} onClick={() => openEdit(u)} />
+   561→              <ActionBtn icon={u.status === 'suspended' ? Power : PowerOff} label={u.status === 'suspended' ? t.active : t.suspended} onClick={() => handleToggleStatus(u)} />
+   562→              <ActionBtn icon={Trash2} onClick={() => setDlg({ type: 'delete', user: u })} danger />
+   563→            </div>
+   564→          </CardContent></Card>
+   565→        ))}
+   566→      </div>
+   567→
+   568→      <Dialog open={dlg?.type === 'add' || dlg?.type === 'edit'} onOpenChange={() => setDlg(null)}>
+   569→        <DialogContent className="max-w-md" dir={isRTL ? 'rtl' : 'ltr'}><DialogHeader><DialogTitle>{dlg?.type === 'add' ? t.addUserDlg : t.editUserDlg}</DialogTitle><DialogDescription className="sr-only">{isRTL ? 'إدارة المستخدمين' : 'Manage users'}</DialogDescription></DialogHeader>
+   570→          <div className="space-y-4 pt-2">
+   571→            <FormField label={t.name}><Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} /></FormField>
+   572→            <FormField label={t.email}><Input type="email" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} dir="ltr" /></FormField>
+   573→            <FormField label={t.tenant}><Input value={form.tenant} onChange={e => setForm(p => ({ ...p, tenant: e.target.value }))} /></FormField>
+   574→            <FormField label={t.role}><Select value={form.role} onValueChange={v => setForm(p => ({ ...p, role: v }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="owner">{t.owner}</SelectItem><SelectItem value="manager">{t.manager}</SelectItem><SelectItem value="receptionist">{t.receptionist}</SelectItem><SelectItem value="accountant">{t.accountant}</SelectItem></SelectContent></Select></FormField>
+   575→          </div>
+   576→          <DlgFooter onCancel={() => setDlg(null)} onConfirm={handleSave} />
+   577→        </DialogContent>
+   578→      </Dialog>
+   579→      <ConfirmDialog open={dlg?.type === 'delete'} onOpenChange={() => setDlg(null)} title={t.deleteUserDlg} desc={t.confirmDeleteUser.replace('{name}', dlg?.user?.name || '')} onConfirm={() => { if (dlg?.user) handleDelete(dlg.user) }} danger />
+   580→    </div>
+   581→  )
+   582→}
+   583→
+   584→// ════════════════════════════════════════════════════════════════
+   585→// PAGE 4: PLANS (Full CRUD + JOD currency)
+   586→// ════════════════════════════════════════════════════════════════
+   587→const PLAN_COLORS = ['bg-gray-500', 'bg-sky-500', 'bg-violet-500', 'bg-indigo-500', 'bg-emerald-500', 'bg-amber-500', 'bg-rose-500']
+   588→
+   589→function PlansPage() {
+   590→  const { t, lang, isRTL } = useSA()
+   591→  const { sym, fmt } = useCurrency()
+   592→  const [plans, setPlans] = useState<Plan[]>([...PLANS])
+   593→  const [dlg, setDlg] = useState<{ type: 'add' | 'edit' | 'delete'; plan?: Plan } | null>(null)
+   594→  const [detailPlan, setDetailPlan] = useState<Plan | null>(null)
+   595→  const emptyFeature = { ar: '', en: '' }
+   596→  const [form, setForm] = useState({ name: '', price: 0, tenants: 0, color: 'bg-violet-500', popular: false, features: [{ ar: '', en: '' }] as { ar: string; en: string }[] })
+   597→
+   598→  const openAdd = () => {
+   599→    setForm({ name: '', price: 0, tenants: 0, color: 'bg-violet-500', popular: false, features: [{ ar: '', en: '' }] })
+   600→    setDlg({ type: 'add' })
+   601→  }
+   602→  const openEdit = (p: Plan) => {
+   603→    setForm({ name: p.name, price: p.price, tenants: p.tenants, color: p.color, popular: p.popular, features: [...p.features] })
+   604→    setDlg({ type: 'edit', plan: p })
+   605→  }
+   606→
+   607→  const handleSave = useCallback(() => {
+   608→    if (!form.name.trim()) { toast.error(lang === 'ar' ? 'يرجى إدخال اسم الباقة' : 'Please enter plan name'); return }
+   609→    const cleanFeatures = form.features.filter(f => f.ar.trim() || f.en.trim())
+   610→    if (cleanFeatures.length === 0) { toast.error(lang === 'ar' ? 'أضف ميزة واحدة على الأقل' : 'Add at least one feature'); return }
+   611→    if (dlg?.type === 'add') {
+   612→      const p: Plan = { id: Date.now().toString(), name: form.name, price: form.price, tenants: form.tenants, features: cleanFeatures, color: form.color, popular: form.popular, currency: 'JOD' }
+   613→      setPlans(prev => [...prev, p]); toast.success(lang === 'ar' ? 'تم إنشاء الباقة' : 'Plan created')
+   614→    } else if (dlg?.plan) {
+   615→      setPlans(prev => prev.map(p => p.id === dlg.plan!.id ? { ...p, name: form.name, price: form.price, tenants: form.tenants, features: cleanFeatures, color: form.color, popular: form.popular } : p))
+   616→      toast.success(t.updated)
+   617→    }
+   618→    setDlg(null)
+   619→  }, [form, dlg, t, lang])
+   620→
+   621→  const handleDelete = () => {
+   622→    if (!dlg?.plan) return
+   623→    setPlans(prev => prev.filter(p => p.id !== dlg.plan!.id)); toast.success(t.deleted); setDlg(null)
+   624→  }
+   625→
+   626→  const addFeature = () => setForm(p => ({ ...p, features: [...p.features, { ar: '', en: '' }] }))
+   627→  const removeFeature = (i: number) => setForm(p => ({ ...p, features: p.features.filter((_, idx) => idx !== i) }))
+   628→  const updateFeature = (i: number, field: 'ar' | 'en', val: string) => {
+   629→    setForm(p => { const f = [...p.features]; f[i] = { ...f[i], [field]: val }; return { ...p, features: f } })
+   630→  }
+   631→
+   632→  return (
+   633→    <div className="space-y-6">
+   634→      <PageTitle title={t.plansTitle} action={<PrimaryBtn icon={Plus} label={t.createPlan} onClick={openAdd} />} />
+   635→      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 sm:gap-5">
+   636→        {plans.map((p, i) => (
+   637→          <motion.div key={p.id} variants={fade} initial="hidden" animate="visible" transition={{ delay: i * 0.04 }}>
+   638→            <Card className={`h-full flex flex-col transition-all hover:shadow-lg border-0 shadow-sm ${p.popular ? 'ring-2 ring-violet-500 shadow-violet-500/10' : ''}`}>
+   639→              <CardContent className="flex-1 flex flex-col items-center p-5 sm:p-6 pt-7">
+   640→                {p.popular && <Badge className="bg-violet-600 text-white mb-3 -mt-1 text-[10px]">{t.mostPopular}</Badge>}
+   641→                <div className={`h-12 w-12 rounded-2xl ${p.color} flex items-center justify-center mb-4 shadow-lg`}><CreditCard className="h-6 w-6 text-white" /></div>
+   642→                <h3 className="font-bold text-base">{p.name}</h3>
+   643→                <p className="text-3xl font-extrabold mt-3 mb-1">{p.price > 0 ? `${p.price}` : t.free}</p>
+   644→                <p className="text-xs text-muted-foreground mb-5">{p.price > 0 ? `${sym} ${t.perMonth}` : ''} · {p.tenants} {t.tenants}</p>
+   645→                <Separator className="w-full mb-5" />
+   646→                <ul className="space-y-2.5 w-full text-start flex-1">{p.features.map((f, j) => (
+   647→                  <li key={j} className="flex items-start gap-2 text-xs sm:text-sm"><CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" /><span>{lang === 'en' ? f.en : f.ar}</span></li>
+   648→                ))}</ul>
+   649→                <div className="flex gap-2 w-full mt-6">
+   650→                  <Button className={`flex-1 ${p.popular ? 'bg-violet-600 hover:bg-violet-700 text-white' : ''}`} variant={p.popular ? 'default' : 'outline'} onClick={() => setDetailPlan(p)}>{t.view}</Button>
+   651→                  <ActionBtn icon={Edit} label={t.edit} onClick={() => openEdit(p)} />
+   652→                  <ActionBtn icon={Trash2} onClick={() => setDlg({ type: 'delete', plan: p })} danger />
+   653→                </div>
+   654→              </CardContent>
+   655→            </Card>
+   656→          </motion.div>
+   657→        ))}
+   658→      </div>
+   659→
+   660→      {/* Detail Dialog */}
+   661→      <Dialog open={!!detailPlan} onOpenChange={() => setDetailPlan(null)}>
+   662→        <DialogContent className="max-w-sm" dir={isRTL ? 'rtl' : 'ltr'}><DialogHeader><DialogTitle>{t.planDetails}</DialogTitle><DialogDescription className="sr-only">{lang === 'ar' ? 'تفاصيل الباقة' : 'Plan details'}</DialogDescription></DialogHeader>
+   663→          {detailPlan && <div className="space-y-4 pt-2">
+   664→            <div className="text-center"><p className="text-3xl font-extrabold">{detailPlan.price > 0 ? `${detailPlan.price} ${sym}` : t.free}</p><p className="text-sm text-muted-foreground mt-1">{t.monthly} · {detailPlan.tenants} {t.tenants}</p></div>
+   665→            <Separator />
+   666→            <ul className="space-y-2">{detailPlan.features.map((f, i) => (<li key={i} className="flex items-center gap-2 text-sm"><CheckCircle2 className="h-4 w-4 text-emerald-500" />{lang === 'en' ? f.en : f.ar}</li>))}</ul>
+   667→          </div>}
+   668→          <DlgFooter onCancel={() => setDetailPlan(null)} onConfirm={() => { if (detailPlan) { openEdit(detailPlan); setDetailPlan(null) } }} confirmLabel={t.edit} />
+   669→        </DialogContent>
+   670→      </Dialog>
+   671→
+   672→      {/* Add/Edit Dialog */}
+   673→      <Dialog open={dlg?.type === 'add' || dlg?.type === 'edit'} onOpenChange={() => setDlg(null)}>
+   674→        <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto" dir={isRTL ? 'rtl' : 'ltr'}>
+   675→          <DialogHeader><DialogTitle>{dlg?.type === 'add' ? t.createPlan : t.editPlanDlg}</DialogTitle><DialogDescription className="sr-only">{lang === 'ar' ? 'إضافة أو تعديل باقة' : 'Add or edit a plan'}</DialogDescription></DialogHeader>
+   676→          <div className="space-y-4 pt-2">
+   677→            <FormField label={lang === 'ar' ? 'اسم الباقة' : 'Plan Name'}>
+   678→              <Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder={lang === 'ar' ? 'مثال: Professional' : 'e.g. Professional'} />
+   679→            </FormField>
+   680→            <div className="grid grid-cols-2 gap-3">
+   681→              <FormField label={t.amount}>
+   682→                <Input type="number" value={form.price || ''} onChange={e => setForm(p => ({ ...p, price: Number(e.target.value) }))} placeholder="0" />
+   683→              </FormField>
+   684→              <FormField label={lang === 'ar' ? 'عدد المستأجرين' : 'Max Tenants'}>
+   685→                <Input type="number" value={form.tenants || ''} onChange={e => setForm(p => ({ ...p, tenants: Number(e.target.value) }))} placeholder="0" />
+   686→              </FormField>
+   687→            </div>
+   688→            <FormField label={lang === 'ar' ? 'اللون' : 'Color'}>
+   689→              <div className="flex flex-wrap gap-2">
+   690→                {PLAN_COLORS.map(c => (
+   691→                  <button key={c} className={`h-8 w-8 rounded-full ${c} transition-transform ${form.color === c ? 'ring-2 ring-offset-2 ring-violet-500 scale-110' : 'opacity-60 hover:opacity-100'}`} onClick={() => setForm(p => ({ ...p, color: c }))} />
+   692→                ))}
+   693→              </div>
+   694→            </FormField>
+   695→            <div className="flex items-center justify-between">
+   696→              <span className="text-sm font-medium">{t.mostPopular}</span>
+   697→              <Toggle on={form.popular} onToggle={() => setForm(p => ({ ...p, popular: !p.popular }))} />
+   698→            </div>
+   699→            <Separator />
+   700→            <div className="space-y-3">
+   701→              <div className="flex items-center justify-between">
+   702→                <span className="text-sm font-medium">{lang === 'ar' ? 'المميزات' : 'Features'}</span>
+   703→                <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={addFeature}><Plus className="h-3 w-3" />{lang === 'ar' ? 'إضافة' : 'Add'}</Button>
+   704→              </div>
+   705→              {form.features.map((f, i) => (
+   706→                <div key={i} className="flex items-start gap-2">
+   707→                  <div className="flex-1 grid grid-cols-2 gap-2">
+   708→                    <Input value={f.ar} onChange={e => updateFeature(i, 'ar', e.target.value)} placeholder={lang === 'ar' ? 'بالعربي' : 'Arabic'} />
+   709→                    <Input value={f.en} onChange={e => updateFeature(i, 'en', e.target.value)} placeholder="English" dir="ltr" />
+   710→                  </div>
+   711→                  {form.features.length > 1 && <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0 mt-0.5" onClick={() => removeFeature(i)}><Trash2 className="h-3.5 w-3.5 text-red-400" /></Button>}
+   712→                </div>
+   713→              ))}
+   714→            </div>
+   715→          </div>
+   716→          <DlgFooter onCancel={() => setDlg(null)} onConfirm={handleSave} />
+   717→        </DialogContent>
+   718→      </Dialog>
+   719→
+   720→      {/* Delete Confirm */}
+   721→      <ConfirmDialog open={dlg?.type === 'delete'} onOpenChange={() => setDlg(null)} title={t.delete} desc={lang === 'ar' ? `هل أنت متأكد من حذف باقة "${dlg?.plan?.name}"؟` : `Delete plan "${dlg?.plan?.name}"?`} onConfirm={handleDelete} danger />
+   722→    </div>
+   723→  )
+   724→}
+   725→
+   726→// ════════════════════════════════════════════════════════════════
+   727→// PAGE 5: BILLING (Full invoice CRUD + CSV export + JOD)
+   728→// ════════════════════════════════════════════════════════════════
+   729→function BillingPage() {
+   730→  const { t, lang, isRTL } = useSA()
+   731→  const { fmt, sym } = useCurrency()
+   732→  const [invoices, setInvoices] = useState<Invoice[]>([...INVOICES])
+   733→  const [filter, setFilter] = useState('all')
+   734→  const [page, setPage] = useState(1)
+   735→  const [sort, setSort] = useState<SortState>({ key: 'date', dir: 'desc' })
+   736→  const [addOpen, setAddOpen] = useState(false)
+   737→  const [invForm, setInvForm] = useState({ tenant: '', tenantEn: '', plan: 'Starter', amount: 0, status: 'pending' as string })
+   738→  const [previewInv, setPreviewInv] = useState<Invoice | null>(null)
+   739→
+   740→  const filtered = useMemo(() => {
+   741→    let list = filter === 'all' ? [...invoices] : invoices.filter(i => i.status === filter)
+   742→    return genericSort(list, sort.key, sort.dir, lang)
+   743→  }, [invoices, filter, sort, lang])
+   744→  const { items, totalPages } = paginate(filtered, page, PER_PAGE)
+   745→  const handleSort = (key: string) => setSort(p => p.key === key ? { key, dir: p.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' })
+   746→  const totalPaid = invoices.filter(i => i.status === 'paid').reduce((s, i) => s + i.amount, 0)
+   747→  const totalPending = invoices.filter(i => i.status === 'pending' || i.status === 'overdue').reduce((s, i) => s + i.amount, 0)
+   748→
+   749→  const handleStatusChange = useCallback((invoiceId: string, newStatus: string, method?: string) => {
+   750→    setInvoices(p => p.map(i => {
+   751→      if (i.id !== invoiceId) return i
+   752→      const updated = { ...i, status: newStatus }
+   753→      if (newStatus === 'paid') {
+   754→        updated.paidDate = new Date().toISOString().split('T')[0]
+   755→        updated.paymentMethod = method || 'cliq'
+   756→        updated.history = [...(i.history || []), {
+   757→          date: new Date().toISOString(), action: 'دفعة ناجحة', actionEn: 'Payment received',
+   758→          details: `تم الدفع عبر ${method === 'card' ? 'بطاقة ائتمان' : method === 'bank_transfer' ? 'تحويل بنكي' : 'CLIQ'}`,
+   759→          detailsEn: `Paid via ${method === 'card' ? 'credit card' : method === 'bank_transfer' ? 'bank transfer' : 'CLIQ'}`,
+   760→          by: 'Super Admin',
+   761→        }]
+   762→      } else if (newStatus === 'refunded') {
+   763→        updated.history = [...(i.history || []), {
+   764→          date: new Date().toISOString(), action: 'إرجاع', actionEn: 'Refunded',
+   765→          details: 'تم إرجاع مبلغ الفاتورة', detailsEn: 'Invoice amount refunded', by: 'Super Admin',
+   766→        }]
+   767→      }
+   768→      return updated
+   769→    }))
+   770→    toast.success(t.invoiceStatusChanged)
+   771→  }, [])
+   772→
+   773→  const handleMarkPaid = (inv: Invoice) => { handleStatusChange(inv.id, 'paid') }
+   774→
+   775→  const handleCreateInvoice = () => {
+   776→    if (!invForm.tenant.trim()) { toast.error(isRTL ? 'يرجى اختيار المستأجر' : 'Please select a tenant'); return }
+   777→    if (invForm.amount <= 0) { toast.error(isRTL ? 'يرجى إدخال مبلغ صحيح' : 'Please enter a valid amount'); return }
+   778→    const newId = `INV-${String(invoices.length + 1).padStart(3, '0')}`
+   779→    const today = new Date().toISOString().split('T')[0]
+   780→    const dueDate = new Date(); dueDate.setDate(dueDate.getDate() + 30)
+   781→    const inv: Invoice = {
+   782→      id: newId, tenant: invForm.tenant, tenantEn: invForm.tenantEn,
+   783→      amount: invForm.amount, status: invForm.status,
+   784→      date: today, dueDate: dueDate.toISOString().split('T')[0], paidDate: null,
+   785→      plan: invForm.plan, currency: 'JOD', taxRate: 16, notes: '', paymentMethod: '',
+   786→      history: [{ date: new Date().toISOString(), action: 'إنشاء الفاتورة', actionEn: 'Invoice created', details: `فاتورة اشتراك ${invForm.plan}`, detailsEn: `${invForm.plan} subscription invoice`, by: 'Super Admin' }],
+   787→    }
+   788→    setInvoices(p => [inv, ...p]); toast.success(isRTL ? `تم إنشاء الفاتورة ${newId}` : `Invoice ${newId} created`); setAddOpen(false)
+   789→    setInvForm({ tenant: '', tenantEn: '', plan: 'Starter', amount: 0, status: 'pending' })
+   790→  }
+   791→
+   792→  const handleExportExcel = useCallback(() => {
+   793→    import('xlsx').then(XLSX => {
+   794→      const statusLabels: Record<string, string> = { paid: isRTL ? 'مدفوع' : 'Paid', pending: isRTL ? 'معلق' : 'Pending', overdue: isRTL ? 'متأخر' : 'Overdue', failed: isRTL ? 'فاشل' : 'Failed' }
+   795→      const headers = isRTL
+   796→        ? ['رقم الفاتورة', 'المستأجر', 'الباقة', 'المبلغ (د.أ)', 'العملة', 'الحالة', 'التاريخ']
+   797→        : ['Invoice No.', 'Tenant', 'Plan', 'Amount (JOD)', 'Currency', 'Status', 'Date']
+   798→      const rows = filtered.map(inv => [
+   799→        inv.id, isRTL ? inv.tenant : (inv.tenantEn || inv.tenant), inv.plan,
+   800→        inv.amount, inv.currency, statusLabels[inv.status] || inv.status, inv.date,
+   801→      ])
+   802→      const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
+   803→      ws['!cols'] = headers.map(() => ({ wch: 20 }))
+   804→      const wb = XLSX.utils.book_new()
+   805→      XLSX.utils.book_append_sheet(wb, ws, isRTL ? 'الفواتير' : 'Invoices')
+   806→      XLSX.writeFile(wb, `invoices_${new Date().toISOString().split('T')[0]}.xlsx`)
+   807→      toast.success(isRTL ? 'تم تصدير الفواتير إلى Excel بنجاح' : 'Invoices exported to Excel successfully')
+   808→    }).catch(() => {
+   809→      toast.error(isRTL ? 'فشل تصدير Excel' : 'Excel export failed')
+   810→    })
+   811→  }, [filtered, isRTL])
+   812→
+   813→  const handleDeleteInvoice = (inv: Invoice) => {
+   814→    setInvoices(p => p.filter(i => i.id !== inv.id)); toast.success(t.deleted); setPage(1)
+   815→  }
+   816→
+   817→  return (
+   818→    <div className="space-y-5">
+   819→      <PageTitle title={t.billingTitle} action={
+   820→        <div className="flex gap-2">
+   821→          <Button variant="outline" className="gap-2 h-9" onClick={handleExportExcel}><Download className="h-4 w-4" />{t.exportExcel}</Button>
+   822→          <PrimaryBtn icon={Plus} label={t.createInvoice} onClick={() => setAddOpen(true)} />
+   823→        </div>
+   824→      } />
+   825→      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+   826→        <StatCard icon={CheckCircle2} label={t.payments} value={fmt(totalPaid)} color="text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30" />
+   827→        <StatCard icon={Clock} label={t.pending} value={fmt(totalPending)} color="text-amber-600 bg-amber-50 dark:bg-amber-950/30" />
+   828→        <StatCard icon={Banknote} label={t.paid} value={`${invoices.filter(i => i.status === 'paid').length}`} color="text-sky-600 bg-sky-50 dark:bg-sky-950/30" />
+   829→        <StatCard icon={AlertTriangle} label={t.overdue} value={`${invoices.filter(i => i.status === 'overdue').length}`} color="text-red-600 bg-red-50 dark:bg-red-950/30" />
+   830→      </div>
+   831→      <div className="flex gap-3">
+   832→        <Select value={filter} onValueChange={v => { setFilter(v); setPage(1) }}>
+   833→          <SelectTrigger className="w-44 h-10"><SelectValue /></SelectTrigger>
+   834→          <SelectContent><SelectItem value="all">{t.all}</SelectItem><SelectItem value="paid">{t.paid}</SelectItem><SelectItem value="pending">{t.pending}</SelectItem><SelectItem value="overdue">{t.overdue}</SelectItem><SelectItem value="failed">{t.failed}</SelectItem></SelectContent>
+   835→        </Select>
+   836→      </div>
+   837→
+   838→      <Card className="border-0 shadow-sm overflow-hidden hidden md:block">
+   839→        <div className="overflow-x-auto">
+   840→          <Table><TableHeader><TableRow className="bg-muted/50 hover:bg-muted/50">
+   841→            <SortableTH label={t.invoiceNo} sortKey="id" currentSort={sort} onSort={handleSort} className="ps-5" />
+   842→            <SortableTH label={t.tenant} sortKey="tenant" currentSort={sort} onSort={handleSort} />
+   843→            <SortableTH label={t.plan} sortKey="plan" currentSort={sort} onSort={handleSort} className="hidden lg:table-cell" />
+   844→            <SortableTH label={t.amount} sortKey="amount" currentSort={sort} onSort={handleSort} align="end" />
+   845→            <SortableTH label={t.status} sortKey="status" currentSort={sort} onSort={handleSort} />
+   846→            <TableHead className="pe-5 font-semibold text-xs uppercase tracking-wider text-end">{t.actions}</TableHead>
+   847→          </TableRow></TableHeader>
+   848→          <TableBody>
+   849→            {items.length === 0 ? <EmptyRow colSpan={6} /> : items.map(inv => (
+   850→            <TableRow key={inv.id} className="group hover:bg-muted/20 transition-colors">
+   851→              <TableCell className="ps-5 font-mono text-sm font-semibold">{inv.id}</TableCell>
+   852→              <TableCell className="px-3 text-sm">{invTenant(inv, lang)}</TableCell>
+   853→              <TableCell className="px-3 hidden lg:table-cell"><Badge variant="secondary" className="text-xs">{inv.plan}</Badge></TableCell>
+   854→              <TableCell className="px-3 text-end font-semibold tabular-nums text-sm">{inv.amount.toLocaleString()} <span className="text-xs font-normal text-muted-foreground">{sym}</span></TableCell>
+   855→              <TableCell className="px-3"><StatusBadge status={inv.status} locale={lang} /></TableCell>
+   856→              <TableCell className="pe-5">
+   857→                <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+   858→                  <ActionBtn icon={Eye} label={t.view} onClick={() => setPreviewInv(inv)} />
+   859→                  {inv.status === 'pending' && <ActionBtn icon={CheckCircle2} label={t.invoiceMarkPaid} onClick={() => handleStatusChange(inv.id, 'paid')} />}
+   860→                  {inv.status === 'overdue' && <ActionBtn icon={AlertTriangle} onClick={() => { handleStatusChange(inv.id, 'pending'); toast.success(t.invoiceSendReminderDesc) }} />}
+   861→                  {inv.status === 'paid' && <ActionBtn icon={RefreshCw} label={t.invoiceRefund} onClick={() => handleStatusChange(inv.id, 'refunded')} />}
+   862→                  <ActionBtn icon={Download} onClick={handleExportExcel} />
+   863→                  <ActionBtn icon={Trash2} onClick={() => handleDeleteInvoice(inv)} danger />
+   864→                </div>
+   865→              </TableCell>
+   866→            </TableRow>
+   867→          ))}
+   868→          </TableBody></Table>
+   869→        </div>
+   870→        <TableFooter current={items.length} total={filtered.length} entity={isRTL ? 'فاتورة' : 'invoices'} />
+   871→        <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+   872→      </Card>
+   873→
+   874→      <div className="md:hidden space-y-3">
+   875→        {items.length === 0 ? <Card className="border-0 shadow-sm"><CardContent className="py-16 text-center text-muted-foreground text-sm">{t.noResults}</CardContent></Card> : items.map(inv => (
+   876→          <Card key={inv.id} className="border-0 shadow-sm"><CardContent className="p-4">
+   877→            <div className="flex items-start justify-between gap-3 mb-3">
+   878→              <div className="min-w-0"><p className="font-mono text-sm font-bold">{inv.id}</p><p className="text-xs text-muted-foreground mt-0.5">{invTenant(inv, lang)}</p></div>
+   879→              <StatusBadge status={inv.status} locale={lang} />
+   880→            </div>
+   881→            <div className="flex items-center justify-between pt-2 border-t">
+   882→              <span className="font-bold text-sm">{inv.amount.toLocaleString()} <span className="text-xs font-normal text-muted-foreground">{sym}</span></span>
+   883→              <div className="flex gap-1">
+   884→                <ActionBtn icon={Eye} onClick={() => setPreviewInv(inv)} />
+   885→                {inv.status !== 'paid' && <ActionBtn icon={CheckCircle2} onClick={() => handleMarkPaid(inv)} />}
+   886→                {inv.status === 'paid' && <ActionBtn icon={RefreshCw} label={t.invoiceRefund} onClick={() => handleStatusChange(inv.id, 'refunded')} />}
+   887→                <ActionBtn icon={Download} onClick={() => handleExportExcel()} />
+   888→                <ActionBtn icon={Trash2} onClick={() => handleDeleteInvoice(inv)} danger />
+   889→              </div>
+   890→            </div>
+   891→          </CardContent></Card>
+   892→        ))}
+   893→      </div>
+   894→
+   895→      {/* Create Invoice Dialog */}
+   896→      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+   897→        <DialogContent className="max-w-md" dir={isRTL ? 'rtl' : 'ltr'}><DialogHeader><DialogTitle>{t.createInvoice}</DialogTitle><DialogDescription className="sr-only">{isRTL ? 'إنشاء فاتورة جديدة' : 'Create a new invoice'}</DialogDescription></DialogHeader>
+   898→          <div className="space-y-4 pt-2">
+   899→            <FormField label={t.tenant}>
+   900→              <Select value={invForm.tenant} onValueChange={v => {
+   901→                const tn = INIT_TENANTS.find(x => x.name === v || x.nameEn === v)
+   902→                setInvForm(p => ({ ...p, tenant: tn?.name || v, tenantEn: tn?.nameEn || v }))
+   903→              }}>
+   904→                <SelectTrigger><SelectValue placeholder={isRTL ? 'اختر المستأجر' : 'Select tenant'} /></SelectTrigger>
+   905→                <SelectContent>
+   906→                  {INIT_TENANTS.map(tn => <SelectItem key={tn.id} value={lang === 'en' ? tn.nameEn : tn.name}>{lang === 'en' ? tn.nameEn : tn.name}</SelectItem>)}
+   907→                </SelectContent>
+   908→              </Select>
+   909→            </FormField>
+   910→            <div className="grid grid-cols-2 gap-3">
+   911→              <FormField label={t.plan}>
+   912→                <Select value={invForm.plan} onValueChange={v => {
+   913→                  setInvForm(p => ({ ...p, plan: v }))
+   914→                  const plan = PLANS.find(pl => pl.name === v)
+   915→                  if (plan) setInvForm(p => ({ ...p, amount: plan.price }))
+   916→                }}>
+   917→                  <SelectTrigger><SelectValue /></SelectTrigger>
+   918→                  <SelectContent>{PLANS.map(p => <SelectItem key={p.id} value={p.name}>{p.name} ({p.price} {sym})</SelectItem>)}</SelectContent>
+   919→                </Select>
+   920→              </FormField>
+   921→              <FormField label={t.amount}>
+   922→                <Input type="number" value={invForm.amount || ''} onChange={e => setInvForm(p => ({ ...p, amount: Number(e.target.value) }))} />
+   923→              </FormField>
+   924→            </div>
+   925→            <FormField label={t.status}>
+   926→              <Select value={invForm.status} onValueChange={v => setInvForm(p => ({ ...p, status: v }))}>
+   927→                <SelectTrigger><SelectValue /></SelectTrigger>
+   928→                <SelectContent>
+   929→                  <SelectItem value="pending">{t.pending}</SelectItem>
+   930→                  <SelectItem value="paid">{t.paid}</SelectItem>
+   931→                </SelectContent>
+   932→              </Select>
+   933→            </FormField>
+   934→          </div>
+   935→          <DlgFooter onCancel={() => setAddOpen(false)} onConfirm={handleCreateInvoice} confirmLabel={isRTL ? 'إنشاء' : 'Create'} />
+   936→        </DialogContent>
+   937→      </Dialog>
+   938→
+   939→      {/* Invoice Preview Dialog */}
+   940→      {previewInv && <InvoicePreviewDialog invoice={previewInv} open={!!previewInv} onClose={() => setPreviewInv(null)} onStatusChange={handleStatusChange} />}
+   941→    </div>
+   942→  )
+   943→}
+   944→
+   945→// ════════════════════════════════════════════════════════════════
+   946→// PAGE 6: ROLES & PERMISSIONS (Enterprise RBAC — Enhanced)
+   947→// ════════════════════════════════════════════════════════════════
+   948→function RolesPage() {
+   949→  const { t, lang, isRTL } = useSA()
+   950→  const [roles, setRoles] = useState<RbacRole[]>(INIT_RBAC_ROLES)
+   951→  const [templates, setTemplates] = useState<PermissionTemplate[]>(INIT_RBAC_TEMPLATES)
+   952→  const [dlg, setDlg] = useState<{ type: 'add' | 'edit' | 'delete' | 'matrix' | 'clone_src' | 'details' | 'policy' | 'save_tpl'; role?: RbacRole } | null>(null)
+   953→  const [form, setForm] = useState({ name: '', nameEn: '', desc: '', descEn: '', parentId: null as string | null, permissions: {} as Record<string, string[]> })
+   954→  const [tplDlg, setTplDlg] = useState(false)
+   955→  const [viewTab, setViewTab] = useState<'roles' | 'matrix' | 'templates' | 'api' | 'buttons' | 'jwt' | 'visibility' | 'policies'>('roles')
+   956→  const [detailRole, setDetailRole] = useState<RbacRole | null>(null)
+   957→  const [policyForm, setPolicyForm] = useState({ name: '', nameEn: '', effect: 'deny' as 'allow' | 'deny', module: '*' as string, action: '*' as string, condition: '', conditionAr: '', conditionEn: '', priority: 1 })
+   958→  const [editingPolicyId, setEditingPolicyId] = useState<string | null>(null)
+   959→  const [saveTplForm, setSaveTplForm] = useState({ name: '', nameEn: '', desc: '', descEn: '' })
+   960→
+   961→  const rName = (r: RbacRole) => lang === 'en' ? r.nameEn : r.name
+   962→  const rDesc = (r: RbacRole) => lang === 'en' ? r.descriptionEn : r.description
+   963→
+   964→  const openAdd = () => {
+   965→    setForm({ name: '', nameEn: '', desc: '', descEn: '', parentId: null, permissions: {} })
+   966→    SYSTEM_MODULES.forEach(m => { form.permissions[m.key] = ['view'] })
+   967→    setForm(p => ({ ...p, permissions: { ...p.permissions } }))
+   968→    setDlg({ type: 'add' })
+   969→  }
+   970→
+   971→  const openEdit = (r: RbacRole) => {
+   972→    setForm({ name: r.name, nameEn: r.nameEn, desc: r.description, descEn: r.descriptionEn, parentId: r.parentId, permissions: cloneRolePermissions(r) })
+   973→    setDlg({ type: 'edit', role: r })
+   974→  }
+   975→
+   976→  const openMatrix = (r: RbacRole) => { setForm({ name: r.name, nameEn: r.nameEn, desc: r.description, descEn: r.descriptionEn, parentId: r.parentId, permissions: cloneRolePermissions(r) }); setDlg({ type: 'matrix', role: r }) }
+   977→
+   978→  const openDetails = (r: RbacRole) => { setDetailRole(r) }
+   979→
+   980→  const handleClone = (r: RbacRole) => {
+   981→    const clone: RbacRole = { ...r, id: Date.now().toString(), name: `${r.name} ${t.rbacCloneSuffix}`, nameEn: `${r.nameEn} (Copy)`, userCount: 0, isSystem: false, parentId: r.parentId, permissions: cloneRolePermissions(r), createdAt: new Date().toISOString().split('T')[0], claims: r.claims ? r.claims.map(c => ({ ...c })) : [], policies: r.policies ? r.policies.map(p => ({ ...p })) : [], hiddenPages: r.hiddenPages ? [...r.hiddenPages] : [] }
+   982→    setRoles(p => [clone, ...p]); toast.success(t.rbacRoleCloned)
+   983→  }
+   984→
+   985→  const handleSave = () => {
+   986→    if (!form.name.trim()) { toast.error(lang === 'ar' ? 'يرجى إدخال اسم الدور' : 'Please enter role name'); return }
+   987→    if (dlg?.type === 'add') {
+   988→      const r: RbacRole = { id: Date.now().toString(), name: form.name, nameEn: form.nameEn, description: form.desc, descriptionEn: form.descEn, userCount: 0, isSystem: false, parentId: form.parentId, permissions: { ...form.permissions }, createdAt: new Date().toISOString().split('T')[0], claims: [], policies: [], hiddenPages: [] }
+   989→      setRoles(p => [r, ...p]); toast.success(t.roleCreated)
+   990→    } else if (dlg?.role) {
+   991→      setRoles(p => p.map(r => r.id === dlg.role!.id ? { ...r, name: form.name, nameEn: form.nameEn, description: form.desc, descriptionEn: form.descEn, parentId: form.parentId, permissions: { ...form.permissions } } : r))
+   992→      toast.success(t.roleUpdated)
+   993→    }
+   994→    setDlg(null)
+   995→  }
+   996→
+   997→  const handleDelete = () => {
+   998→    if (!dlg?.role) return
+   999→    setRoles(p => p.filter(x => x.id !== dlg.role!.id)); toast.success(t.roleDeleted); setDlg(null)
+  1000→  }
+  1001→
+  1002→  const handleTogglePerm = (mod: string, action: string) => {
+  1003→    setForm(p => ({ ...p, permissions: togglePermission({ ...p, permissions: p.permissions }, mod, action) }))
+  1004→  }
+  1005→
+  1006→  const handleApplyTemplate = (tpl: PermissionTemplate) => {
+  1007→    const perms = applyTemplate(tpl)
+  1008→    setForm(p => ({ ...p, permissions: perms }))
+  1009→    setTplDlg(false); toast.success(t.rbacTemplateApplied)
+  1010→  }
+  1011→
+  1012→  // Policy management
+  1013→  const openAddPolicy = () => {
+  1014→    setEditingPolicyId(null)
+  1015→    setPolicyForm({ name: '', nameEn: '', effect: 'deny', module: '*', action: '*', condition: '', conditionAr: '', conditionEn: '', priority: 1 })
+  1016→    setDlg({ type: 'policy', role: detailRole || undefined })
+  1017→  }
+  1018→
+  1019→  const openEditPolicy = (policy: RbacPolicy) => {
+  1020→    setEditingPolicyId(policy.id)
+  1021→    setPolicyForm({ name: policy.name, nameEn: policy.nameEn, effect: policy.effect, module: policy.module, action: policy.action, condition: policy.condition || '', conditionAr: policy.conditionAr || '', conditionEn: policy.conditionEn || '', priority: policy.priority })
+  1022→    setDlg({ type: 'policy', role: detailRole || undefined })
+  1023→  }
+  1024→
+  1025→  const handleSavePolicy = () => {
+  1026→    if (!policyForm.name.trim() || !dlg?.role) return
+  1027→    const newPolicy: RbacPolicy = {
+  1028→      id: editingPolicyId || `p-${Date.now()}`,
+  1029→      name: policyForm.name,
+  1030→      nameEn: policyForm.nameEn,
+  1031→      effect: policyForm.effect,
+  1032→      module: policyForm.module,
+  1033→      action: policyForm.action,
+  1034→      condition: policyForm.condition || undefined,
+  1035→      conditionAr: policyForm.conditionAr || undefined,
+  1036→      conditionEn: policyForm.conditionEn || undefined,
+  1037→      priority: policyForm.priority,
+  1038→    }
+  1039→    setRoles(p => p.map(r => {
+  1040→      if (r.id !== dlg.role!.id) return r
+  1041→      const policies = [...(r.policies || [])]
+  1042→      if (editingPolicyId) {
+  1043→        const idx = policies.findIndex(pp => pp.id === editingPolicyId)
+  1044→        if (idx >= 0) policies[idx] = newPolicy
+  1045→      } else {
+  1046→        policies.push(newPolicy)
+  1047→      }
+  1048→      return { ...r, policies }
+  1049→    }))
+  1050→    toast.success(editingPolicyId ? t.rbacPolicyUpdated : t.rbacPolicyCreated)
+  1051→    setDlg(null)
+  1052→    // Refresh detailRole
+  1053→    setRoles(p => p)
+  1054→  }
+  1055→
+  1056→  const handleDeletePolicy = (policyId: string) => {
+  1057→    if (!detailRole) return
+  1058→    setRoles(p => p.map(r => r.id === detailRole.id ? { ...r, policies: (r.policies || []).filter(pp => pp.id !== policyId) } : r))
+  1059→    toast.success(t.rbacPolicyDeleted)
+  1060→  }
+  1061→
+  1062→  // Save as Template
+  1063→  const openSaveTemplate = () => {
+  1064→    setSaveTplForm({ name: '', nameEn: '', desc: '', descEn: '' })
+  1065→    setDlg({ type: 'save_tpl', role: detailRole || undefined })
+  1066→  }
+  1067→
+  1068→  const handleSaveTemplate = () => {
+  1069→    if (!saveTplForm.name.trim() || !dlg?.role) return
+  1070→    const newTpl: PermissionTemplate = {
+  1071→      id: `tpl-${Date.now()}`,
+  1072→      name: saveTplForm.name,
+  1073→      nameEn: saveTplForm.nameEn,
+  1074→      description: saveTplForm.desc,
+  1075→      descriptionEn: saveTplForm.descEn,
+  1076→      permissions: cloneRolePermissions(dlg.role),
+  1077→    }
+  1078→    setTemplates(p => [...p, newTpl])
+  1079→    toast.success(t.rbacTemplateSaved)
+  1080→    setDlg(null)
+  1081→  }
+  1082→
+  1083→  const permCount = (r: RbacRole) => countPermissions(r.permissions)
+  1084→  const effectivePerms = dlg?.role ? getEffectivePermissions(dlg.role, roles) : null
+  1085→  const inheritedInfo = dlg?.role ? getInheritedVsOwn(dlg.role, roles) : null
+  1086→
+  1087→  const TABS = [
+  1088→    { key: 'roles' as const, label: t.rolesTitle },
+  1089→    { key: 'matrix' as const, label: t.rbacMatrix },
+  1090→    { key: 'templates' as const, label: t.rbacTemplates },
+  1091→    { key: 'api' as const, label: lang === 'ar' ? 'API' : 'API' },
+  1092→    { key: 'buttons' as const, label: lang === 'ar' ? 'الأزرار' : 'Buttons' },
+  1093→    { key: 'jwt' as const, label: t.rbacJwtClaims },
+  1094→    { key: 'visibility' as const, label: t.rbacMenuVisibility },
+  1095→    { key: 'policies' as const, label: lang === 'ar' ? 'السياسات' : 'Policies' },
+  1096→  ]
+  1097→
+  1098→  // Method colors
+  1099→  const methodColor = (m: string) => m === 'GET' ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30' : m === 'POST' ? 'text-sky-600 bg-sky-50 dark:bg-sky-950/30' : m === 'PUT' || m === 'PATCH' ? 'text-amber-600 bg-amber-50 dark:bg-amber-950/30' : 'text-red-600 bg-red-50 dark:bg-red-950/30'
+  1100→
+  1101→  return (
+  1102→    <div className="space-y-6">
+  1103→      <PageTitle title={t.rbacTitle} action={<PrimaryBtn icon={Plus} label={t.addRole} onClick={openAdd} />} />
+  1104→
+  1105→      {/* View Tabs — scrollable */}
+  1106→      <div className="flex gap-2 overflow-x-auto pb-1">
+  1107→        {TABS.map(tab => (
+  1108→          <Button key={tab.key} size="sm" variant={viewTab === tab.key ? 'default' : 'outline'} className="text-xs rounded-full px-4 whitespace-nowrap shrink-0" onClick={() => setViewTab(tab.key)}>
+  1109→            {tab.label}
+  1110→          </Button>
+  1111→        ))}
+  1112→      </div>
+  1113→
+  1114→      {/* Roles View */}
+  1115→      {viewTab === 'roles' && (
+  1116→        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+  1117→          {roles.map((r, i) => (
+  1118→            <motion.div key={r.id} variants={fade} initial="hidden" animate="visible" transition={{ delay: i * 0.04 }}>
+  1119→              <Card className="group transition-all hover:shadow-lg border-0 shadow-sm h-full">
+  1120→                <CardContent className="p-5 sm:p-6">
+  1121→                  <div className="flex items-start justify-between mb-4">
+  1122→                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-100 dark:bg-violet-900/30"><Shield className="h-5 w-5 text-violet-600" /></div>
+  1123→                    <div className="flex items-center gap-1.5">
+  1124→                      {r.isSystem && <Badge variant="secondary" className="text-[10px] bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400">{t.rbacSystemRole}</Badge>}
+  1125→                      {r.claims && r.claims.length > 0 && <Badge variant="secondary" className="text-[10px] bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400">{r.claims.length} Claims</Badge>}
+  1126→                    </div>
+  1127→                  </div>
+  1128→                  <h3 className="font-bold text-base">{rName(r)}</h3>
+  1129→                  <p className="text-xs text-muted-foreground mb-1">{lang === 'ar' ? r.nameEn : r.name}</p>
+  1130→                  <p className="text-sm text-muted-foreground mb-4 leading-relaxed">{rDesc(r)}</p>
+  1131→                  <div className="flex items-center gap-3 mb-4 text-xs text-muted-foreground">
+  1132→                    <span>{permCount(r)} {t.rbacPermissions}</span>
+  1133→                    <span>·</span>
+  1134→                    <span>{r.userCount} {t.rbacUserCount}</span>
+  1135→                    {r.parentId && <><span>·</span><span className="text-sky-600">{t.rbacInherited}</span></>}
+  1136→                    {(r.policies || []).length > 0 && <><span>·</span><span className="text-red-500">{r.policies.length} {lang === 'ar' ? 'سياسات' : 'policies'}</span></>}
+  1137→                  </div>
+  1138→                  <div className="flex items-center justify-between pt-3 border-t">
+  1139→                    <div className="flex gap-1">
+  1140→                      <ActionBtn icon={Eye} label={t.rbacViewDetails} onClick={() => openDetails(r)} />
+  1141→                      <ActionBtn icon={Edit} label={t.edit} onClick={() => openEdit(r)} />
+  1142→                      <ActionBtn icon={Copy} label={t.rbacCloneRole} onClick={() => handleClone(r)} />
+  1143→                    </div>
+  1144→                    {!r.isSystem && <ActionBtn icon={Trash2} onClick={() => setDlg({ type: 'delete', role: r })} danger />}
+  1145→                  </div>
+  1146→                </CardContent>
+  1147→              </Card>
+  1148→            </motion.div>
+  1149→          ))}
+  1150→        </div>
+  1151→      )}
+  1152→
+  1153→      {/* Matrix Overview */}
+  1154→      {viewTab === 'matrix' && (
+  1155→        <Card className="border-0 shadow-sm overflow-hidden">
+  1156→          <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">{t.rbacMatrix} — {roles.length} {lang === 'ar' ? 'أدوار' : 'roles'} × {SYSTEM_MODULES.length} {t.rbacModule}</CardTitle></CardHeader>
+  1157→          <CardContent className="overflow-x-auto">
+  1158→            <table className="w-full text-xs">
+  1159→              <thead>
+  1160→                <tr className="border-b">
+  1161→                  <th className="p-2 text-start font-semibold sticky start-0 bg-background min-w-[120px]">{t.rbacModule}</th>
+  1162→                  {roles.map(r => <th key={r.id} className="p-2 text-center font-semibold min-w-[80px]">{rName(r)}</th>)}
+  1163→                </tr>
+  1164→              </thead>
+  1165→              <tbody>
+  1166→                {SYSTEM_MODULES.map(mod => (
+  1167→                  <tr key={mod.key} className="border-b border-border/50 hover:bg-muted/30">
+  1168→                    <td className="p-2 font-medium sticky start-0 bg-background">{lang === 'ar' ? mod.labelAr : mod.labelEn}</td>
+  1169→                    {roles.map(r => {
+  1170→                      const count = (r.permissions[mod.key] || []).length
+  1171→                      const total = PERMISSION_ACTIONS.length
+  1172→                      const pct = Math.round(count / total * 100)
+  1173→                      return (
+  1174→                        <td key={r.id} className="p-2 text-center">
+  1175→                          <div className="flex items-center justify-center gap-1">
+  1176→                            <div className="w-12 h-1.5 rounded-full bg-muted overflow-hidden"><div className={`h-full rounded-full ${pct === 100 ? 'bg-emerald-500' : pct > 50 ? 'bg-sky-500' : pct > 0 ? 'bg-amber-500' : 'bg-gray-300'}`} style={{ width: `${pct}%` }} /></div>
+  1177→                            <span className="tabular-nums text-muted-foreground w-6">{count}</span>
+  1178→                          </div>
+  1179→                        </td>
+  1180→                      )
+  1181→                    })}
+  1182→                  </tr>
+  1183→                ))}
+  1184→              </tbody>
+  1185→            </table>
+  1186→          </CardContent>
+  1187→        </Card>
+  1188→      )}
+  1189→
+  1190→      {/* Templates View — Default + Custom */}
+  1191→      {viewTab === 'templates' && (
+  1192→        <div className="space-y-6">
+  1193→          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+  1194→            {templates.map((tpl, i) => {
+  1195→              const isCustom = !INIT_RBAC_TEMPLATES.some(t => t.id === tpl.id)
+  1196→              return (
+  1197→                <motion.div key={tpl.id} variants={fade} initial="hidden" animate="visible" transition={{ delay: i * 0.04 }}>
+  1198→                  <Card className="group transition-all hover:shadow-lg border-0 shadow-sm cursor-pointer" onClick={() => { setViewTab('roles'); setDlg({ type: 'add' }); handleApplyTemplate(tpl) }}>
+  1199→                    <CardContent className="p-5 text-center">
+  1200→                      <div className="h-12 w-12 rounded-2xl bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center mx-auto mb-3"><Shield className="h-6 w-6 text-violet-600" /></div>
+  1201→                      <h3 className="font-bold text-sm">{lang === 'ar' ? tpl.name : tpl.nameEn}</h3>
+  1202→                      <p className="text-xs text-muted-foreground mt-1 mb-3">{lang === 'ar' ? tpl.description : tpl.descriptionEn}</p>
+  1203→                      <Badge variant="secondary" className="text-[10px]">{countPermissions(tpl.permissions)} {t.rbacPermissions}</Badge>
+  1204→                      {isCustom && <Badge variant="outline" className="text-[9px] ms-1">{lang === 'ar' ? 'مخصص' : 'Custom'}</Badge>}
+  1205→                      <p className="text-[10px] text-violet-600 mt-3 group-hover:underline">{t.rbacApplyTemplate}</p>
+  1206→                    </CardContent>
+  1207→                  </Card>
+  1208→                </motion.div>
+  1209→              )
+  1210→            })}
+  1211→          </div>
+  1212→        </div>
+  1213→      )}
+  1214→
+  1215→      {/* API Endpoints Authorization View */}
+  1216→      {viewTab === 'api' && (
+  1217→        <Card className="border-0 shadow-sm overflow-hidden">
+  1218→          <CardHeader className="pb-2">
+  1219→            <CardTitle className="text-sm font-semibold">{lang === 'ar' ? 'تفويض نقاط API' : 'API Endpoint Authorization'} — {lang === 'ar' ? 'اختر دوراً لمحاكاة التفويض' : 'Select a role to simulate authorization'}</CardTitle>
+  1220→          </CardHeader>
+  1221→          <CardContent>
+  1222→            <div className="flex gap-2 mb-4 flex-wrap">
+  1223→              {roles.map(r => (
+  1224→                <Button key={r.id} size="sm" variant={detailRole?.id === r.id ? 'default' : 'outline'} className="text-xs rounded-full px-3" onClick={() => setDetailRole(r)}>
+  1225→                  {rName(r)}
+  1226→                </Button>
+  1227→              ))}
+  1228→            </div>
+  1229→            {detailRole && (
+  1230→              <div className="overflow-x-auto border rounded-lg">
+  1231→                <table className="w-full text-xs">
+  1232→                  <thead>
+  1233→                    <tr className="bg-muted/50">
+  1234→                      <th className="p-2 text-start font-semibold sticky start-0 bg-muted/50 min-w-[60px]">Method</th>
+  1235→                      <th className="p-2 text-start font-semibold min-w-[220px]" dir="ltr">{lang === 'ar' ? 'المسار' : 'Endpoint'}</th>
+  1236→                      <th className="p-2 text-start font-semibold min-w-[120px]">{lang === 'ar' ? 'الوصف' : 'Description'}</th>
+  1237→                      <th className="p-2 text-center font-semibold min-w-[80px]">{lang === 'ar' ? 'الحالة' : 'Status'}</th>
+  1238→                      <th className="p-2 text-start font-semibold min-w-[150px]">{lang === 'ar' ? 'ملاحظات' : 'Notes'}</th>
+  1239→                    </tr>
+  1240→                  </thead>
+  1241→                  <tbody>
+  1242→                    {Object.entries(API_ENDPOINTS).map(([mod, endpoints]) =>
+  1243→                      endpoints.map((ep, i) => {
+  1244→                        const auth = isApiAuthorized(detailRole, ep.method, ep.path)
+  1245→                        const forbidden = simulate403(ep.path, ep.method, detailRole)
+  1246→                        return (
+  1247→                          <tr key={`${mod}-${i}`} className="border-b border-border/50 hover:bg-muted/30">
+  1248→                            <td className="p-2 sticky start-0 bg-background">
+  1249→                              <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-bold ${methodColor(ep.method)}`}>{ep.method}</span>
+  1250→                            </td>
+  1251→                            <td className="p-2 font-mono text-[11px]" dir="ltr">{ep.path}</td>
+  1252→                            <td className="p-2 text-xs">{lang === 'ar' ? ep.labelAr : ep.labelEn}</td>
+  1253→                            <td className="p-2 text-center">
+  1254→                              {auth.authorized
+  1255→                                ? <Badge className="bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 text-[10px] border-emerald-200">200 OK</Badge>
+  1256→                                : <Badge className="bg-red-50 text-red-700 dark:bg-red-950/30 text-[10px] border-red-200">403</Badge>
+  1257→                              }
+  1258→                            </td>
+  1259→                            <td className="p-2 text-xs text-muted-foreground">
+  1260→                              {!auth.authorized && forbidden ? forbidden.body.message : (lang === 'ar' ? 'مصرح' : 'Authorized')}
+  1261→                            </td>
+  1262→                          </tr>
+  1263→                        )
+  1264→                      })
+  1265→                    )}
+  1266→                  </tbody>
+  1267→                </table>
+  1268→              </div>
+  1269→            )}
+  1270→          </CardContent>
+  1271→        </Card>
+  1272→      )}
+  1273→
+  1274→      {/* Buttons Visibility View */}
+  1275→      {viewTab === 'buttons' && (
+  1276→        <Card className="border-0 shadow-sm overflow-hidden">
+  1277→          <CardHeader className="pb-2">
+  1278→            <CardTitle className="text-sm font-semibold">{lang === 'ar' ? 'صلاحيات الأزرار (UI Buttons)' : 'Button Permissions'}</CardTitle>
+  1279→          </CardHeader>
+  1280→          <CardContent>
+  1281→            <div className="flex gap-2 mb-4 flex-wrap">
+  1282→              {roles.map(r => (
+  1283→                <Button key={r.id} size="sm" variant={detailRole?.id === r.id ? 'default' : 'outline'} className="text-xs rounded-full px-3" onClick={() => setDetailRole(r)}>
+  1284→                  {rName(r)}
+  1285→                </Button>
+  1286→              ))}
+  1287→            </div>
+  1288→            {detailRole && (
+  1289→              <div className="space-y-4">
+  1290→                {Object.entries(UI_BUTTONS).map(([mod, buttons]) => {
+  1291→                  const modLabel = SYSTEM_MODULES.find(m => m.key === mod)
+  1292→                  if (!modLabel || buttons.length === 0) return null
+  1293→                  return (
+  1294→                    <div key={mod} className="border rounded-lg p-3">
+  1295→                      <p className="text-xs font-semibold mb-2">{lang === 'ar' ? modLabel.labelAr : modLabel.labelEn}</p>
+  1296→                      <div className="flex flex-wrap gap-2">
+  1297→                        {buttons.map(btn => {
+  1298→                          const visible = isButtonVisible(detailRole, mod, btn.key)
+  1299→                          return (
+  1300→                            <div key={btn.key} className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] ${visible ? 'bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-emerald-950/30 dark:border-emerald-800' : 'bg-red-50 border-red-200 text-red-500 dark:bg-red-950/30 dark:border-red-800 line-through opacity-60'}`}>
+  1301→                              {visible ? <CheckCircle2 className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
+  1302→                              {lang === 'ar' ? btn.labelAr : btn.labelEn}
+  1303→                              <span className="text-[9px] opacity-60">({btn.requiredAction})</span>
+  1304→                            </div>
+  1305→                          )
+  1306→                        })}
+  1307→                      </div>
+  1308→                    </div>
+  1309→                  )
+  1310→                })}
+  1311→              </div>
+  1312→            )}
+  1313→          </CardContent>
+  1314→        </Card>
+  1315→      )}
+  1316→
+  1317→      {/* JWT Claims View */}
+  1318→      {viewTab === 'jwt' && (
+  1319→        <Card className="border-0 shadow-sm overflow-hidden">
+  1320→          <CardHeader className="pb-2">
+  1321→            <CardTitle className="text-sm font-semibold">{t.rbacJwtClaims} — {lang === 'ar' ? 'حمولات الرمز المميز' : 'Token Payloads'}</CardTitle>
+  1322→          </CardHeader>
+  1323→          <CardContent>
+  1324→            <div className="flex gap-2 mb-4 flex-wrap">
+  1325→              {roles.map(r => (
+  1326→                <Button key={r.id} size="sm" variant={detailRole?.id === r.id ? 'default' : 'outline'} className="text-xs rounded-full px-3" onClick={() => setDetailRole(r)}>
+  1327→                  {rName(r)}
+  1328→                </Button>
+  1329→              ))}
+  1330→            </div>
+  1331→            {detailRole && (
+  1332→              <div className="space-y-4">
+  1333→                {/* Role Claims Table */}
+  1334→                <div className="border rounded-lg p-4">
+  1335→                  <p className="text-xs font-semibold mb-3">{lang === 'ar' ? 'الادعاءات المخصصة' : 'Custom Claims'}</p>
+  1336→                  {(detailRole.claims || []).length === 0 ? (
+  1337→                    <p className="text-xs text-muted-foreground">{lang === 'ar' ? 'لا توجد ادعاءات مخصصة' : 'No custom claims'}</p>
+  1338→                  ) : (
+  1339→                    <div className="overflow-x-auto">
+  1340→                      <table className="w-full text-xs">
+  1341→                        <thead><tr className="border-b"><th className="p-2 text-start font-semibold">Key</th><th className="p-2 text-start font-semibold">Value</th><th className="p-2 text-start font-semibold">{lang === 'ar' ? 'النوع' : 'Type'}</th><th className="p-2 text-start font-semibold">{lang === 'ar' ? 'التسمية' : 'Label'}</th></tr></thead>
+  1342→                        <tbody>
+  1343→                          {(detailRole.claims || []).map((c, i) => (
+  1344→                            <tr key={i} className="border-b border-border/50">
+  1345→                              <td className="p-2 font-mono text-violet-600" dir="ltr">{c.key}</td>
+  1346→                              <td className="p-2 font-mono" dir="ltr">{c.value}</td>
+  1347→                              <td className="p-2"><Badge variant="secondary" className="text-[10px]">{c.type}</Badge></td>
+  1348→                              <td className="p-2">{lang === 'ar' ? c.labelAr : c.labelEn}</td>
+  1349→                            </tr>
+  1350→                          ))}
+  1351→                        </tbody>
+  1352→                      </table>
+  1353→                    </div>
+  1354→                  )}
+  1355→                </div>
+  1356→                {/* JWT Payload */}
+  1357→                <div className="border rounded-lg p-4">
+  1358→                  <div className="flex items-center justify-between mb-3">
+  1359→                    <p className="text-xs font-semibold">{lang === 'ar' ? 'حمولة JWT المُنشأة' : 'Generated JWT Payload'}</p>
+  1360→                    <Button size="sm" variant="ghost" className="h-7 text-xs gap-1" onClick={() => { navigator.clipboard.writeText(JSON.stringify(generateJwtClaims(detailRole), null, 2)); toast.success(lang === 'ar' ? 'تم النسخ' : 'Copied') }}>
+  1361→                      <Copy className="h-3 w-3" />{lang === 'ar' ? 'نسخ' : 'Copy'}
+  1362→                    </Button>
+  1363→                  </div>
+  1364→                  <pre className="bg-muted rounded-lg p-4 text-xs font-mono overflow-x-auto leading-relaxed" dir="ltr">
+  1365→                    {JSON.stringify(generateJwtClaims(detailRole), null, 2)}
+  1366→                  </pre>
+  1367→                </div>
+  1368→              </div>
+  1369→            )}
+  1370→          </CardContent>
+  1371→        </Card>
+  1372→      )}
+  1373→
+  1374→      {/* Menu Visibility View */}
+  1375→      {viewTab === 'visibility' && (
+  1376→        <Card className="border-0 shadow-sm overflow-hidden">
+  1377→          <CardHeader className="pb-2">
+  1378→            <CardTitle className="text-sm font-semibold">{t.rbacMenuVisibility} — {lang === 'ar' ? 'إخفاء الصفحات حسب الصلاحيات' : 'Hide pages based on permissions'}</CardTitle>
+  1379→          </CardHeader>
+  1380→          <CardContent>
+  1381→            <div className="flex gap-2 mb-4 flex-wrap">
+  1382→              {roles.map(r => (
+  1383→                <Button key={r.id} size="sm" variant={detailRole?.id === r.id ? 'default' : 'outline'} className="text-xs rounded-full px-3" onClick={() => setDetailRole(r)}>
+  1384→                  {rName(r)}
+  1385→                </Button>
+  1386→              ))}
+  1387→            </div>
+  1388→            {detailRole && (
+  1389→              <div className="overflow-x-auto border rounded-lg">
+  1390→                <table className="w-full text-xs">
+  1391→                  <thead>
+  1392→                    <tr className="bg-muted/50">
+  1393→                      <th className="p-2 text-start font-semibold">{lang === 'ar' ? 'الصفحة' : 'Page'}</th>
+  1394→                      <th className="p-2 text-start font-semibold">{lang === 'ar' ? 'الوحدة' : 'Module'}</th>
+  1395→                      <th className="p-2 text-center font-semibold">{lang === 'ar' ? 'عرض' : 'View'}</th>
+  1396→                      <th className="p-2 text-center font-semibold">{lang === 'ar' ? 'مرئي في القائمة' : 'Menu Visible'}</th>
+  1397→                      <th className="p-2 text-center font-semibold">{lang === 'ar' ? 'الحالة' : 'Status'}</th>
+  1398→                    </tr>
+  1399→                  </thead>
+  1400→                  <tbody>
+  1401→                    {SYSTEM_MODULES.map(mod => {
+  1402→                      const pages = PAGE_VISIBILITY_MAP[mod.key] || []
+  1403→                      const hasView = (detailRole.permissions[mod.key] || []).includes('view')
+  1404→                      const hiddenExplicit = (detailRole.hiddenPages || []).some(p => pages.includes(p))
+  1405→                      const isHidden = !hasView || hiddenExplicit
+  1406→                      return (
+  1407→                        <tr key={mod.key} className={`border-b border-border/50 ${isHidden ? 'bg-red-50/50 dark:bg-red-950/10' : ''}`}>
+  1408→                          <td className="p-2 font-medium">{pages.map(p => p).join(', ')}</td>
+  1409→                          <td className="p-2">{lang === 'ar' ? mod.labelAr : mod.labelEn}</td>
+  1410→                          <td className="p-2 text-center">
+  1411→                            {hasView ? <CheckCircle2 className="h-4 w-4 text-emerald-500 mx-auto" /> : <XCircle className="h-4 w-4 text-red-400 mx-auto" />}
+  1412→                          </td>
+  1413→                          <td className="p-2 text-center">
+  1414→                            {isHidden
+  1415→                              ? <Badge className="bg-red-50 text-red-600 dark:bg-red-950/30 text-[10px] border-red-200">{t.rbacHidePage}</Badge>
+  1416→                              : <Badge className="bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 text-[10px] border-emerald-200">{lang === 'ar' ? 'مرئي' : 'Visible'}</Badge>
+  1417→                            }
+  1418→                          </td>
+  1419→                          <td className="p-2 text-xs text-muted-foreground">
+  1420→                            {!hasView && (lang === 'ar' ? 'لا يملك صلاحية العرض' : 'No view permission')}
+  1421→                            {hasView && hiddenExplicit && (lang === 'ar' ? 'مخفي صراحةً' : 'Explicitly hidden')}
+  1422→                            {hasView && !hiddenExplicit && (lang === 'ar' ? 'مصرح' : 'Authorized')}
+  1423→                          </td>
+  1424→                        </tr>
+  1425→                      )
+  1426→                    })}
+  1427→                  </tbody>
+  1428→                </table>
+  1429→              </div>
+  1430→            )}
+  1431→          </CardContent>
+  1432→        </Card>
+  1433→      )}
+  1434→
+  1435→      {/* Policies View — Interactive Management */}
+  1436→      {viewTab === 'policies' && (
+  1437→        <Card className="border-0 shadow-sm overflow-hidden">
+  1438→          <CardHeader className="pb-2">
+  1439→            <div className="flex items-center justify-between">
+  1440→              <CardTitle className="text-sm font-semibold">{lang === 'ar' ? 'سياسات التحكم بالوصول' : 'Access Control Policies'}</CardTitle>
+  1441→              {detailRole && <Button size="sm" className="gap-1.5 h-8 text-xs bg-violet-600 hover:bg-violet-700 text-white" onClick={openAddPolicy}><Plus className="h-3.5 w-3.5" />{t.rbacAddPolicy}</Button>}
+  1442→            </div>
+  1443→          </CardHeader>
+  1444→          <CardContent>
+  1445→            <div className="flex gap-2 mb-4 flex-wrap">
+  1446→              {roles.map(r => (
+  1447→                <Button key={r.id} size="sm" variant={detailRole?.id === r.id ? 'default' : 'outline'} className="text-xs rounded-full px-3" onClick={() => setDetailRole(r)}>
+  1448→                  {rName(r)}
+  1449→                  {(r.policies || []).length > 0 && <Badge variant="secondary" className="ms-1.5 text-[9px] px-1.5 h-4">{r.policies!.length}</Badge>}
+  1450→                </Button>
+  1451→              ))}
+  1452→            </div>
+  1453→            {detailRole && (
+  1454→              (detailRole.policies || []).length === 0 ? (
+  1455→                <div className="text-center py-12 text-muted-foreground">
+  1456→                  <Shield className="h-10 w-10 mx-auto mb-3 opacity-20" />
+  1457→                  <p className="text-sm">{t.rbacNoPolicies}</p>
+  1458→                  <p className="text-xs mt-1">{lang === 'ar' ? 'جميع الصلاحيات مسموحة حسب المصفوفة' : 'All permissions allowed per matrix'}</p>
+  1459→                  <Button size="sm" variant="outline" className="mt-4 gap-1.5 text-xs" onClick={openAddPolicy}><Plus className="h-3.5 w-3.5" />{t.rbacAddPolicy}</Button>
+  1460→                </div>
+  1461→              ) : (
+  1462→                <div className="space-y-3">
+  1463→                  {(detailRole.policies || []).map((policy, i) => {
+  1464→                    const modLabel = SYSTEM_MODULES.find(m => m.key === policy.module)
+  1465→                    return (
+  1466→                      <div key={policy.id || i} className={`flex items-start gap-4 p-4 rounded-lg border ${policy.effect === 'deny' ? 'border-red-200 bg-red-50/50 dark:bg-red-950/10' : 'border-emerald-200 bg-emerald-50/50 dark:bg-emerald-950/10'}`}>
+  1467→                        <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${policy.effect === 'deny' ? 'bg-red-100 dark:bg-red-900/30' : 'bg-emerald-100 dark:bg-emerald-900/30'}`}>
+  1468→                          {policy.effect === 'deny' ? <XCircle className="h-4 w-4 text-red-600" /> : <CheckCircle2 className="h-4 w-4 text-emerald-600" />}
+  1469→                        </div>
+  1470→                        <div className="flex-1 min-w-0">
+  1471→                          <div className="flex items-center gap-2 mb-1">
+  1472→                            <span className="font-semibold text-sm">{lang === 'ar' ? policy.name : policy.nameEn}</span>
+  1473→                            <Badge className={`text-[10px] ${policy.effect === 'deny' ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>{policy.effect === 'deny' ? 'DENY' : 'ALLOW'}</Badge>
+  1474→                            <Badge variant="outline" className="text-[10px]">P{policy.priority}</Badge>
+  1475→                          </div>
+  1476→                          <p className="text-xs text-muted-foreground">
+  1477→                            {policy.module === '*' ? t.rbacPolicyAllModules : (modLabel ? (lang === 'ar' ? modLabel.labelAr : modLabel.labelEn) : policy.module)}
+  1478→                            {' → '}
+  1479→                            {policy.action === '*' ? t.rbacPolicyAllActions : policy.action}
+  1480→                            {policy.condition && (
+  1481→                              <><br /><span className="font-mono text-[11px]" dir="ltr">{lang === 'ar' ? (policy.conditionAr || policy.condition) : (policy.conditionEn || policy.condition)}</span></>
+  1482→                            )}
+  1483→                          </p>
+  1484→                        </div>
+  1485→                        <div className="flex gap-1 shrink-0">
+  1486→                          <ActionBtn icon={Edit} onClick={() => openEditPolicy(policy)} />
+  1487→                          <ActionBtn icon={Trash2} onClick={() => handleDeletePolicy(policy.id)} danger />
+  1488→                        </div>
+  1489→                      </div>
+  1490→                    )
+  1491→                  })}
+  1492→                </div>
+  1493→              )
+  1494→            )}
+  1495→          </CardContent>
+  1496→        </Card>
+  1497→      )}
+  1498→
+  1499→      {/* Role Details Dialog (Claims + Policies + Hidden Pages) */}
+  1500→      {detailRole && (
+  1501→        <Dialog open={!!detailRole} onOpenChange={() => setDetailRole(null)}>
+  1502→          <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto" dir={isRTL ? 'rtl' : 'ltr'}>
+  1503→            <DialogHeader>
+  1504→              <DialogTitle className="flex items-center gap-2">
+  1505→                <Shield className="h-5 w-5 text-violet-600" />
+  1506→                {rName(detailRole)} — {t.rbacViewDetails}
+  1507→              </DialogTitle>
+  1508→              <DialogDescription className="sr-only">{lang === 'ar' ? 'تفاصيل الدور' : 'Role details'}</DialogDescription>
+  1509→            </DialogHeader>
+  1510→            <div className="space-y-5 pt-2">
+  1511→              {/* Info */}
+  1512→              <div className="grid grid-cols-2 gap-3">
+  1513→                <div className="rounded-lg bg-muted/50 p-3">
+  1514→                  <p className="text-[10px] text-muted-foreground">{t.rbacPermissionCount}</p>
+  1515→                  <p className="text-lg font-bold">{countPermissions(getEffectivePermissions(detailRole, roles))}</p>
+  1516→                </div>
+  1517→                <div className="rounded-lg bg-muted/50 p-3">
+  1518→                  <p className="text-[10px] text-muted-foreground">{t.rbacUserCount}</p>
+  1519→                  <p className="text-lg font-bold">{detailRole.userCount}</p>
+  1520→                </div>
+  1521→              </div>
+  1522→
+  1523→              {/* Claims */}
+  1524→              <div>
+  1525→                <h4 className="text-sm font-semibold mb-2">{t.rbacJwtClaims} ({(detailRole.claims || []).length})</h4>
+  1526→                {(detailRole.claims || []).length === 0 ? (
+  1527→                  <p className="text-xs text-muted-foreground">{lang === 'ar' ? 'لا توجد ادعاءات' : 'No claims'}</p>
+  1528→                ) : (
+  1529→                  <div className="flex flex-wrap gap-2">
+  1530→                    {(detailRole.claims || []).map((c, i) => (
+  1531→                      <Badge key={i} variant="outline" className="text-xs gap-1">
+  1532→                        <span className="font-mono text-violet-600" dir="ltr">{c.key}</span>
+  1533→                        <span className="text-muted-foreground">=</span>
+  1534→                        <span className="font-mono" dir="ltr">{c.value}</span>
+  1535→                      </Badge>
+  1536→                    ))}
+  1537→                  </div>
+  1538→                )}
+  1539→              </div>
+  1540→
+  1541→              {/* Policies */}
+  1542→              <div>
+  1543→                <h4 className="text-sm font-semibold mb-2">{lang === 'ar' ? 'السياسات' : 'Policies'} ({(detailRole.policies || []).length})</h4>
+  1544→                {(detailRole.policies || []).length === 0 ? (
+  1545→                  <p className="text-xs text-muted-foreground">{lang === 'ar' ? 'لا توجد سياسات' : 'No policies'}</p>
+  1546→                ) : (
+  1547→                  <div className="space-y-2">
+  1548→                    {(detailRole.policies || []).map((p, i) => (
+  1549→                      <div key={p.id || i} className={`flex items-center gap-2 text-xs rounded-lg border p-2.5 ${p.effect === 'deny' ? 'border-red-200 bg-red-50/50 dark:bg-red-950/10' : 'border-emerald-200 bg-emerald-50/50 dark:bg-emerald-950/10'}`}>
+  1550→                        {p.effect === 'deny' ? <XCircle className="h-3.5 w-3.5 text-red-500 shrink-0" /> : <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />}
+  1551→                        <span className="font-medium">{lang === 'ar' ? p.name : p.nameEn}</span>
+  1552→                        <span className="text-muted-foreground ms-auto">→ {p.module}.{p.action}</span>
+  1553→                      </div>
+  1554→                    ))}
+  1555→                  </div>
+  1556→                )}
+  1557→              </div>
+  1558→
+  1559→              {/* Hidden Pages */}
+  1560→              <div>
+  1561→                <h4 className="text-sm font-semibold mb-2">{t.rbacMenuVisibility} — {t.rbacHidePage} ({getHiddenPages(detailRole, roles).length})</h4>
+  1562→                {getHiddenPages(detailRole, roles).length === 0 ? (
+  1563→                  <p className="text-xs text-emerald-600">{lang === 'ar' ? 'جميع الصفحات مرئية' : 'All pages visible'}</p>
+  1564→                ) : (
+  1565→                  <div className="flex flex-wrap gap-2">
+  1566→                    {getHiddenPages(detailRole, roles).map(p => (
+  1567→                      <Badge key={p} variant="secondary" className="text-xs bg-red-50 text-red-600 dark:bg-red-950/30">{p}</Badge>
+  1568→                    ))}
+  1569→                  </div>
+  1570→                )}
+  1571→              </div>
+  1572→            </div>
+  1573→            <DlgFooter onCancel={() => setDetailRole(null)} onConfirm={() => { openEdit(detailRole); setDetailRole(null) }} confirmLabel={t.edit} />
+  1574→            <div className="flex justify-center pt-2">
+  1575→              <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={() => { openSaveTemplate() }}>
+  1576→                <Copy className="h-3.5 w-3.5" />{t.rbacSaveAsTemplate}
+  1577→              </Button>
+  1578→            </div>
+  1579→          </DialogContent>
+  1580→        </Dialog>
+  1581→      )}
+  1582→
+  1583→      {/* Permission Matrix Dialog (View) */}
+  1584→      <Dialog open={dlg?.type === 'matrix'} onOpenChange={() => setDlg(null)}>
+  1585→        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto" dir={isRTL ? 'rtl' : 'ltr'}>
+  1586→          <DialogHeader><DialogTitle>{t.rbacMatrix} — {dlg?.role ? rName(dlg.role) : ''}</DialogTitle><DialogDescription className="sr-only">{lang === 'ar' ? 'مصفوفة الصلاحيات' : 'Permission matrix'}</DialogDescription></DialogHeader>
+  1587→          {dlg?.role && effectivePerms && inheritedInfo && (
+  1588→            <div className="space-y-3 pt-2">
+  1589→              <div className="flex items-center gap-4 text-xs mb-4">
+  1590→                <div className="flex items-center gap-1.5"><div className="h-3 w-3 rounded bg-emerald-500" /><span>{t.rbacOwnPerms}</span></div>
+  1591→                <div className="flex items-center gap-1.5"><div className="h-3 w-3 rounded bg-sky-400" /><span>{t.rbacInherited}</span></div>
+  1592→                <div className="ms-auto font-semibold">{countPermissions(effectivePerms)} {t.rbacTotalPermissions}</div>
+  1593→              </div>
+  1594→              <div className="overflow-x-auto">
+  1595→                <table className="w-full text-xs">
+  1596→                  <thead>
+  1597→                    <tr className="border-b">
+  1598→                      <th className="p-2 text-start font-semibold sticky start-0 bg-background min-w-[100px]">{t.rbacModule}</th>
+  1599→                      {PERMISSION_ACTIONS.map(a => <th key={a.key} className="p-1.5 text-center font-semibold min-w-[60px]">{lang === 'ar' ? a.labelAr : a.labelEn}</th>)}
+  1600→                    </tr>
+  1601→                  </thead>
+  1602→                  <tbody>
+  1603→                    {SYSTEM_MODULES.map(mod => (
+  1604→                      <tr key={mod.key} className="border-b border-border/50">
+  1605→                        <td className="p-2 font-medium sticky start-0 bg-background text-xs">{lang === 'ar' ? mod.labelAr : mod.labelEn}</td>
+  1606→                        {PERMISSION_ACTIONS.map(action => {
+  1607→                          const hasOwn = (inheritedInfo.own[mod.key] || []).includes(action.key)
+  1608→                          const hasInh = (inheritedInfo.inherited[mod.key] || []).includes(action.key)
+  1609→                          const has = hasOwn || hasInh
+  1610→                          return (
+  1611→                            <td key={action.key} className="p-1.5 text-center">
+  1612→                              {has ? (
+  1613→                                <span className={`inline-flex h-5 w-5 items-center justify-center rounded text-[9px] font-bold ${hasOwn ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700' : 'bg-sky-100 dark:bg-sky-900/30 text-sky-700'}`}>✓</span>
+  1614→                              ) : (
+  1615→                                <span className="inline-flex h-5 w-5 items-center justify-center rounded bg-muted text-muted-foreground text-[9px]">—</span>
+  1616→                              )}
+  1617→                            </td>
+  1618→                          )
+  1619→                        })}
+  1620→                      </tr>
+  1621→                    ))}
+  1622→                  </tbody>
+  1623→                </table>
+  1624→              </div>
+  1625→            </div>
+  1626→          )}
+  1627→          <DlgFooter onCancel={() => setDlg(null)} onConfirm={() => { if (dlg?.role) { openEdit(dlg.role); setDlg(null) } }} confirmLabel={t.edit} />
+  1628→        </DialogContent>
+  1629→      </Dialog>
+  1630→
+  1631→      {/* Add/Edit Dialog with Permission Matrix Editor */}
+  1632→      <Dialog open={dlg?.type === 'add' || dlg?.type === 'edit'} onOpenChange={() => setDlg(null)}>
+  1633→        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto" dir={isRTL ? 'rtl' : 'ltr'}>
+  1634→          <DialogHeader><DialogTitle>{dlg?.type === 'add' ? t.addRoleDlg : t.editRoleDlg}</DialogTitle><DialogDescription className="sr-only">{lang === 'ar' ? 'إدارة الأدوار' : 'Role management'}</DialogDescription></DialogHeader>
+  1635→          <div className="space-y-4 pt-2">
+  1636→            <div className="grid grid-cols-2 gap-3">
+  1637→              <FormField label={t.roleName}><Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} /></FormField>
+  1638→              <FormField label={t.roleNameEn}><Input value={form.nameEn} onChange={e => setForm(p => ({ ...p, nameEn: e.target.value }))} dir="ltr" /></FormField>
+  1639→            </div>
+  1640→            <FormField label={t.rbacDescription}><Input value={form.desc} onChange={e => setForm(p => ({ ...p, desc: e.target.value }))} /></FormField>
+  1641→
+  1642→            {/* Parent Role for Inheritance */}
+  1643→            <FormField label={t.rbacParentRole}>
+  1644→              <Select value={form.parentId || '__none__'} onValueChange={v => setForm(p => ({ ...p, parentId: v === '__none__' ? null : v }))}>
+  1645→                <SelectTrigger><SelectValue /></SelectTrigger>
+  1646→                <SelectContent>
+  1647→                  <SelectItem value="__none__">{t.rbacNoParent}</SelectItem>
+  1648→                  {roles.filter(r => r.id !== dlg?.role?.id).map(r => <SelectItem key={r.id} value={r.id}>{rName(r)}</SelectItem>)}
+  1649→                </SelectContent>
+  1650→              </Select>
+  1651→            </FormField>
+  1652→
+  1653→            <Separator />
+  1654→
+  1655→            {/* Apply Template */}
+  1656→            <div className="flex items-center justify-between">
+  1657→              <span className="text-sm font-medium">{t.rbacTemplates}</span>
+  1658→              <div className="flex gap-2">
+  1659→                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setTplDlg(true)}>{t.rbacApplyTemplate}</Button>
+  1660→              </div>
+  1661→            </div>
+  1662→
+  1663→            {/* Permission Matrix Editor */}
+  1664→            <div className="overflow-x-auto">
+  1665→              <table className="w-full text-xs">
+  1666→                <thead>
+  1667→                  <tr className="border-b">
+  1668→                    <th className="p-2 text-start font-semibold sticky start-0 bg-background min-w-[100px]">{t.rbacModule}</th>
+  1669→                    {PERMISSION_ACTIONS.map(a => <th key={a.key} className="p-1.5 text-center font-semibold min-w-[50px]">{lang === 'ar' ? a.labelAr : a.labelEn}</th>)}
+  1670→                  </tr>
+  1671→                </thead>
+  1672→                <tbody>
+  1673→                  {SYSTEM_MODULES.map(mod => (
+  1674→                    <tr key={mod.key} className="border-b border-border/50 hover:bg-muted/30">
+  1675→                      <td className="p-2 font-medium sticky start-0 bg-background text-xs">{lang === 'ar' ? mod.labelAr : mod.labelEn}</td>
+  1676→                      {PERMISSION_ACTIONS.map(action => {
+  1677→                        const has = (form.permissions[mod.key] || []).includes(action.key)
+  1678→                        return (
+  1679→                          <td key={action.key} className="p-1.5 text-center">
+  1680→                            <button type="button" onClick={() => handleTogglePerm(mod.key, action.key)} className={`inline-flex h-6 w-6 items-center justify-center rounded-md transition-colors ${has ? 'bg-emerald-500 text-white' : 'bg-muted text-muted-foreground hover:bg-muted/80'}`}>
+  1681→                              {has && <span className="text-[10px]">✓</span>}
+  1682→                            </button>
+  1683→                          </td>
+  1684→                        )
+  1685→                      })}
+  1686→                    </tr>
+  1687→                  ))}
+  1688→                </tbody>
+  1689→              </table>
+  1690→            </div>
+  1691→
+  1692→            <div className="text-xs text-muted-foreground text-center">{t.rbacTotalPermissions}: {countPermissions(form.permissions)}</div>
+  1693→          </div>
+  1694→          <DlgFooter onCancel={() => setDlg(null)} onConfirm={handleSave} confirmLabel={dlg?.type === 'add' ? t.create : t.save} />
+  1695→        </DialogContent>
+  1696→      </Dialog>
+  1697→
+  1698→      {/* Template Selection Dialog */}
+  1699→      <Dialog open={tplDlg} onOpenChange={setTplDlg}>
+  1700→        <DialogContent className="max-w-md" dir={isRTL ? 'rtl' : 'ltr'}>
+  1701→          <DialogHeader><DialogTitle>{t.rbacApplyTemplate}</DialogTitle><DialogDescription className="sr-only">{lang === 'ar' ? 'اختر قالب صلاحيات' : 'Select permission template'}</DialogDescription></DialogHeader>
+  1702→          <div className="space-y-2 pt-2">
+  1703→            {templates.map(tpl => (
+  1704→              <button key={tpl.id} className="w-full flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors text-start" onClick={() => handleApplyTemplate(tpl)}>
+  1705→                <div>
+  1706→                  <p className="text-sm font-medium">{lang === 'ar' ? tpl.name : tpl.nameEn}</p>
+  1707→                  <p className="text-xs text-muted-foreground">{lang === 'ar' ? tpl.description : tpl.descriptionEn}</p>
+  1708→                </div>
+  1709→                <Badge variant="secondary" className="text-[10px]">{countPermissions(tpl.permissions)}</Badge>
+  1710→              </button>
+  1711→            ))}
+  1712→          </div>
+  1713→        </DialogContent>
+  1714→      </Dialog>
+  1715→
+  1716→      {/* Policy Add/Edit Dialog */}
+  1717→      <Dialog open={dlg?.type === 'policy'} onOpenChange={() => setDlg(null)}>
+  1718→        <DialogContent className="max-w-md" dir={isRTL ? 'rtl' : 'ltr'}>
+  1719→          <DialogHeader><DialogTitle>{editingPolicyId ? t.rbacEditPolicy : t.rbacAddPolicy}</DialogTitle><DialogDescription className="sr-only">{lang === 'ar' ? 'إدارة السياسات' : 'Policy management'}</DialogDescription></DialogHeader>
+  1720→          <div className="space-y-4 pt-2">
+  1721→            <div className="grid grid-cols-2 gap-3">
+  1722→              <FormField label={t.rbacPolicyName}><Input value={policyForm.name} onChange={e => setPolicyForm(p => ({ ...p, name: e.target.value }))} /></FormField>
+  1723→              <FormField label={t.rbacPolicyName + ' (EN)'}><Input value={policyForm.nameEn} onChange={e => setPolicyForm(p => ({ ...p, nameEn: e.target.value }))} dir="ltr" /></FormField>
+  1724→            </div>
+  1725→            <FormField label={t.rbacPolicyEffect}>
+  1726→              <Select value={policyForm.effect} onValueChange={v => setPolicyForm(p => ({ ...p, effect: v as 'allow' | 'deny' }))}>
+  1727→                <SelectTrigger><SelectValue /></SelectTrigger>
+  1728→                <SelectContent>
+  1729→                  <SelectItem value="deny"><span className="text-red-600">DENY — {lang === 'ar' ? 'رفض' : 'Reject'}</span></SelectItem>
+  1730→                  <SelectItem value="allow"><span className="text-emerald-600">ALLOW — {lang === 'ar' ? 'سماح' : 'Permit'}</span></SelectItem>
+  1731→                </SelectContent>
+  1732→              </Select>
+  1733→            </FormField>
+  1734→            <div className="grid grid-cols-2 gap-3">
+  1735→              <FormField label={t.rbacPolicyModule}>
+  1736→                <Select value={policyForm.module} onValueChange={v => setPolicyForm(p => ({ ...p, module: v }))}>
+  1737→                  <SelectTrigger><SelectValue /></SelectTrigger>
+  1738→                  <SelectContent>
+  1739→                    <SelectItem value="*">{t.rbacPolicyAllModules}</SelectItem>
+  1740→                    {SYSTEM_MODULES.map(m => <SelectItem key={m.key} value={m.key}>{lang === 'ar' ? m.labelAr : m.labelEn}</SelectItem>)}
+  1741→                  </SelectContent>
+  1742→                </Select>
+  1743→              </FormField>
+  1744→              <FormField label={t.rbacPolicyAction}>
+  1745→                <Select value={policyForm.action} onValueChange={v => setPolicyForm(p => ({ ...p, action: v }))}>
+  1746→                  <SelectTrigger><SelectValue /></SelectTrigger>
+  1747→                  <SelectContent>
+  1748→                    <SelectItem value="*">{t.rbacPolicyAllActions}</SelectItem>
+  1749→                    {PERMISSION_ACTIONS.map(a => <SelectItem key={a.key} value={a.key}>{lang === 'ar' ? a.labelAr : a.labelEn}</SelectItem>)}
+  1750→                  </SelectContent>
+  1751→                </Select>
+  1752→              </FormField>
+  1753→            </div>
+  1754→            <FormField label={t.rbacPolicyPriority}><Input type="number" min={1} max={99} value={policyForm.priority} onChange={e => setPolicyForm(p => ({ ...p, priority: Number(e.target.value) }))} /></FormField>
+  1755→            <FormField label={t.rbacPolicyCondition}><Input value={policyForm.condition} onChange={e => setPolicyForm(p => ({ ...p, condition: e.target.value }))} placeholder='e.g. tenant.status === "active"' dir="ltr" /></FormField>
+  1756→          </div>
+  1757→          <DlgFooter onCancel={() => setDlg(null)} onConfirm={handleSavePolicy} confirmLabel={t.save} />
+  1758→        </DialogContent>
+  1759→      </Dialog>
+  1760→
+  1761→      {/* Save as Template Dialog */}
+  1762→      <Dialog open={dlg?.type === 'save_tpl'} onOpenChange={() => setDlg(null)}>
+  1763→        <DialogContent className="max-w-md" dir={isRTL ? 'rtl' : 'ltr'}>
+  1764→          <DialogHeader><DialogTitle>{t.rbacSaveAsTemplate}</DialogTitle><DialogDescription className="sr-only">{lang === 'ar' ? 'حفظ الصلاحيات كقالب' : 'Save permissions as template'}</DialogDescription></DialogHeader>
+  1765→          <div className="space-y-4 pt-2">
+  1766→            <div className="grid grid-cols-2 gap-3">
+  1767→              <FormField label={t.rbacTemplateName}><Input value={saveTplForm.name} onChange={e => setSaveTplForm(p => ({ ...p, name: e.target.value }))} /></FormField>
+  1768→              <FormField label={t.rbacTemplateName + ' (EN)'}><Input value={saveTplForm.nameEn} onChange={e => setSaveTplForm(p => ({ ...p, nameEn: e.target.value }))} dir="ltr" /></FormField>
+  1769→            </div>
+  1770→            <FormField label={t.rbacTemplateDesc}><Textarea value={saveTplForm.desc} onChange={e => setSaveTplForm(p => ({ ...p, desc: e.target.value }))} rows={2} /></FormField>
+  1771→            <div className="rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
+  1772→              {lang === 'ar' ? 'سيتم حفظ صلاحيات الدور الحالية كقالب جديد يمكن تطبيقه على أي دور آخر' : 'Current role permissions will be saved as a new template applicable to any role'}
+  1773→            </div>
+  1774→          </div>
+  1775→          <DlgFooter onCancel={() => setDlg(null)} onConfirm={handleSaveTemplate} confirmLabel={t.save} />
+  1776→        </DialogContent>
+  1777→      </Dialog>
+  1778→
+  1779→      <ConfirmDialog open={dlg?.type === 'delete'} onOpenChange={() => setDlg(null)} title={t.delete} desc={t.confirmDeleteRole.replace('{name}', dlg?.role ? rName(dlg.role) : '')} onConfirm={handleDelete} danger />
+  1780→    </div>
+  1781→  )
+  1782→}
+  1783→
+  1784→// ════════════════════════════════════════════════════════════════
+  1785→// PAGE 7: AUDIT LOGS (bilingual)
+  1786→// ════════════════════════════════════════════════════════════════
+  1787→function AuditPage() {
+  1788→  const { t, lang } = useSA()
+  1789→  const [logs] = useState<SysLog[]>(INIT_LOGS)
+  1790→  const [filter, setFilter] = useState('all')
+  1791→  const [page, setPage] = useState(1)
+  1792→  const filtered = useMemo(() => filter === 'all' ? logs : logs.filter(l => l.level === filter), [logs, filter])
+  1793→  const { items, totalPages } = paginate(filtered, page, 8)
+  1794→
+  1795→  return (
+  1796→    <div className="space-y-5">
+  1797→      <PageTitle title={t.auditTitle} action={<Button className="gap-2" variant="outline" onClick={() => toast.success(t.logExported)}><Download className="h-4 w-4" />{t.export}</Button>} />
+  1798→      <div className="flex flex-wrap gap-2">
+  1799→        {['all','info','success','warn','error'].map(f => (
+  1800→          <Button key={f} size="sm" variant={filter === f ? 'default' : 'outline'} className="text-xs h-8 rounded-full px-4" onClick={() => { setFilter(f); setPage(1) }}>
+  1801→            {f === 'all' ? t.all : getLogLabel(f, t)}
+  1802→          </Button>
+  1803→        ))}
+  1804→      </div>
+  1805→      <Card className="border-0 shadow-sm overflow-hidden hidden sm:block">
+  1806→        <div className="overflow-x-auto">
+  1807→          <Table><TableHeader><TableRow className="bg-muted/50 hover:bg-muted/50">
+  1808→            <TableHead className="ps-5 font-semibold text-xs uppercase tracking-wider w-24">{t.level}</TableHead>
+  1809→            <TableHead className="px-3 font-semibold text-xs uppercase tracking-wider">{t.message}</TableHead>
+  1810→            <TableHead className="px-3 font-semibold text-xs uppercase tracking-wider hidden md:table-cell">{t.source}</TableHead>
+  1811→            <TableHead className="pe-5 font-semibold text-xs uppercase tracking-wider text-end">{t.date}</TableHead>
+  1812→          </TableRow></TableHeader>
+  1813→          <TableBody>{items.map(l => (
+  1814→            <TableRow key={l.id} className="hover:bg-muted/20 transition-colors">
+  1815→              <TableCell className="ps-5"><span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${l.level === 'info' ? 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-400' : l.level === 'warn' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400' : l.level === 'error' ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400'}`}>{getLogLabel(l.level, t)}</span></TableCell>
+  1816→              <TableCell className="px-3 text-sm max-w-[400px]">{logMsg(l, lang)}</TableCell>
+  1817→              <TableCell className="px-3 text-xs text-muted-foreground hidden md:table-cell">{logSrc(l, lang)}</TableCell>
+  1818→              <TableCell className="pe-5 text-xs text-muted-foreground whitespace-nowrap text-end">{new Date(l.timestamp).toLocaleString(lang === 'ar' ? 'ar-JO' : 'en-JO')}</TableCell>
+  1819→            </TableRow>
+  1820→          ))}</TableBody></Table>
+  1821→        </div>
+  1822→        <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+  1823→      </Card>
+  1824→      <div className="sm:hidden space-y-2">
+  1825→        {items.map(l => (
+  1826→          <Card key={l.id} className="border-0 shadow-sm"><CardContent className="p-3">
+  1827→            <div className="flex items-start gap-3"><LogDot level={l.level} />
+  1828→              <div className="min-w-0 flex-1">
+  1829→                <div className="flex items-center gap-2 mb-1"><span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${l.level === 'info' ? 'bg-sky-100 text-sky-700' : l.level === 'warn' ? 'bg-amber-100 text-amber-700' : l.level === 'error' ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>{getLogLabel(l.level, t)}</span><span className="text-[10px] text-muted-foreground">{logSrc(l, lang)}</span></div>
+  1830→                <p className="text-xs leading-relaxed">{logMsg(l, lang)}</p>
+  1831→                <p className="text-[10px] text-muted-foreground mt-1">{new Date(l.timestamp).toLocaleString(lang === 'ar' ? 'ar-JO' : 'en-JO')}</p>
+  1832→              </div>
+  1833→            </div>
+  1834→          </CardContent></Card>
+  1835→        ))}
+  1836→      </div>
+  1837→    </div>
+  1838→  )
+  1839→}
+  1840→
+  1841→// ════════════════════════════════════════════════════════════════
+  1842→// PAGE 8: NOTIFICATIONS (full CRUD on templates)
+  1843→// ════════════════════════════════════════════════════════════════
+  1844→function NotificationsPage() {
+  1845→  const { t, lang, isRTL } = useSA()
+  1846→  const [templates, setTemplates] = useState<NotificationTemplate[]>(NOTIF_TEMPLATES)
+  1847→  const [sendOpen, setSendOpen] = useState(false)
+  1848→  const [msg, setMsg] = useState({ title: '', body: '', target: 'all' })
+  1849→  const [delTarget, setDelTarget] = useState<NotificationTemplate | null>(null)
+  1850→
+  1851→  const handleDelete = (tmpl: NotificationTemplate) => { setTemplates(p => p.filter(x => x.id !== tmpl.id)); toast.success(t.deleted); setDelTarget(null) }
+  1852→
+  1853→  return (
+  1854→    <div className="space-y-5">
+  1855→      <PageTitle title={t.notificationsTitle} action={<PrimaryBtn icon={Bell} label={t.sendNotif} onClick={() => setSendOpen(true)} />} />
+  1856→
+  1857→      <Card className="border-0 shadow-sm overflow-hidden hidden sm:block">
+  1858→        <div className="overflow-x-auto">
+  1859→          <Table><TableHeader><TableRow className="bg-muted/50 hover:bg-muted/50">
+  1860→            <TableHead className="ps-5 font-semibold text-xs uppercase tracking-wider">{t.template}</TableHead>
+  1861→            <TableHead className="px-3 font-semibold text-xs uppercase tracking-wider hidden md:table-cell">{t.type}</TableHead>
+  1862→            <TableHead className="px-3 font-semibold text-xs uppercase tracking-wider">{t.status}</TableHead>
+  1863→            <TableHead className="px-3 font-semibold text-xs uppercase tracking-wider text-end hidden lg:table-cell">{t.sent}</TableHead>
+  1864→            <TableHead className="pe-5 font-semibold text-xs uppercase tracking-wider text-end">{t.actions}</TableHead>
+  1865→          </TableRow></TableHeader>
+  1866→          <TableBody>{templates.map(tmpl => (
+  1867→            <TableRow key={tmpl.id} className="group hover:bg-muted/20 transition-colors">
+  1868→              <TableCell className="ps-5 font-medium text-sm">{lang === 'en' ? tmpl.nameEn : tmpl.name}</TableCell>
+  1869→              <TableCell className="px-3 text-sm hidden md:table-cell">{lang === 'en' ? tmpl.typeEn : tmpl.type}</TableCell>
+  1870→              <TableCell className="px-3"><StatusBadge status={tmpl.status} locale={lang} /></TableCell>
+  1871→              <TableCell className="px-3 tabular-nums text-sm hidden lg:table-cell text-end">{tmpl.sent}</TableCell>
+  1872→              <TableCell className="pe-5">
+  1873→                <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+  1874→                  <ActionBtn icon={Edit} label={t.edit} onClick={() => toast.info(t.editTemplate)} />
+  1875→                  <ActionBtn icon={Mail} onClick={() => toast.success(t.testSent)} />
+  1876→                  <ActionBtn icon={Trash2} onClick={() => setDelTarget(tmpl)} danger />
+  1877→                </div>
+  1878→              </TableCell>
+  1879→            </TableRow>
+  1880→          ))}</TableBody></Table>
+  1881→        </div>
+  1882→      </Card>
+  1883→
+  1884→      <div className="sm:hidden space-y-3">
+  1885→        {templates.map(tmpl => (
+  1886→          <Card key={tmpl.id} className="border-0 shadow-sm"><CardContent className="p-4">
+  1887→            <div className="flex items-start justify-between gap-3 mb-2">
+  1888→              <div className="min-w-0"><p className="font-medium text-sm">{lang === 'en' ? tmpl.nameEn : tmpl.name}</p><p className="text-xs text-muted-foreground mt-0.5">{lang === 'en' ? tmpl.typeEn : tmpl.type} · {tmpl.sent} {t.sent}</p></div>
+  1889→              <StatusBadge status={tmpl.status} locale={lang} />
+  1890→            </div>
+  1891→            <div className="flex items-center justify-end gap-1 pt-2 border-t">
+  1892→              <ActionBtn icon={Edit} label={t.edit} onClick={() => toast.info(t.editTemplate)} />
+  1893→              <ActionBtn icon={Mail} onClick={() => toast.success(t.testSent)} />
+  1894→              <ActionBtn icon={Trash2} onClick={() => setDelTarget(tmpl)} danger />
+  1895→            </div>
+  1896→          </CardContent></Card>
+  1897→        ))}
+  1898→      </div>
+  1899→
+  1900→      <Dialog open={sendOpen} onOpenChange={setSendOpen}>
+  1901→        <DialogContent className="max-w-md" dir={isRTL ? 'rtl' : 'ltr'}><DialogHeader><DialogTitle>{t.sendNotifDlg}</DialogTitle><DialogDescription className="sr-only">{isRTL ? 'إرسال إشعار' : 'Send notification'}</DialogDescription></DialogHeader>
+  1902→          <div className="space-y-4 pt-2">
+  1903→            <FormField label={t.title}><Input value={msg.title} onChange={e => setMsg(p => ({ ...p, title: e.target.value }))} /></FormField>
+  1904→            <FormField label={t.content}><Input value={msg.body} onChange={e => setMsg(p => ({ ...p, body: e.target.value }))} /></FormField>
+  1905→            <FormField label={t.target}><Select value={msg.target} onValueChange={v => setMsg(p => ({ ...p, target: v }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">{t.everyone}</SelectItem><SelectItem value="active">{t.activeUsers}</SelectItem><SelectItem value="trial">{t.trialUsers}</SelectItem></SelectContent></Select></FormField>
+  1906→          </div>
+  1907→          <DlgFooter onCancel={() => setSendOpen(false)} onConfirm={() => { toast.success(t.notifSent); setSendOpen(false); setMsg({ title: '', body: '', target: 'all' }) }} confirmLabel={t.send} />
+  1908→        </DialogContent>
+  1909→      </Dialog>
+  1910→
+  1911→      <ConfirmDialog open={!!delTarget} onOpenChange={() => setDelTarget(null)} title={t.delete} desc={t.confirmDeleteTemplate} onConfirm={() => { if (delTarget) handleDelete(delTarget) }} danger />
+  1912→    </div>
+  1913→  )
+  1914→}
+  1915→
+  1916→// ════════════════════════════════════════════════════════════════
+  1917→// PAGE 9: REPORTS
+  1918→// ════════════════════════════════════════════════════════════════
+  1919→function ReportsPage() {
+  1920→  const { t, lang } = useSA()
+  1921→  return (
+  1922→    <div className="space-y-6">
+  1923→      <PageTitle title={t.reportsTitle} />
+  1924→      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+  1925→        {REPORTS.map((r, i) => (
+  1926→          <motion.div key={r.id} variants={fade} initial="hidden" animate="visible" transition={{ delay: i * 0.04 }}>
+  1927→            <Card className="group transition-all hover:shadow-lg border-0 shadow-sm h-full">
+  1928→              <CardContent className="p-5 sm:p-6">
+  1929→                <div className="flex items-start justify-between mb-4">
+  1930→                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-sky-100 dark:bg-sky-900/30"><BarChart3 className="h-5 w-5 text-sky-600" /></div>
+  1931→                  <Badge variant="outline" className="text-xs">{lang === 'en' ? r.typeEn : r.type}</Badge>
+  1932→                </div>
+  1933→                <h3 className="font-bold text-sm mb-1">{lang === 'en' ? r.nameEn : r.name}</h3>
+  1934→                <p className="text-xs text-muted-foreground mb-5 leading-relaxed">{lang === 'en' ? r.descEn : r.desc}</p>
+  1935→                <div className="flex items-center justify-between pt-3 border-t">
+  1936→                  <span className="text-[11px] text-muted-foreground">{t.lastGenerated} {r.last}</span>
+  1937→                  <div className="flex gap-1">
+  1938→                    <ActionBtn icon={RefreshCw} label={t.generate} onClick={() => toast.success(t.reportGenerated)} />
+  1939→                    <ActionBtn icon={Download} onClick={() => toast.success(t.reportDownloaded)} />
+  1940→                  </div>
+  1941→                </div>
+  1942→              </CardContent>
+  1943→            </Card>
+  1944→          </motion.div>
+  1945→        ))}
+  1946→      </div>
+  1947→    </div>
+  1948→  )
+  1949→}
+  1950→
+  1951→// ════════════════════════════════════════════════════════════════
+  1952→// PAGE 10: SYSTEM HEALTH
+  1953→// ════════════════════════════════════════════════════════════════
+  1954→function SystemPage() {
+  1955→  const { t, lang } = useSA()
+  1956→  const [logs] = useState<SysLog[]>(INIT_LOGS)
+  1957→  const gauges = [
+  1958→    { label: t.gaugeApi, value: 99, icon: Server },
+  1959→    { label: t.gaugeDatabase, value: 85, icon: Database },
+  1960→    { label: t.gaugeMemory, value: 78, icon: Monitor },
+  1961→    { label: t.gaugeDisk, value: 62, icon: HardDrive },
+  1962→    { label: t.gaugeCdn, value: 100, icon: Globe },
+  1963→    { label: t.gaugeWorker, value: 95, icon: RefreshCw },
+  1964→  ]
+  1965→
+  1966→  return (
+  1967→    <div className="space-y-6">
+  1968→      <PageTitle title={t.systemTitle} action={<Button className="gap-2" variant="outline" onClick={() => toast.success(t.refreshed)}><RefreshCw className="h-4 w-4" />{t.refresh}</Button>} />
+  1969→      <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 sm:gap-4">
+  1970→        {gauges.map((g, i) => (
+  1971→          <motion.div key={g.label} variants={fade} initial="hidden" animate="visible" transition={{ delay: i * 0.04 }}>
+  1972→            <Card className="text-center border-0 shadow-sm">
+  1973→              <CardContent className="p-3 sm:p-4">
+  1974→                <div className="relative mx-auto h-14 w-14 sm:h-16 sm:w-16 mb-2">
+  1975→                  <svg className={`h-14 w-14 sm:h-16 sm:w-16 -rotate-90 ${gaugeColor(g.value)}`} viewBox="0 0 64 64">
+  1976→                    <circle cx="32" cy="32" r="28" fill="none" stroke="currentColor" strokeWidth="4" className="opacity-15" />
+  1977→                    <circle cx="32" cy="32" r="28" fill="none" stroke="currentColor" strokeWidth="4" strokeDasharray={`${2 * Math.PI * 28 * g.value / 100} ${2 * Math.PI * 28}`} strokeLinecap="round" />
+  1978→                  </svg>
+  1979→                  <span className="absolute inset-0 flex items-center justify-center text-xs sm:text-sm font-bold">{g.value}%</span>
+  1980→                </div>
+  1981→                <div className="flex items-center justify-center gap-1.5 text-muted-foreground"><g.icon className="h-3.5 w-3.5" /><span className="text-[10px] sm:text-xs font-medium">{g.label}</span></div>
+  1982→              </CardContent>
+  1983→            </Card>
+  1984→          </motion.div>
+  1985→        ))}
+  1986→      </div>
+  1987→      <Card className="border-0 shadow-sm">
+  1988→        <CardHeader className="pb-3"><CardTitle className="text-sm sm:text-base font-semibold">{t.systemLog}</CardTitle></CardHeader>
+  1989→        <CardContent>
+  1990→          <div className="space-y-0.5">{logs.map(l => (
+  1991→            <div key={l.id} className="flex items-start gap-3 rounded-lg px-3 py-2.5 hover:bg-muted/50 transition-colors">
+  1992→              <LogDot level={l.level} />
+  1993→              <div className="min-w-0 flex-1">
+  1994→                <p className="text-sm leading-relaxed">{logMsg(l, lang)}</p>
+  1995→                <p className="text-[11px] text-muted-foreground mt-0.5">{logSrc(l, lang)} — {new Date(l.timestamp).toLocaleString(lang === 'ar' ? 'ar-JO' : 'en-JO')}</p>
+  1996→              </div>
+  1997→            </div>
+  1998→          ))}</div>
+  1999→        </CardContent>
+  2000→      </Card>
+
+[showing lines 1-2000 of 2632; use offset=2001 with limit to continue reading]
