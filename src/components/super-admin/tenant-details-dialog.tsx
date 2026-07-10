@@ -5,15 +5,19 @@ import { motion } from 'framer-motion'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
 import { Progress } from '@/components/ui/progress'
+import { toast } from 'sonner'
 import {
   X, Building2, User, CreditCard, Shield, Activity, Clock,
   Database, HardDrive, Globe, Mail, Phone, MapPin, CalendarDays,
   Users, BarChart3, FileText, CheckCircle2, AlertTriangle, Lock,
-  Server, Bell, Zap,
+  Server, Bell, Zap, ExternalLink, Copy, Rocket, Eye, Pencil,
+  CircleDot, Ban,
 } from 'lucide-react'
 import { useSA, StatusBadge, useCurrency } from './sa-helpers'
+import { useT } from './sa-i18n'
 import { type Tenant, PLANS, INVOICES, INIT_LOGS, COUNTRIES as ALL_COUNTRIES } from './sa-data'
 
 // ─── Types ───────────────────────────────────────────────────────
@@ -98,13 +102,18 @@ export function TenantDetailsDialog({
   tenant,
   open,
   onClose,
+  onUpdateTenant,
 }: {
   tenant: Tenant
   open: boolean
   onClose: () => void
+  onUpdateTenant?: (updated: Tenant) => void
 }) {
   const { t, isRTL, lang } = useSA()
   const { sym } = useCurrency()
+  const t2 = useT()
+  const [editingDomain, setEditingDomain] = useState(false)
+  const [domainInput, setDomainInput] = useState('')
 
   if (!open || !tenant) return null
 
@@ -380,6 +389,169 @@ export function TenantDetailsDialog({
               </div>
             </SectionCard>
 
+            {/* ──── WORKSPACE: Preview Link & Publish ──── */}
+            <SectionCard icon={Globe} title={t2.workspaceSection} delay={0.34}>
+              <div className="space-y-4">
+                {/* Publish Status Banner */}
+                <div className={`flex items-center justify-between p-3 rounded-xl border-2 transition-all ${
+                  tenant.workspacePublished
+                    ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800'
+                    : 'bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800'
+                }`}>
+                  <div className="flex items-center gap-2.5">
+                    {tenant.workspacePublished
+                      ? <CircleDot className="h-5 w-5 text-emerald-600" />
+                      : <Ban className="h-5 w-5 text-amber-600" />
+                    }
+                    <div>
+                      <p className="font-semibold text-sm">
+                        {tenant.workspacePublished ? t2.workspacePublishedBadge : t2.workspaceDraftBadge}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground">
+                        {tenant.workspacePublished
+                          ? (isRTL ? 'مساحة العمل متاحة للعملاء' : 'Workspace is live for customers')
+                          : (isRTL ? 'مساحة العمل غير منشورة بعد' : 'Workspace is not published yet')
+                        }
+                      </p>
+                    </div>
+                  </div>
+                  <Badge className={tenant.workspacePublished
+                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400'
+                    : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400'
+                  }>
+                    {tenant.workspacePublished ? t2.workspacePublished : t2.workspaceDraft}
+                  </Badge>
+                </div>
+
+                {/* Preview Link */}
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground">{t2.workspacePreviewLink}</p>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/80 border text-sm font-mono" dir="ltr">
+                      <Eye className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                      <span className="truncate text-xs">{`https://bookflow.app/preview/${tenant.workspaceSlug}`}</span>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-9 w-9 shrink-0"
+                      onClick={() => {
+                        navigator.clipboard.writeText(`https://bookflow.app/preview/${tenant.workspaceSlug}`)
+                        toast.success(t2.workspacePreviewCopied)
+                      }}
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-9 w-9 shrink-0"
+                      onClick={() => window.open(`https://bookflow.app/preview/${tenant.workspaceSlug}`, '_blank')}
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Live Link (if published) */}
+                {tenant.workspacePublished && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-emerald-600">{isRTL ? 'رابط مباشر' : 'Live URL'}</p>
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 text-sm font-mono" dir="ltr">
+                        <CircleDot className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                        <span className="truncate text-xs">
+                          {tenant.customDomain
+                            ? `https://${tenant.customDomain}`
+                            : `https://${tenant.workspaceSlug}.bookflow.app`
+                          }
+                        </span>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-9 w-9 shrink-0"
+                        onClick={() => {
+                          const url = tenant.customDomain
+                            ? `https://${tenant.customDomain}`
+                            : `https://${tenant.workspaceSlug}.bookflow.app`
+                          navigator.clipboard.writeText(url)
+                          toast.success(t2.workspacePreviewCopied)
+                        }}
+                      >
+                        <Copy className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-9 w-9 shrink-0"
+                        onClick={() => {
+                          const url = tenant.customDomain
+                            ? `https://${tenant.customDomain}`
+                            : `https://${tenant.workspaceSlug}.bookflow.app`
+                          window.open(url, '_blank')
+                        }}
+                      >
+                        <ExternalLink className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Slug */}
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">{t2.workspaceSlug}</span>
+                  <code className="text-xs bg-muted px-2 py-1 rounded font-mono" dir="ltr">{tenant.workspaceSlug}</code>
+                </div>
+
+                {/* Custom Domain */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-muted-foreground">{t2.workspaceCustomDomain}</span>
+                    {!editingDomain && (
+                      <Button variant="ghost" size="sm" className="h-6 text-[10px] gap-1" onClick={() => { setDomainInput(tenant.customDomain); setEditingDomain(true) }}>
+                        <Pencil className="h-3 w-3" />{t2.workspaceChangeDomain}
+                      </Button>
+                    )}
+                  </div>
+                  {editingDomain ? (
+                    <div className="flex items-center gap-2">
+                      <Input
+                        value={domainInput}
+                        onChange={e => setDomainInput(e.target.value)}
+                        placeholder="book.mycompany.com"
+                        className="h-8 text-xs font-mono"
+                        dir="ltr"
+                      />
+                      <Button
+                        size="sm"
+                        className="h-8 text-xs"
+                        onClick={() => {
+                          onUpdateTenant?.({ ...tenant, customDomain: domainInput })
+                          setEditingDomain(false)
+                          toast.success(t2.workspaceDomainUpdated)
+                        }}
+                      >
+                        {t.save}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 text-xs"
+                        onClick={() => setEditingDomain(false)}
+                      >
+                        {t.cancel}
+                      </Button>
+                    </div>
+                  ) : (
+                    <code className="text-xs bg-muted px-2 py-1 rounded font-mono block" dir="ltr">
+                      {tenant.customDomain || (isRTL ? 'لم يتم تعيين نطاق مخصص' : 'No custom domain set')}
+                    </code>
+                  )}
+                </div>
+              </div>
+            </SectionCard>
+
             {/* Recent Activity */}
             <SectionCard icon={Activity} title={isRTL ? 'آخر النشاطات' : 'Recent Activity'} delay={0.36}>
               <div className="space-y-2">
@@ -404,9 +576,59 @@ export function TenantDetailsDialog({
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="p-5 sm:p-6 border-t bg-muted/30 flex items-center justify-end gap-2">
-          <Button variant="outline" onClick={onClose}>{t.close}</Button>
+        {/* Footer — Preview Link & Publish Button */}
+        <div className="p-5 sm:p-6 border-t bg-muted/30">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            {/* Left side: Preview link */}
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-background border flex-1 min-w-0" dir="ltr">
+                <Eye className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                <span className="text-xs font-mono truncate">{`bookflow.app/preview/${tenant.workspaceSlug}`}</span>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-9 gap-1.5 shrink-0 text-xs"
+                onClick={() => {
+                  navigator.clipboard.writeText(`https://bookflow.app/preview/${tenant.workspaceSlug}`)
+                  toast.success(t2.workspacePreviewCopied)
+                }}
+              >
+                <Copy className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">{t2.workspaceCopyLink}</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-9 gap-1.5 shrink-0 text-xs"
+                onClick={() => window.open(`https://bookflow.app/preview/${tenant.workspaceSlug}`, '_blank')}
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">{t2.workspaceOpenPreview}</span>
+              </Button>
+            </div>
+
+            {/* Right side: Publish / Unpublish button */}
+            <Button
+              variant={tenant.workspacePublished ? 'outline' : 'default'}
+              size="sm"
+              className={`h-9 gap-1.5 shrink-0 text-xs font-semibold ${
+                !tenant.workspacePublished
+                  ? 'bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white shadow-lg shadow-violet-600/20'
+                  : 'border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-800 dark:hover:bg-red-950/30'
+              }`}
+              onClick={() => {
+                const updated = { ...tenant, workspacePublished: !tenant.workspacePublished }
+                onUpdateTenant?.(updated)
+                toast.success(tenant.workspacePublished ? t2.workspaceUnpublishSuccess : t2.workspacePublishSuccess)
+              }}
+            >
+              {tenant.workspacePublished
+                ? <><Ban className="h-3.5 w-3.5" />{t2.workspaceTakeOffline}</>
+                : <><Rocket className="h-3.5 w-3.5" />{t2.workspaceGoLive}</>
+              }
+            </Button>
+          </div>
         </div>
       </motion.div>
     </div>

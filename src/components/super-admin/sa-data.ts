@@ -29,6 +29,9 @@ export interface Tenant {
   email: string
   subscriptionStatus: string
   subscriptionEndDate: string
+  workspaceSlug: string
+  workspacePublished: boolean
+  customDomain: string
 }
 
 export interface PlatformUser {
@@ -189,14 +192,14 @@ export interface SortState { key: string; dir: SortDir }
 
 // ─── Mock Data (bilingual, JOD currency) ─────────────────────────
 export const INIT_TENANTS: Tenant[] = [
-  { id: '1', name: 'مركز النور الطبي', nameEn: 'Al Noor Medical', plan: 'Enterprise', bookings: 1250, revenue: 37500, users: 12, status: 'active', createdAt: '2025-01-15', country: 'السعودية', email: 'info@alnoor.sa', subscriptionStatus: 'active', subscriptionEndDate: '2026-01-15' },
-  { id: '2', name: 'صالون ياسمين', nameEn: 'Yasmin Beauty', plan: 'Professional', bookings: 680, revenue: 10840, users: 8, status: 'active', createdAt: '2025-02-20', country: 'السعودية', email: 'info@yasmin.sa', subscriptionStatus: 'active', subscriptionEndDate: '2025-08-20' },
-  { id: '3', name: 'أكاديمية المستقبل', nameEn: 'Future Academy', plan: 'Professional', bookings: 420, revenue: 7600, users: 6, status: 'active', createdAt: '2025-03-10', country: 'الإمارات', email: 'info@future-edu.ae', subscriptionStatus: 'active', subscriptionEndDate: '2025-09-10' },
-  { id: '4', name: 'عيادة الابتسامة', nameEn: 'Smile Clinic', plan: 'Starter', bookings: 45, revenue: 0, users: 2, status: 'trial', createdAt: '2025-06-01', country: 'مصر', email: 'info@smile.eg', subscriptionStatus: 'trial', subscriptionEndDate: '2025-07-01' },
-  { id: '5', name: 'نادي اللياقة الذهبية', nameEn: 'Golden Fitness', plan: 'Professional', bookings: 310, revenue: 4400, users: 5, status: 'suspended', createdAt: '2025-01-28', country: 'الأردن', email: 'info@goldenfit.jo', subscriptionStatus: 'expired', subscriptionEndDate: '2025-04-28' },
-  { id: '6', name: 'مركز التجميل الملكي', nameEn: 'Royal Beauty', plan: 'Enterprise', bookings: 920, revenue: 29000, users: 15, status: 'active', createdAt: '2025-02-01', country: 'السعودية', email: 'info@royalbeauty.sa', subscriptionStatus: 'active', subscriptionEndDate: '2026-02-01' },
-  { id: '7', name: 'عيادة العيون المتقدمة', nameEn: 'Advanced Eye Clinic', plan: 'Business', bookings: 580, revenue: 14400, users: 10, status: 'active', createdAt: '2025-01-20', country: 'السعودية', email: 'info@adv-eye.sa', subscriptionStatus: 'active', subscriptionEndDate: '2025-07-20' },
-  { id: '8', name: 'مركز اللياقة البدنية', nameEn: 'Fit Life Center', plan: 'Starter', bookings: 120, revenue: 1198, users: 3, status: 'active', createdAt: '2025-04-15', country: 'الإمارات', email: 'info@fitlife.ae', subscriptionStatus: 'active', subscriptionEndDate: '2025-10-15' },
+  { id: '1', name: 'مركز النور الطبي', nameEn: 'Al Noor Medical', plan: 'Enterprise', bookings: 1250, revenue: 37500, users: 12, status: 'active', createdAt: '2025-01-15', country: 'السعودية', email: 'info@alnoor.sa', subscriptionStatus: 'active', subscriptionEndDate: '2026-01-15', workspaceSlug: 'alnoor-medical', workspacePublished: true, customDomain: 'book.alnoor.sa' },
+  { id: '2', name: 'صالون ياسمين', nameEn: 'Yasmin Beauty', plan: 'Professional', bookings: 680, revenue: 10840, users: 8, status: 'active', createdAt: '2025-02-20', country: 'السعودية', email: 'info@yasmin.sa', subscriptionStatus: 'active', subscriptionEndDate: '2025-08-20', workspaceSlug: 'yasmin-beauty', workspacePublished: true, customDomain: 'book.yasmin.sa' },
+  { id: '3', name: 'أكاديمية المستقبل', nameEn: 'Future Academy', plan: 'Professional', bookings: 420, revenue: 7600, users: 6, status: 'active', createdAt: '2025-03-10', country: 'الإمارات', email: 'info@future-edu.ae', subscriptionStatus: 'active', subscriptionEndDate: '2025-09-10', workspaceSlug: 'future-academy', workspacePublished: true, customDomain: '' },
+  { id: '4', name: 'عيادة الابتسامة', nameEn: 'Smile Clinic', plan: 'Starter', bookings: 45, revenue: 0, users: 2, status: 'trial', createdAt: '2025-06-01', country: 'مصر', email: 'info@smile.eg', subscriptionStatus: 'trial', subscriptionEndDate: '2025-07-01', workspaceSlug: 'smile-clinic', workspacePublished: false, customDomain: '' },
+  { id: '5', name: 'نادي اللياقة الذهبية', nameEn: 'Golden Fitness', plan: 'Professional', bookings: 310, revenue: 4400, users: 5, status: 'suspended', createdAt: '2025-01-28', country: 'الأردن', email: 'info@goldenfit.jo', subscriptionStatus: 'expired', subscriptionEndDate: '2025-04-28', workspaceSlug: 'golden-fitness', workspacePublished: false, customDomain: '' },
+  { id: '6', name: 'مركز التجميل الملكي', nameEn: 'Royal Beauty', plan: 'Enterprise', bookings: 920, revenue: 29000, users: 15, status: 'active', createdAt: '2025-02-01', country: 'السعودية', email: 'info@royalbeauty.sa', subscriptionStatus: 'active', subscriptionEndDate: '2026-02-01', workspaceSlug: 'royal-beauty', workspacePublished: true, customDomain: 'booking.royalbeauty.sa' },
+  { id: '7', name: 'عيادة العيون المتقدمة', nameEn: 'Advanced Eye Clinic', plan: 'Business', bookings: 580, revenue: 14400, users: 10, status: 'active', createdAt: '2025-01-20', country: 'السعودية', email: 'info@adv-eye.sa', subscriptionStatus: 'active', subscriptionEndDate: '2025-07-20', workspaceSlug: 'adv-eye-clinic', workspacePublished: true, customDomain: '' },
+  { id: '8', name: 'مركز اللياقة البدنية', nameEn: 'Fit Life Center', plan: 'Starter', bookings: 120, revenue: 1198, users: 3, status: 'active', createdAt: '2025-04-15', country: 'الإمارات', email: 'info@fitlife.ae', subscriptionStatus: 'active', subscriptionEndDate: '2025-10-15', workspaceSlug: 'fitlife-center', workspacePublished: false, customDomain: '' },
 ]
 
 export const INIT_USERS: PlatformUser[] = [

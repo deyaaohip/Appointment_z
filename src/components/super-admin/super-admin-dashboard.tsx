@@ -21,6 +21,7 @@ import {
   RefreshCw, Globe, UserPlus, Clock, Monitor, HardDrive, Mail, Download,
   Power, PowerOff, Save, ChevronLeft, Search, Wallet, XCircle, Info,
   Upload, Image as ImageIcon, ClipboardCheck, Banknote, Copy, Link2, LayoutGrid, ChevronRight,
+  Rocket,
 } from 'lucide-react'
 
 // ─── Imports from shared modules ───────────────────────────────
@@ -179,6 +180,7 @@ function OverviewPage() {
 // ════════════════════════════════════════════════════════════════
 function TenantsPage() {
   const { t, isRTL, lang } = useSA()
+  const t2 = useT()
   const { sym } = useCurrency()
   const [tenants, setTenants] = useState<Tenant[]>(INIT_TENANTS)
   const [search, setSearch] = useState('')
@@ -221,6 +223,7 @@ function TenantsPage() {
     const endDate = new Date(data.startDate)
     endDate.setMonth(endDate.getMonth() + cycleMonths)
 
+    const slug = data.nameEn.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
     const newTenant: Tenant = {
       id: Date.now().toString(),
       name: data.nameAr,
@@ -235,6 +238,9 @@ function TenantsPage() {
       createdAt: data.startDate,
       subscriptionStatus: 'active',
       subscriptionEndDate: endDate.toISOString().split('T')[0],
+      workspaceSlug: slug,
+      workspacePublished: false,
+      customDomain: '',
     }
     // Atomic update: add tenant + create invoice in one state batch
     setTenants(prev => [newTenant, ...prev])
@@ -318,7 +324,17 @@ function TenantsPage() {
                   <TableCell className="ps-5">
                     <div className="flex items-center gap-3">
                       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-900/30 text-violet-600 font-bold text-xs">{tnName(tn).charAt(0)}</div>
-                      <div className="min-w-0"><p className="font-medium text-sm truncate max-w-[200px]">{tnName(tn)}</p><p className="text-xs text-muted-foreground truncate max-w-[200px]" dir="ltr">{tn.email}</p></div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <p className="font-medium text-sm truncate max-w-[200px]">{tnName(tn)}</p>
+                          {tn.workspacePublished && (
+                            <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400 text-[9px] px-1.5 py-0 h-4 font-semibold shrink-0">
+                              {t2.workspacePublishedBadge}
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground truncate max-w-[200px]" dir="ltr">{tn.email}</p>
+                      </div>
                     </div>
                   </TableCell>
                   <TableCell className="px-3"><Badge variant="secondary" className="font-medium text-xs">{tn.plan}</Badge></TableCell>
@@ -334,6 +350,19 @@ function TenantsPage() {
                   <TableCell className="pe-5">
                     <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <ActionBtn icon={Eye} label={t.view} onClick={() => setDetailTenant(tn)} />
+                      <ActionBtn icon={Globe} label={t2.workspacePreview} onClick={() => {
+                        navigator.clipboard.writeText(`https://bookflow.app/preview/${tn.workspaceSlug}`)
+                        toast.success(t2.workspacePreviewCopied)
+                      }} />
+                      <ActionBtn
+                        icon={tn.workspacePublished ? PowerOff : Rocket}
+                        label={tn.workspacePublished ? t2.workspaceTakeOffline : t2.workspaceGoLive}
+                        onClick={() => {
+                          setTenants(p => p.map(x => x.id === tn.id ? { ...x, workspacePublished: !x.workspacePublished } : x))
+                          toast.success(tn.workspacePublished ? t2.workspaceUnpublishSuccess : t2.workspacePublishSuccess)
+                        }}
+                        variant={tn.workspacePublished ? 'danger' : undefined}
+                      />
                       <ActionBtn icon={Edit} label={t.edit} onClick={() => openEdit(tn)} />
                       <ActionBtn icon={CalendarDays} label={t.extendSubscription} onClick={() => openExtend(tn)} />
                       <ActionBtn icon={tn.status === 'suspended' ? Power : PowerOff} label={tn.status === 'suspended' ? t.active : t.suspended} onClick={() => handleToggleStatus(tn)} />
@@ -370,6 +399,19 @@ function TenantsPage() {
             </div>
             <div className="flex items-center justify-end gap-1 pt-2 border-t">
               <ActionBtn icon={Eye} onClick={() => setDetailTenant(tn)} />
+              <ActionBtn icon={Globe} label={t2.workspacePreview} onClick={() => {
+                navigator.clipboard.writeText(`https://bookflow.app/preview/${tn.workspaceSlug}`)
+                toast.success(t2.workspacePreviewCopied)
+              }} />
+              <ActionBtn
+                icon={tn.workspacePublished ? PowerOff : Rocket}
+                label={tn.workspacePublished ? t2.workspaceTakeOffline : t2.workspaceGoLive}
+                onClick={() => {
+                  setTenants(p => p.map(x => x.id === tn.id ? { ...x, workspacePublished: !x.workspacePublished } : x))
+                  toast.success(tn.workspacePublished ? t2.workspaceUnpublishSuccess : t2.workspacePublishSuccess)
+                }}
+                variant={tn.workspacePublished ? 'danger' : undefined}
+              />
               <ActionBtn icon={CalendarDays} label={t.extendSubscription} onClick={() => openExtend(tn)} />
               <ActionBtn icon={Edit} label={t.edit} onClick={() => openEdit(tn)} />
               <ActionBtn icon={tn.status === 'suspended' ? Power : PowerOff} label={tn.status === 'suspended' ? t.active : t.suspended} onClick={() => handleToggleStatus(tn)} />
@@ -442,7 +484,14 @@ function TenantsPage() {
       <TenantWizard open={wizardOpen} onClose={() => setWizardOpen(false)} onSave={handleWizardSave} existingTenants={existingTenants} />
 
       {/* Tenant Details Dialog */}
-      {detailTenant && <TenantDetailsDialog tenant={detailTenant} open={!!detailTenant} onClose={() => setDetailTenant(null)} />}
+      {detailTenant && (
+        <TenantDetailsDialog
+          tenant={detailTenant}
+          open={!!detailTenant}
+          onClose={() => setDetailTenant(null)}
+          onUpdateTenant={(updated) => setTenants(p => p.map(tn => tn.id === updated.id ? updated : tn))}
+        />
+      )}
     </div>
   )
 }

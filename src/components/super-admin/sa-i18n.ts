@@ -520,6 +520,29 @@ interface T {
   rbac403Message: string
   rbacEnforcePermissions: string
   rbacEffectivePermsCalc: string
+
+  // Workspace Preview & Publish
+  workspacePreview: string
+  workspacePublish: string
+  workspaceUnpublish: string
+  workspacePublished: string
+  workspaceDraft: string
+  workspacePreviewLink: string
+  workspacePreviewCopied: string
+  workspacePublishSuccess: string
+  workspaceUnpublishSuccess: string
+  workspaceStatus: string
+  workspaceCustomDomain: string
+  workspaceSlug: string
+  workspaceGoLive: string
+  workspaceTakeOffline: string
+  workspaceCopyLink: string
+  workspaceOpenPreview: string
+  workspacePublishedBadge: string
+  workspaceDraftBadge: string
+  workspaceSection: string
+  workspaceChangeDomain: string
+  workspaceDomainUpdated: string
 }
 
 const ar: T = {
@@ -1009,6 +1032,29 @@ const ar: T = {
   rbac403Message: 'غير مصرح - 403 Forbidden',
   rbacEnforcePermissions: 'تفعيل التفويض',
   rbacEffectivePermsCalc: 'حساب الصلاحيات الفعالة',
+
+  // Workspace Preview & Publish
+  workspacePreview: 'معاينة',
+  workspacePublish: 'نشر',
+  workspaceUnpublish: 'إلغاء النشر',
+  workspacePublished: 'منشور',
+  workspaceDraft: 'مسودة',
+  workspacePreviewLink: 'رابط المعاينة',
+  workspacePreviewCopied: 'تم نسخ رابط المعاينة',
+  workspacePublishSuccess: 'تم نشر مساحة العمل بنجاح',
+  workspaceUnpublishSuccess: 'تم إلغاء نشر مساحة العمل',
+  workspaceStatus: 'حالة مساحة العمل',
+  workspaceCustomDomain: 'نطاق مخصص',
+  workspaceSlug: 'المعرف',
+  workspaceGoLive: 'نشر مباشر',
+  workspaceTakeOffline: 'إيقاف عن العمل',
+  workspaceCopyLink: 'نسخ الرابط',
+  workspaceOpenPreview: 'فتح المعاينة',
+  workspacePublishedBadge: 'مباشر',
+  workspaceDraftBadge: 'مسودة',
+  workspaceSection: 'مساحة العمل',
+  workspaceChangeDomain: 'تغيير النطاق',
+  workspaceDomainUpdated: 'تم تحديث النطاق',
 }
 
 const en: T = {
@@ -1476,6 +1522,29 @@ const en: T = {
   rbac403Message: 'Unauthorized - 403 Forbidden',
   rbacEnforcePermissions: 'Enforce Permissions',
   rbacEffectivePermsCalc: 'Effective Permissions Calculator',
+
+  // Workspace Preview & Publish
+  workspacePreview: 'Preview',
+  workspacePublish: 'Publish',
+  workspaceUnpublish: 'Unpublish',
+  workspacePublished: 'Published',
+  workspaceDraft: 'Draft',
+  workspacePreviewLink: 'Preview Link',
+  workspacePreviewCopied: 'Preview link copied to clipboard',
+  workspacePublishSuccess: 'Workspace published successfully',
+  workspaceUnpublishSuccess: 'Workspace taken offline',
+  workspaceStatus: 'Workspace Status',
+  workspaceCustomDomain: 'Custom Domain',
+  workspaceSlug: 'Slug',
+  workspaceGoLive: 'Go Live',
+  workspaceTakeOffline: 'Take Offline',
+  workspaceCopyLink: 'Copy Link',
+  workspaceOpenPreview: 'Open Preview',
+  workspacePublishedBadge: 'Live',
+  workspaceDraftBadge: 'Draft',
+  workspaceSection: 'Workspace',
+  workspaceChangeDomain: 'Change Domain',
+  workspaceDomainUpdated: 'Domain updated successfully',
 }
 
 const translations: Record<Lang, T> = { ar, en }
